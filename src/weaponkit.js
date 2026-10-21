@@ -5,6 +5,7 @@
 //  are; the same spec gives its name and its numbers in a fight.
 // ============================================================================
 import { THREE, std, mesh, sph, TEX, V3 } from './engine.js';
+import { attachAura } from './auras.js';
 
 const box = (x, y, z) => new THREE.BoxGeometry(x, y, z);
 const cyl = (a, b, h, s = 12) => new THREE.CylinderGeometry(a, b, h, s);
@@ -318,122 +319,6 @@ export function buildForged(spec) {
   if (!g.userData.tick) g.userData.tick = null;
   g.userData.spec = spec;
   return g;
-}
-
-// ---------------------------------------------------------------- auras
-// one cloud of points per weapon (a single draw call), moving in the weapon's own frame but
-// knowing which way the world's up is, so flames rise and water falls however the blade is held
-const upW = new THREE.Vector3(0, 1, 0), qW = new THREE.Quaternion(), upL = new THREE.Vector3();
-// bx: the box the particles live in [x0, x1, y0, y1, z0, z1] (the head, the blade, the limbs); power: 0.2 .. 2
-function attachAura(g, kind, bx, power = 1) {
-  power = Math.max(0.2, Math.min(2, power));
-  const [x0, x1, y0, y1, z0, z1] = bx, span = Math.max(0.1, y1 - y0);
-  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, orbitR = Math.max(x1 - x0, z1 - z0) / 2 + 0.08;
-  const N = Math.round((kind === 'lightning' ? 26 : 110) * power);
-  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), ph = new Float32Array(N);
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const C = {
-    flame: ['#ffd070', '#ff6a1a'], lightning: ['#ffffff', '#7ac8ff'], water: ['#9fd8ff', '#2a70d0'], wind: ['#ffffff', '#b8e8d8'],
-    frost: ['#ffffff', '#8ad0ff'], shadow: ['#9a5cff', '#2a0848'], holy: ['#fff6d0', '#ffb830'],
-  }[kind];
-  const c0 = new THREE.Color(C[0]), c1 = new THREE.Color(C[1]), cc = new THREE.Color();
-  const size = { flame: 0.5, lightning: 0.3, water: 0.26, wind: 0.3, frost: 0.28, shadow: 0.6, holy: 0.3 }[kind] * (0.7 + 0.3 * power);
-  const bright = Math.min(1.5, 0.6 + 0.4 * power);
-  const mat = new THREE.PointsMaterial({ size, map: TEX.soft, vertexColors: true, transparent: true, depthWrite: false, blending: kind === 'shadow' ? THREE.NormalBlending : THREE.AdditiveBlending, opacity: kind === 'shadow' ? 0.75 : 1, sizeAttenuation: true });
-  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
-  // lightning: jagged bolts as thin crossed ribbons (a bright core and a soft glow, one draw call each),
-  // running along the blade and arcing off it, redrawn every few frames
-  let bolts = null;
-  if (kind === 'lightning') bolts = makeBolts(g, Math.max(2, Math.round(2 + power * 2)));
-  const rnd = () => Math.random();
-  const spawn = i => {
-    pos[i * 3] = x0 + rnd() * (x1 - x0); pos[i * 3 + 1] = y0 + rnd() * span; pos[i * 3 + 2] = z0 + rnd() * (z1 - z0);
-    max[i] = { flame: 0.45, lightning: 0.22, water: 0.55, wind: 0.7, frost: 1.1, shadow: 1.0, holy: 1.0 }[kind] * (0.6 + rnd() * 0.8);
-    life[i] = max[i] * (kind === 'lightning' ? rnd() : 0);
-    ph[i] = rnd() * Math.PI * 2;
-    const sp = kind === 'lightning' ? 2.2 : 0.3;
-    vel[i * 3] = (rnd() - 0.5) * sp; vel[i * 3 + 1] = (rnd() - 0.5) * sp; vel[i * 3 + 2] = (rnd() - 0.5) * sp;
-  };
-  for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
-  let last = -1, flick = 0;
-  return t => {
-    const dt = last < 0 ? 0.016 : Math.min(0.05, t - last); last = t;
-    g.getWorldQuaternion(qW); upL.copy(upW).applyQuaternion(qW.invert());
-    for (let i = 0; i < N; i++) {
-      life[i] += dt;
-      if (life[i] >= max[i]) { spawn(i); }
-      const k = life[i] / max[i], o = i * 3;
-      let fade;
-      switch (kind) {
-        case 'flame': pos[o] += (vel[o] * 0.5 + upL.x * 1.4) * dt; pos[o + 1] += (vel[o + 1] * 0.5 + upL.y * 1.4) * dt; pos[o + 2] += (vel[o + 2] * 0.5 + upL.z * 1.4) * dt; fade = (1 - k) * Math.min(1, k * 6); break;
-        case 'water': pos[o] += (vel[o] * 0.3 - upL.x * 0.9 * k) * dt; pos[o + 1] += (vel[o + 1] * 0.3 - upL.y * 0.9 * k) * dt; pos[o + 2] += (vel[o + 2] * 0.3 - upL.z * 0.9 * k) * dt; fade = 1 - k * k; break;
-        case 'frost': pos[o] += (Math.sin(t * 3 + ph[i]) * 0.1 - upL.x * 0.25) * dt; pos[o + 1] += (-upL.y * 0.25) * dt; pos[o + 2] += (Math.cos(t * 3 + ph[i]) * 0.1 - upL.z * 0.25) * dt; fade = Math.sin(k * Math.PI); break;
-        case 'wind': { const a = ph[i] + t * 7, r = orbitR + 0.06 * Math.sin(t * 2 + ph[i]); pos[o] = cx + Math.cos(a) * r; pos[o + 2] = cz + Math.sin(a) * r; pos[o + 1] += 0.5 * dt; if (pos[o + 1] > y1 + 0.1) pos[o + 1] = y0; fade = Math.sin(k * Math.PI); break; }
-        case 'holy': { const a = ph[i] + t * 1.8, r = orbitR * 0.7 + orbitR * 0.5 * Math.sin(k * Math.PI); pos[o] = cx + Math.cos(a) * r; pos[o + 2] = cz + Math.sin(a) * r; pos[o + 1] += upL.y * 0.15 * dt; fade = Math.sin(k * Math.PI); break; }
-        case 'shadow': pos[o] += (vel[o] * 0.4 - upL.x * 0.3) * dt; pos[o + 1] += (vel[o + 1] * 0.4 - upL.y * 0.3) * dt; pos[o + 2] += (vel[o + 2] * 0.4 - upL.z * 0.3) * dt; fade = Math.sin(k * Math.PI); break;
-        default: pos[o] += vel[o] * dt; pos[o + 1] += vel[o + 1] * dt; pos[o + 2] += vel[o + 2] * dt; fade = (1 - k) * (1 - k); // sparks flying off
-      }
-      cc.copy(c0).lerp(c1, k).multiplyScalar(Math.max(0, fade) * bright);
-      col[o] = cc.r; col[o + 1] = cc.g; col[o + 2] = cc.b;
-    }
-    geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
-    if (bolts) {
-      if ((flick -= dt) <= 0) {
-        // a crackle: new bolts for a few frames, then a short gap
-        const gap = rnd() < 0.3;
-        flick = gap ? 0.03 + rnd() * 0.05 : 0.04 + rnd() * 0.07;
-        bolts.draw(gap ? 0 : bolts.n, bx, power);
-      }
-    }
-  };
-}
-// bolts: n jagged paths of up to 9 segments, each segment two crossed quads; a thin bright core and a wide dim glow
-function makeBolts(g, n) {
-  const SEG = 9, Q = n * SEG * 2;
-  const make = (w, color, opacity) => {
-    const geo = new THREE.BufferGeometry();
-    const pos = new Float32Array(Q * 4 * 3), idx = new Uint16Array(Q * 6);
-    for (let q = 0; q < Q; q++) { const v = q * 4, o = q * 6; idx[o] = v; idx[o + 1] = v + 1; idx[o + 2] = v + 2; idx[o + 3] = v; idx[o + 4] = v + 2; idx[o + 5] = v + 3; }
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(new THREE.BufferAttribute(idx, 1));
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-    m.frustumCulled = false; g.add(m);
-    return { m, pos, w };
-  };
-  const core = make(0.014, '#ffffff', 1), glow = make(0.042, '#4aa8ff', 0.35);
-  const A = new THREE.Vector3(), B = new THREE.Vector3(), D = new THREE.Vector3(), U = new THREE.Vector3(), V = new THREE.Vector3(), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
-  const rnd = Math.random;
-  function seg(layer, q, a, b) {
-    A.copy(a); B.copy(b); D.subVectors(B, A).normalize();
-    U.crossVectors(D, Math.abs(D.z) < 0.9 ? Z : X).normalize().multiplyScalar(layer.w); V.crossVectors(D, U).normalize().multiplyScalar(layer.w);
-    const P = layer.pos; let o = q * 24;
-    const put = (p, off, sgn) => { P[o++] = p.x + off.x * sgn; P[o++] = p.y + off.y * sgn; P[o++] = p.z + off.z * sgn; };
-    put(A, U, 1); put(B, U, 1); put(B, U, -1); put(A, U, -1);
-    put(A, V, 1); put(B, V, 1); put(B, V, -1); put(A, V, -1);
-  }
-  const pts = [];
-  return { n, draw(count, bx, power) {
-    const [x0, x1, y0, y1, z0, z1] = bx, wx = x1 - x0, wz = z1 - z0, span = y1 - y0;
-    core.pos.fill(0); glow.pos.fill(0);
-    let q = 0;
-    for (let b = 0; b < count; b++) {
-      // along the blade: from somewhere low to somewhere high, jittering across it; now and then it arcs
-      // out to the side and comes back (or ends in the air)
-      pts.length = 0;
-      const ya = y0 + rnd() * span * 0.4, yb = Math.min(y1 + 0.05, ya + span * (0.35 + rnd() * 0.6));
-      const arcAt = rnd() < 0.6 ? 2 + Math.floor(rnd() * 5) : -1, arcDir = rnd() < 0.5 ? -1 : 1, arcR = 0.12 + rnd() * 0.22 * (0.5 + power * 0.5);
-      for (let i = 0; i <= SEG; i++) {
-        const t = i / SEG;
-        let x = x0 + rnd() * wx, z = z0 + rnd() * wz;
-        if (arcAt >= 0 && Math.abs(i - arcAt) <= 1) { const k = 1 - Math.abs(i - arcAt) * 0.5; x += arcDir * arcR * k; z += (rnd() - 0.5) * 0.1 * k; }
-        pts.push(new THREE.Vector3(x, ya + (yb - ya) * t, z));
-      }
-      for (let i = 0; i < SEG; i++) { seg(core, q, pts[i], pts[i + 1]); seg(glow, q, pts[i], pts[i + 1]); q += 2; }
-    }
-    core.m.geometry.attributes.position.needsUpdate = true; glow.m.geometry.attributes.position.needsUpdate = true;
-    const k = Math.min(1, 0.5 + power * 0.5);
-    core.m.material.opacity = (0.6 + rnd() * 0.4) * k; glow.m.material.opacity = (0.3 + rnd() * 0.3) * k;
-  } };
 }
 
 function outlineBox(pts) { let x0 = 9, x1 = -9, y0 = 9, y1 = -9; for (const [x, y] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return [x0, x1, y0, y1]; }
