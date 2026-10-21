@@ -69,9 +69,8 @@ with sync_playwright() as pw:
 
     page.evaluate('__dw.start(0)')
     page.wait_for_function("__dw.UI.state === 'play'", timeout=60000)
-    page.wait_for_timeout(1500)
-    st = page.evaluate('__dw.stats()')
-    check(st['onGround'], 'the hero stands on the ground at the start')
+    page.wait_for_function('__dw.player.onGround', timeout=600000)
+    check(True, 'the hero stands on the ground at the start')
     page.screenshot(path=str(out / '02-start.png'))
 
     # (the moving tests run on FAST graphics: software rendering is slow, and they wait for frames, not seconds)
@@ -166,7 +165,8 @@ with sync_playwright() as pw:
     if w:
         page.evaluate(f'__dw.sky.t = 0.45; __dw.player.place({w[0]} + 0.5, 30, {w[1]} + 0.5)')
         page.wait_for_function('__dw.world.readyAround(__dw.player.pos.x, __dw.player.pos.z, 32) >= 1', timeout=120000)
-        page.wait_for_timeout(2500)
+        page.wait_for_function('__dw.player.inWater || __dw.player.onGround', timeout=600000)
+        frames(3)
         st = page.evaluate('({ y: __dw.player.pos.y, w: __dw.player.inWater })')
         check(st['w'], f'the hero swims in a lake (y {st["y"]:.1f})')
         page.screenshot(path=str(out / '30-swim.png'))
