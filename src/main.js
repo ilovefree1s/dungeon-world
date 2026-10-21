@@ -164,8 +164,9 @@ function closeMenu() { UI.state = 'play'; $('menu').hidden = true; writeSave(); 
 // the forge: opened from the menu; what it makes goes into the warrior's hand
 $('forgeBtn').addEventListener('click', () => { UI.state = 'forge'; $('menu').hidden = true; openForge(); });
 forge.onClose = () => { UI.state = 'menu'; $('menu').hidden = false; syncMenu(); };
-forge.onEquip = spec => player.equipForged(spec);
-player.equipForged(equippedSpec());
+// (wielding something made for another hero switches to that hero, so you see it in hand)
+forge.onEquip = (spec, cls) => { player.equipForged(spec, cls); if (spec && player.cls !== cls) { player.setClass(cls); UI.cls = cls; abilities.reset(); } };
+for (let c = 0; c < 3; c++) player.equipForged(equippedSpec(c), c);
 $('menuBtn').addEventListener('click', openMenu);
 $('resume').addEventListener('click', () => { closeMenu(); if (!IS_TOUCH) lockMouse(); });
 // the mouse: captured by a click in the world while you play; letting it go (Esc) opens the menu

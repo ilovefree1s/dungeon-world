@@ -146,6 +146,7 @@ html.touchy .keys{display:none}
 .fchip{display:inline-flex;align-items:stretch;border-radius:10px;overflow:hidden;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px var(--line)}
 .fchip button{border:0;background:transparent;padding:6px 9px;font-weight:900;font-size:11px;letter-spacing:.05em;cursor:pointer}
 .fchip .load{text-transform:uppercase}
+.fchip .load i{display:inline-grid;place-items:center;width:16px;height:16px;margin-right:6px;border-radius:4px;background:var(--gold);color:#3a1c00;font-style:normal;font-size:10px}
 .fchip .eqb{color:var(--gold);border-left:1px solid var(--line)}
 .fchip.eq{box-shadow:inset 0 0 0 2px var(--gold)}
 .fchip.eq .eqb{background:var(--gold);color:#3a1c00}
@@ -197,13 +198,13 @@ html.touchy .keys{display:none}
   </div>
   <div id="forge" class="scrim" hidden>
     <div class="panel">
-      <div class="fhead"><h2>THE FORGE</h2><span class="small">BUILD IT, NAME IT, AND THE WARRIOR WIELDS IT</span></div>
+      <div class="fhead"><h2>THE FORGE</h2><span class="small">BLADES FOR THE WARRIOR, STAFFS FOR THE MAGE, BOWS FOR THE HUNTER</span></div>
       <div class="fwrap">
         <div>
           <canvas id="forgeGl"></canvas>
           <div id="forgeStats"></div>
           <div class="fname" style="margin-top:8px"><input id="fName" placeholder="NAME IT" maxlength="28"><button type="button" class="hbtn" id="fDice" aria-label="A name" title="A name">🎲</button></div>
-          <div class="fbtns"><button type="button" id="fRandom">RANDOM</button><button type="button" id="fSave">SAVE</button><button type="button" class="gold" id="fWield">SAVE &amp; WIELD</button><button type="button" id="fUnequip">BACK TO THE PLAIN SWORD</button></div>
+          <div class="fbtns"><button type="button" id="fRandom">RANDOM</button><button type="button" id="fSave">SAVE</button><button type="button" class="gold" id="fWield">SAVE &amp; WIELD</button><button type="button" id="fUnequip">BACK TO THE PLAIN ONE</button></div>
           <div id="fSaved"></div>
         </div>
         <div class="fcol">
@@ -213,7 +214,7 @@ html.touchy .keys{display:none}
           <div class="frow" id="fGuardRow"><span>GUARD</span><div class="seg" id="fGuard"></div></div>
           <div class="frow"><span>GRIP</span><div class="seg" id="fGrip"></div></div>
           <div class="frow"><span>GRIP COLOR</span><div class="seg" id="fGripCol"></div></div>
-          <div class="frow"><span>POMMEL</span><div class="seg" id="fPommel"></div></div>
+          <div class="frow" id="fPommelRow"><span>POMMEL</span><div class="seg" id="fPommel"></div></div>
           <div class="frow"><span>GEM</span><div class="seg" id="fAccent"></div></div>
           <div class="frow"><span>LENGTH</span><input type="range" id="fLen" min="0.7" max="1.5" step="0.01"></div>
           <div class="frow"><span>WIDTH</span><input type="range" id="fWid" min="0.7" max="1.5" step="0.01"></div>

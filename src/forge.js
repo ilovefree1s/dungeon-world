@@ -6,16 +6,17 @@
 // ============================================================================
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { TYPES, MATERIALS, GUARDS, GRIPS, POMMELS, ACCENTS, GRIP_COLORS, randomSpec, defaultSpec, nameOf, statsOf, buildForged } from './weaponkit.js';
+import { TYPES, MATERIALS, GUARDS, GRIPS, POMMELS, ACCENTS, GRIP_COLORS, HERO_NAME, clsOf, randomSpec, defaultSpec, nameOf, statsOf, buildForged } from './weaponkit.js';
 import { sfx } from './audio.js';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dungeonworld.forge.v1';
 const ls = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } } };
-export const forge = { saved: [], equipped: -1, spec: defaultSpec(), open: false, onEquip: null, onClose: null };
-try { const d = JSON.parse(ls.get(KEY)); if (d) { forge.saved = d.saved || []; forge.equipped = d.equipped ?? -1; if (d.spec) forge.spec = d.spec; } } catch (e) { }
+// equipped: one saved weapon's index per hero (warrior, mage, hunter), -1 for its own
+export const forge = { saved: [], equipped: [-1, -1, -1], spec: defaultSpec(), open: false, onEquip: null, onClose: null };
+try { const d = JSON.parse(ls.get(KEY)); if (d) { forge.saved = d.saved || []; forge.equipped = Array.isArray(d.equipped) ? d.equipped : [d.equipped ?? -1, -1, -1]; if (d.spec) forge.spec = d.spec; } } catch (e) { }
 function persist() { ls.set(KEY, JSON.stringify({ saved: forge.saved, equipped: forge.equipped, spec: forge.spec })); }
-export const equippedSpec = () => forge.equipped >= 0 && forge.saved[forge.equipped] ? forge.saved[forge.equipped] : null;
+export const equippedSpec = cls => forge.equipped[cls] >= 0 && forge.saved[forge.equipped[cls]] ? forge.saved[forge.equipped[cls]] : null;
 
 // ---------------------------------------------------------------- the preview
 let renderer = null, scene = null, camera = null, model = null, raf = 0, last = 0, turn = 0, dragging = false, spin = 1;
@@ -46,13 +47,14 @@ function rebuild() {
   if (model) { scene.remove(model); model.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.dispose) o.material.dispose(); }); }
   model = buildForged(forge.spec);
   // (centered on its length, so long and short weapons both fill the view)
-  const tip = model.userData.tipY, bot = -model.userData.gripLen / 2 - 0.2;
-  model.position.y = -(tip + bot) / 2;
+  // (framed by its whole box, so a crossbow's stock and a greatsword's length both fit)
+  const bb = new THREE.Box3().setFromObject(model), size = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+  model.position.set(-c.x, -c.y, -c.z);
   scene.add(model);
-  const span = tip - bot;
+  const span = Math.max(size.y, size.z * 1.2, size.x * 1.2);
   camera.position.set(0, 0.1, span * 1.75 + 0.6); camera.lookAt(0, 0, 0);
   const st = statsOf(forge.spec);
-  $('forgeStats').innerHTML = `<b>DAMAGE</b> ${Math.round(st.dmg * 100)}% <b>SPEED</b> ${Math.round(st.spd * 100)}% <b>REACH</b> ${st.reach} blocks${st.glow ? ' <b>GLOWS</b>' : ''}`;
+  $('forgeStats').innerHTML = `<b>FOR THE</b> ${HERO_NAME[st.cls]} <b>DAMAGE</b> ${Math.round(st.dmg * 100)}% <b>SPEED</b> ${Math.round(st.spd * 100)}% ` + (st.cls === 0 ? `<b>REACH</b> ${st.reach} blocks` : `<b>SHOT</b> ${Math.round(st.shot * 100)}%`) + (st.glow ? ' <b>GLOWS</b>' : '');
 }
 function frame(now) {
   if (!forge.open) return;
@@ -82,8 +84,8 @@ function render() {
   seg('fType', TYPES.map(x => [x.id, x.name]), s.type, v => { s.type = v; });
   seg('fHead', t.heads.map(h => [h, h.toUpperCase()]), s.head, v => { s.head = v; });
   seg('fMat', MATERIALS.map(m => [m.id, m.name, m.color]), s.material, v => { s.material = v; });
-  const bladed = s.type === 'sword' || s.type === 'greatsword' || s.type === 'dagger';
-  $('fGuardRow').hidden = !bladed;
+  const bladed = s.type === 'sword' || s.type === 'greatsword' || s.type === 'dagger', ranged = s.type === 'bow' || s.type === 'crossbow';
+  $('fGuardRow').hidden = !bladed; $('fPommelRow').hidden = ranged;
   seg('fGuard', GUARDS.map(x => [x, x.toUpperCase()]), s.guard, v => { s.guard = v; });
   seg('fGrip', GRIPS.map(x => [x, x.toUpperCase()]), s.grip, v => { s.grip = v; });
   seg('fPommel', POMMELS.map(x => [x, x.toUpperCase()]), s.pommel, v => { s.pommel = v; });
@@ -95,11 +97,16 @@ function render() {
   const list = $('fSaved'); list.innerHTML = '';
   if (!forge.saved.length) list.innerHTML = '<span class="small">NOTHING SAVED YET. FORGE ONE AND SAVE IT.</span>';
   forge.saved.forEach((w, i) => {
-    const chip = document.createElement('div'); chip.className = 'fchip' + (i === forge.equipped ? ' eq' : '');
-    chip.innerHTML = `<button type="button" class="load">${w.name || 'UNNAMED'}</button><button type="button" class="eqb">${i === forge.equipped ? 'WIELDED' : 'WIELD'}</button><button type="button" class="del" aria-label="Delete">×</button>`;
+    const c = clsOf(w), eq = forge.equipped[c] === i;
+    const chip = document.createElement('div'); chip.className = 'fchip' + (eq ? ' eq' : '');
+    chip.innerHTML = `<button type="button" class="load"><i>${HERO_NAME[c][0]}</i>${w.name || 'UNNAMED'}</button><button type="button" class="eqb">${eq ? 'WIELDED' : 'WIELD'}</button><button type="button" class="del" aria-label="Delete">×</button>`;
     chip.querySelector('.load').addEventListener('click', () => { forge.spec = JSON.parse(JSON.stringify(w)); sfx('pickup'); render(); });
-    chip.querySelector('.eqb').addEventListener('click', () => { forge.equipped = i; persist(); sfx('rare'); forge.onEquip && forge.onEquip(w); render(); });
-    chip.querySelector('.del').addEventListener('click', () => { forge.saved.splice(i, 1); if (forge.equipped === i) { forge.equipped = -1; forge.onEquip && forge.onEquip(null); } else if (forge.equipped > i) forge.equipped--; persist(); sfx('nope'); render(); });
+    chip.querySelector('.eqb').addEventListener('click', () => { forge.equipped[c] = i; persist(); sfx('rare'); forge.onEquip && forge.onEquip(w, c); render(); });
+    chip.querySelector('.del').addEventListener('click', () => {
+      forge.saved.splice(i, 1);
+      for (let k = 0; k < 3; k++) { if (forge.equipped[k] === i) { forge.equipped[k] = -1; forge.onEquip && forge.onEquip(null, k); } else if (forge.equipped[k] > i) forge.equipped[k]--; }
+      persist(); sfx('nope'); render();
+    });
     list.appendChild(chip);
   });
   persist();
@@ -123,10 +130,11 @@ function wire() {
     if (!forge.spec.name) forge.spec.name = nameOf(forge.spec);
     const copy = JSON.parse(JSON.stringify(forge.spec));
     forge.saved.push(copy); if (forge.saved.length > 16) forge.saved.shift();
-    forge.equipped = forge.saved.length - 1; persist();
-    sfx('rare'); forge.onEquip && forge.onEquip(copy); render();
+    const c = clsOf(copy);
+    forge.equipped[c] = forge.saved.length - 1; persist();
+    sfx('rare'); forge.onEquip && forge.onEquip(copy, c); render();
   });
-  $('fUnequip').addEventListener('click', () => { forge.equipped = -1; persist(); forge.onEquip && forge.onEquip(null); sfx('pickup'); render(); });
+  $('fUnequip').addEventListener('click', () => { const c = clsOf(forge.spec); forge.equipped[c] = -1; persist(); forge.onEquip && forge.onEquip(null, c); sfx('pickup'); render(); });
   $('fClose').addEventListener('click', closeForge);
   addEventListener('resize', () => { if (forge.open) sizePreview(); });
 }

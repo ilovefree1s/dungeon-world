@@ -19,14 +19,23 @@ function extrude(pts, depth, bevel = 0.012) {
 const mirror = half => [...half, ...half.slice().reverse().map(([x, y]) => [-x, y])];
 
 // ---------------------------------------------------------------- the parts on offer
+// cls: who wields it (0 warrior, 1 mage, 2 hunter)
 export const TYPES = [
-  { id: 'sword', name: 'SWORD', heads: ['straight', 'leaf', 'curved', 'serrated'], dmg: 1, spd: 1, reach: 1 },
-  { id: 'greatsword', name: 'GREATSWORD', heads: ['straight', 'leaf', 'flamberge', 'cleaver'], dmg: 1.45, spd: 0.7, reach: 1.25 },
-  { id: 'dagger', name: 'DAGGER', heads: ['straight', 'curved', 'kris', 'needle'], dmg: 0.6, spd: 1.6, reach: 0.7 },
-  { id: 'axe', name: 'AXE', heads: ['single', 'double', 'bearded', 'crescent'], dmg: 1.3, spd: 0.8, reach: 1 },
-  { id: 'hammer', name: 'HAMMER', heads: ['block', 'maul', 'spiked', 'anvil'], dmg: 1.6, spd: 0.6, reach: 1.05 },
-  { id: 'mace', name: 'MACE', heads: ['flanged', 'ball', 'star', 'lantern'], dmg: 1.2, spd: 0.85, reach: 0.95 },
+  { id: 'sword', name: 'SWORD', cls: 0, heads: ['straight', 'leaf', 'curved', 'serrated'], dmg: 1, spd: 1, reach: 1 },
+  { id: 'greatsword', name: 'GREATSWORD', cls: 0, heads: ['straight', 'leaf', 'flamberge', 'cleaver'], dmg: 1.45, spd: 0.7, reach: 1.25 },
+  { id: 'dagger', name: 'DAGGER', cls: 0, heads: ['straight', 'curved', 'kris', 'needle'], dmg: 0.6, spd: 1.6, reach: 0.7 },
+  { id: 'axe', name: 'AXE', cls: 0, heads: ['single', 'double', 'bearded', 'crescent'], dmg: 1.3, spd: 0.8, reach: 1 },
+  { id: 'hammer', name: 'HAMMER', cls: 0, heads: ['block', 'maul', 'spiked', 'anvil'], dmg: 1.6, spd: 0.6, reach: 1.05 },
+  { id: 'mace', name: 'MACE', cls: 0, heads: ['flanged', 'ball', 'star', 'lantern'], dmg: 1.2, spd: 0.85, reach: 0.95 },
+  { id: 'staff', name: 'STAFF', cls: 1, heads: ['orb', 'crescent', 'claw', 'lantern'], dmg: 1, spd: 1, reach: 1 },
+  { id: 'wand', name: 'WAND', cls: 1, heads: ['gem', 'star', 'twist', 'skull'], dmg: 0.7, spd: 1.5, reach: 0.9 },
+  { id: 'bow', name: 'BOW', cls: 2, heads: ['recurve', 'longbow', 'flat', 'horned'], dmg: 1, spd: 1, reach: 1 },
+  { id: 'crossbow', name: 'CROSSBOW', cls: 2, heads: ['light', 'heavy', 'repeater', 'siege'], dmg: 1.5, spd: 0.6, reach: 1.2 },
 ];
+export const HERO_NAME = ['WARRIOR', 'MAGE', 'HUNTER'];
+export const typeOf = spec => TYPES.find(x => x.id === spec.type) || TYPES[0];
+export const clsOf = spec => typeOf(spec).cls;
+export const isMelee = spec => clsOf(spec) === 0;
 export const MATERIALS = [
   { id: 'steel', name: 'STEEL', color: '#c8d0da', metalness: 1, roughness: 0.25, dmg: 1 },
   { id: 'iron', name: 'IRON', color: '#7d838a', metalness: 0.8, roughness: 0.55, dmg: 0.9 },
@@ -55,7 +64,8 @@ export const defaultSpec = () => ({ type: 'sword', head: 'straight', material: '
 
 // ---------------------------------------------------------------- names
 const ADJ = { steel: 'STEEL', iron: 'IRON', bronze: 'BRONZE', gold: 'GILDED', obsidian: 'BLACK', bone: 'BONE', jade: 'JADE', crystal: 'PRISM', ember: 'EMBER', frost: 'FROST' };
-const NOUN = { sword: ['BLADE', 'SWORD', 'EDGE'], greatsword: ['CLAYMORE', 'GREATSWORD', 'SLAB'], dagger: ['DAGGER', 'FANG', 'STING'], axe: ['AXE', 'CLEAVER', 'HEWER'], hammer: ['HAMMER', 'MAUL', 'CRUSHER'], mace: ['MACE', 'MORNINGSTAR', 'SCEPTER'] };
+const NOUN = { sword: ['BLADE', 'SWORD', 'EDGE'], greatsword: ['CLAYMORE', 'GREATSWORD', 'SLAB'], dagger: ['DAGGER', 'FANG', 'STING'], axe: ['AXE', 'CLEAVER', 'HEWER'], hammer: ['HAMMER', 'MAUL', 'CRUSHER'], mace: ['MACE', 'MORNINGSTAR', 'SCEPTER'],
+  staff: ['STAFF', 'ROD', 'CROOK'], wand: ['WAND', 'SPRIG', 'FINGER'], bow: ['BOW', 'LONGBOW', 'STRINGSONG'], crossbow: ['CROSSBOW', 'ARBALEST', 'BOLTER'] };
 const EPITHET = ['OF THE WOODS', 'OF DAWN', 'OF THE DEEP', 'OF EMBERS', 'OF WINTER', 'OF THE TOWER', 'OF THE BOG', 'OF STORMS', 'OF THE KING', 'OF OLD'];
 export function nameOf(spec, rnd = Math.random) {
   const pick = a => a[Math.floor(rnd() * a.length)];
@@ -69,7 +79,9 @@ export function statsOf(spec) {
   const dmg = t.dmg * m.dmg * (0.8 + spec.length * 0.2) * (0.85 + spec.width * 0.15);
   const spd = t.spd / (0.75 + spec.length * 0.15 + spec.width * 0.1);
   const reach = 4.6 * t.reach * (0.7 + spec.length * 0.3);
-  return { dmg: +dmg.toFixed(2), spd: +spd.toFixed(2), reach: +reach.toFixed(1), glow: !!m.glow };
+  // (for staffs and bows the reach is how fast the shot flies)
+  const shot = t.reach * (0.8 + spec.length * 0.2);
+  return { dmg: +dmg.toFixed(2), spd: +spd.toFixed(2), reach: +reach.toFixed(1), shot: +shot.toFixed(2), glow: !!m.glow, cls: t.cls, color: ACCENTS[spec.accent % ACCENTS.length][0] };
 }
 
 // ---------------------------------------------------------------- the model
@@ -83,16 +95,18 @@ export function buildForged(spec) {
   const gem = std({ color: accent, emissive: accent, emissiveIntensity: 0.7, roughness: 0.15, metalness: 0.1 });
   const gripCol = GRIP_COLORS[spec.gripColor % GRIP_COLORS.length][0];
   const gripMat = std({ color: gripCol, roughness: spec.grip === 'bone' ? 0.6 : 0.8, metalness: spec.grip === 'chain' ? 0.7 : 0 });
+  const ranged = spec.type === 'bow' || spec.type === 'crossbow';
   // the grip: longer for two-handed things
   const two = spec.type === 'greatsword' || spec.type === 'hammer' || (spec.type === 'axe' && spec.head === 'double');
   const gl = (two ? 0.62 : spec.type === 'dagger' ? 0.26 : 0.34) * (0.8 + L * 0.2);
-  g.userData.gripLen = gl;
-  if (spec.grip === 'wrapped') { for (let i = 0; i < Math.round(gl / 0.06); i++) { const r = mesh(cyl(0.05, 0.05, 0.045, 10), gripMat); r.position.y = -gl / 2 + 0.03 + i * 0.06; r.rotation.y = i * 0.5; g.add(r); } }
+  g.userData.gripLen = ranged ? 0.3 : gl;
+  if (ranged) { /* (the bow's own grip sits on its limbs) */ }
+  else if (spec.grip === 'wrapped') { for (let i = 0; i < Math.round(gl / 0.06); i++) { const r = mesh(cyl(0.05, 0.05, 0.045, 10), gripMat); r.position.y = -gl / 2 + 0.03 + i * 0.06; r.rotation.y = i * 0.5; g.add(r); } }
   else if (spec.grip === 'chain') { for (let i = 0; i < Math.round(gl / 0.07); i++) { const r = mesh(new THREE.TorusGeometry(0.04, 0.014, 6, 10), gripMat); r.position.y = -gl / 2 + 0.035 + i * 0.07; r.rotation.y = i * Math.PI / 2; r.rotation.x = Math.PI / 2; g.add(r); } g.add(mesh(cyl(0.03, 0.03, gl, 8), iron)); }
   else { const gr = mesh(cyl(0.045, 0.05, gl, 10), gripMat); g.add(gr); if (spec.grip === 'wood' || spec.grip === 'bone') { const band = mesh(cyl(0.055, 0.055, 0.04, 10), iron); band.position.y = -gl / 2 + 0.05; g.add(band); } }
   const top = gl / 2, bottom = -gl / 2;
   // the pommel
-  const pm = spec.pommel;
+  const pm = ranged ? 'none' : spec.pommel;
   if (pm === 'ball') { const p = mesh(sph(0.07, 10, 8), iron); p.position.y = bottom - 0.03; g.add(p); }
   else if (pm === 'disc') { const p = mesh(cyl(0.09, 0.09, 0.05, 14), iron); p.position.y = bottom - 0.03; g.add(p); }
   else if (pm === 'spike') { const p = mesh(new THREE.ConeGeometry(0.06, 0.2, 8), iron); p.position.y = bottom - 0.1; p.rotation.x = Math.PI; g.add(p); }
@@ -100,7 +114,8 @@ export function buildForged(spec) {
   else if (pm === 'ring') { const p = mesh(new THREE.TorusGeometry(0.07, 0.02, 8, 16), iron); p.position.y = bottom - 0.06; g.add(p); }
   // the guard (not on hammers, maces and axes: they get a collar)
   const gd = spec.guard, bladed = spec.type === 'sword' || spec.type === 'greatsword' || spec.type === 'dagger';
-  if (bladed) {
+  if (ranged) { /* (no collar) */ }
+  else if (bladed) {
     const gw = 0.36 * W * (spec.type === 'dagger' ? 0.7 : spec.type === 'greatsword' ? 1.3 : 1);
     if (gd === 'bar') { const b = mesh(box(gw, 0.06, 0.08), iron); b.position.y = top + 0.02; g.add(b); }
     else if (gd === 'cross') { const b = mesh(box(gw * 1.15, 0.07, 0.07), iron); b.position.y = top + 0.02; g.add(b); for (const s of [-1, 1]) { const e = mesh(sph(0.05, 8, 6), iron); e.position.set(s * gw * 0.57, top + 0.02, 0); g.add(e); } const c = mesh(sph(0.05, 10, 8), gem); c.position.set(0, top + 0.02, 0.05); c.scale.z = 0.6; g.add(c); }
@@ -113,7 +128,7 @@ export function buildForged(spec) {
     if (gd !== 'none') { const b = mesh(cyl(0.085, 0.085, 0.04, 12), iron); b.position.y = top + 0.05; g.add(b); }
   }
   // ---- the business end
-  const y0 = top + 0.04;
+  const y0 = ranged ? 0 : top + 0.04;
   let blade = null;
   if (spec.type === 'sword' || spec.type === 'greatsword' || spec.type === 'dagger') {
     const len = (spec.type === 'sword' ? 1.2 : spec.type === 'greatsword' ? 1.7 : 0.6) * L, hw = (spec.type === 'greatsword' ? 0.085 : spec.type === 'dagger' ? 0.045 : 0.06) * W;
@@ -165,6 +180,53 @@ export function buildForged(spec) {
     const tip = mesh(new THREE.ConeGeometry(0.04, 0.14, 8), iron); tip.position.y = hy + r * 1.3; g.add(tip);
     g.userData.tipY = hy + r * 1.3;
   }
+  else if (spec.type === 'staff' || spec.type === 'wand') {
+    // the mage's: the shaft is the grip's wood, the head holds the gem that lights the bolts
+    const wand = spec.type === 'wand';
+    const shaft = (wand ? 0.7 : 1.6) * L;
+    const pole = mesh(cyl(0.04, 0.055, shaft, 8), gripMat); pole.position.y = y0 + shaft / 2; g.add(pole);
+    const hy = y0 + shaft, r = (wand ? 0.1 : 0.15) * W;
+    const orbMat = std({ color: accent, emissive: accent, emissiveIntensity: 1.4, roughness: 0.1, metalness: 0.1 });
+    g.userData.orbMat = orbMat;
+    let orb;
+    if (spec.head === 'orb' || spec.head === 'gem') { orb = mesh(spec.head === 'gem' ? new THREE.OctahedronGeometry(r * 1.2) : sph(r, 14, 10), orbMat, false); orb.position.y = hy + r * 0.9; const cup = mesh(cyl(r * 0.7, 0.05, r * 0.8, 8), metal); cup.position.y = hy + r * 0.2; g.add(cup); }
+    else if (spec.head === 'crescent') { const c = mesh(new THREE.TorusGeometry(r * 1.6, r * 0.25, 8, 20, Math.PI * 1.3), metal); c.position.y = hy + r * 1.4; c.rotation.z = Math.PI * 0.85; g.add(c); orb = mesh(sph(r * 0.7, 12, 8), orbMat, false); orb.position.y = hy + r * 1.4; }
+    else if (spec.head === 'claw') { for (let i = 0; i < 3; i++) { const a = i * Math.PI * 2 / 3, c = mesh(new THREE.ConeGeometry(r * 0.3, r * 2.4, 6), metal); c.position.set(Math.cos(a) * r * 0.7, hy + r * 1.1, Math.sin(a) * r * 0.7); c.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); g.add(c); } orb = mesh(new THREE.OctahedronGeometry(r * 0.9), orbMat, false); orb.position.y = hy + r * 1.6; }
+    else if (spec.head === 'lantern') { for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2; const rib = mesh(box(0.025, r * 2.6, 0.025), metal); rib.position.set(Math.cos(a) * r * 1.1, hy + r * 1.4, Math.sin(a) * r * 1.1); g.add(rib); } const cap = mesh(cyl(r * 1.3, r * 1.3, 0.05, 8), metal); cap.position.y = hy + r * 2.7; g.add(cap); orb = mesh(sph(r * 0.8, 12, 8), orbMat, false); orb.position.y = hy + r * 1.4; }
+    else if (spec.head === 'star') { orb = mesh(new THREE.OctahedronGeometry(r * 1.1), orbMat, false); orb.position.y = hy + r * 1.2; for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.4; const sp = mesh(new THREE.ConeGeometry(r * 0.25, r * 1.1, 5), metal); sp.position.set(Math.cos(a) * r * 1.1, hy + r * 1.2, Math.sin(a) * r * 1.1); sp.lookAt(0, hy + r * 1.2, 0); sp.rotateX(-Math.PI / 2); g.add(sp); } }
+    else if (spec.head === 'twist') { for (const ph of [0, Math.PI]) { const pts = []; for (let i = 0; i <= 12; i++) { const y = i / 12 * r * 2.6, a = ph + y * 9; pts.push(new V3(Math.cos(a) * r * 0.5, hy + y, Math.sin(a) * r * 0.5)); } g.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.02, 6), metal)); } orb = mesh(sph(r * 0.6, 12, 8), orbMat, false); orb.position.y = hy + r * 2.8; }
+    else { const sk = mesh(sph(r * 1.1, 12, 10), std({ color: '#e6dccb', roughness: 0.6 })); sk.position.y = hy + r * 1.1; g.add(sk); for (const s of [-1, 1]) { const e = mesh(sph(r * 0.3, 8, 6), orbMat, false); e.position.set(s * r * 0.45, hy + r * 1.2, r * 0.85); g.add(e); } orb = mesh(sph(r * 0.5, 10, 8), orbMat, false); orb.position.y = hy + r * 2.4; }
+    g.add(orb); g.userData.orb = orb;
+    const l = new THREE.PointLight(accent, 0, 8, 2); l.position.y = hy + r; g.add(l);
+    g.userData.tipY = hy + r * 3;
+    g.userData.tick = t => { orb.rotation.y = t * 1.2; orb.position.y += Math.sin(t * 3) * 0.002; };
+  } else if (spec.type === 'bow' || spec.type === 'crossbow') {
+    // the hunter's: limbs along y, the string behind at z = stringZ, drawn back when shooting (as Dungeon Heart's)
+    const cross = spec.type === 'crossbow';
+    const H = (cross ? 0.5 : spec.head === 'longbow' ? 1.0 : 0.78) * L;
+    const pts = spec.head === 'recurve' || spec.head === 'horned' ? [[0, -H, -0.02], [0, -H * 0.8, 0.06], [0, -H * 0.45, 0.16], [0, 0, 0.2], [0, H * 0.45, 0.16], [0, H * 0.8, 0.06], [0, H, -0.02]]
+      : [[0, -H, -0.1], [0, -H * 0.47, 0.12], [0, 0, 0.18], [0, H * 0.47, 0.12], [0, H, -0.1]];
+    const curve = new THREE.CatmullRomCurve3(pts.map(p => new V3(...p)));
+    const limbMat = spec.head === 'flat' || spec.head === 'longbow' ? gripMat : metal;
+    const thick = (cross ? 0.045 : spec.head === 'flat' ? 0.05 : 0.038) * W;
+    const limbs = mesh(new THREE.TubeGeometry(curve, 28, thick, 7), limbMat); g.add(limbs);
+    const end = spec.head === 'recurve' || spec.head === 'horned' ? -0.02 : -0.1;
+    if (spec.head === 'horned') for (const s of [-1, 1]) { const c = mesh(new THREE.ConeGeometry(0.05, 0.22, 6), metal); c.position.set(0, s * (H + 0.08), end); c.rotation.x = s > 0 ? 0 : Math.PI; g.add(c); }
+    else for (const s of [-1, 1]) { const c = mesh(cyl(0.03, 0.03, 0.08, 6), metal); c.position.set(0, s * H, end + 0.02); g.add(c); }
+    if (cross) {
+      // the stock, forward of the limbs
+      const stock = mesh(box(0.08 * W, 0.07, 0.9 * L), gripMat); stock.position.set(0, 0, 0.45 * L - 0.1); g.add(stock);
+      const rail = mesh(box(0.03, 0.02, 0.8 * L), metal); rail.position.set(0, 0.045, 0.4 * L - 0.1); g.add(rail);
+      if (spec.head === 'repeater') { const mag = mesh(box(0.1, 0.16, 0.3), metal); mag.position.set(0, 0.12, 0.25); g.add(mag); }
+      if (spec.head === 'siege' || spec.head === 'heavy') { const brace = mesh(box(0.14 * W, 0.04, 0.06), metal); brace.position.set(0, -0.03, 0.05); g.add(brace); }
+      const trig = mesh(box(0.02, 0.08, 0.03), metal); trig.position.set(0, -0.07, 0.55 * L); g.add(trig);
+    } else { const grip = mesh(cyl(0.055, 0.055, 0.24, 8), gripMat); grip.position.z = 0.19; g.add(grip); }
+    const gm = mesh(new THREE.OctahedronGeometry(0.06), gem); gm.position.set(0, 0, 0.25); g.add(gm);
+    const strGeo = new THREE.BufferGeometry().setFromPoints([new V3(0, -H, end), new V3(0, 0, end), new V3(0, H, end)]);
+    const string = new THREE.Line(strGeo, new THREE.LineBasicMaterial({ color: mat.glow ? mat.glow : '#ece4d0' }));
+    g.add(string); g.userData.string = string; g.userData.stringZ = end;
+    g.userData.tipY = H; g.userData.ranged = true;
+  }
   // a soft glow around the glowing materials
   if (mat.glow) {
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.soft, color: mat.glow, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.35 }));
@@ -172,7 +234,7 @@ export function buildForged(spec) {
   }
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.userData.bladeMat = metal;
-  g.userData.tick = null;
+  if (!g.userData.tick) g.userData.tick = null;
   g.userData.spec = spec;
   return g;
 }

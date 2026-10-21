@@ -80,11 +80,12 @@ export const KITS = [
         } },
     ] },
   // ---- mage
-  { name: 'MAGE', attack: { name: 'BOLT', cd: 0.34, use(ctx) {
-      const p = ctx.player, from = p.pos.clone(); from.y += 3.8;
+  { name: 'MAGE', attack: { name: 'BOLT', cd: 0.34, cdOf: p => 0.34 / (p.forged ? p.forged.spd : 1), use(ctx) {
+      const p = ctx.player, from = p.pos.clone(), f = p.forged; from.y += 3.8;
       const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0;
       from.addScaledVector(dir, 1.8);
-      ctx.bolts.fire(from, dir, BOLT, { speed: 68 });
+      // (a staff from the forge: its gem's color, its damage, how fast the bolt flies)
+      ctx.bolts.fire(from, dir, f ? f.color : BOLT, { speed: 68 * (f ? f.shot : 1), mult: f ? f.dmg : 1 });
       sfx('cast');
     } },
     abilities: [
@@ -121,11 +122,11 @@ export const KITS = [
         } },
     ] },
   // ---- hunter
-  { name: 'HUNTER', attack: { name: 'SHOOT', cd: 0.3, use(ctx) {
-      const p = ctx.player, from = p.pos.clone(); from.y += 3.6;
+  { name: 'HUNTER', attack: { name: 'SHOOT', cd: 0.3, cdOf: p => 0.3 / (p.forged ? p.forged.spd : 1), use(ctx) {
+      const p = ctx.player, from = p.pos.clone(), f = p.forged; from.y += 3.6;
       const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0;
       from.addScaledVector(dir, 1.8);
-      ctx.bolts.fire(from, dir, ARROW, { speed: 96, arrow: true });
+      ctx.bolts.fire(from, dir, ARROW, { speed: 96 * (f ? f.shot : 1), arrow: true, mult: f ? f.dmg : 1 });
       sfx('shoot');
     } },
     abilities: [
