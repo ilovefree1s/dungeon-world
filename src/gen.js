@@ -3,7 +3,8 @@
 //  the meshes of one chunk (32 x 32 columns, 96 blocks high). No imports, no
 //  three.js: it runs in a worker (genworker.js) and on the main thread.
 // ============================================================================
-export const CH = 32, WH = 96, SEA = 24;
+// (a block is half a hero-stride across: the land is twice as fine as the heroes' own scale)
+export const CH = 32, WH = 192, SEA = 48;
 export const FOREST = 0, SNOW = 1, DESERT = 2, SWAMP = 3, LAVA = 4, CRYSTAL = 5;
 export const BIOME_NAME = ['WHISPERWOOD', 'FROSTPEAK REACH', 'SUNSCORCH DUNES', 'MIREHOLLOW BOG', 'CINDERWASTE', 'PRISM HIGHLANDS'];
 export const BIOME_SUB = ['the green woods', 'the frozen mountains', 'the burning sands', 'the sunken marsh', 'the ash and fire', 'the shining cliffs'];
@@ -26,11 +27,11 @@ def(MAGMA, [255, 104, 24], 2); def(PRISMMOSS, [96, 200, 196], 1); def(PURPLESTON
 def(WOOD, [112, 76, 44], 1); def(LEAVES, [62, 150, 48], 1); def(LEAVES2, [104, 176, 52], 1); def(PINE, [40, 94, 62], 1); def(SNOWLEAF, [222, 236, 244], 1);
 def(CACTUS, [70, 146, 64], 1); def(SWAMPWOOD, [70, 56, 40], 1); def(SWAMPLEAF, [74, 102, 44], 1); def(CHARWOOD, [34, 30, 32], 1);
 def(PALEWOOD, [214, 204, 232], 1); def(PALELEAF, [236, 132, 214], 1); def(MOSSSTONE, [106, 122, 100], 1); def(OBSIDIAN, [46, 36, 66], 1);
-def(TUFT, [110, 184, 64], 3, 0.55, 0.32); def(FERN, [64, 140, 54], 3, 0.7, 0.5);
-def(FLOWER_R, [236, 58, 64], 3, 0.3, 0.5); def(FLOWER_Y, [252, 212, 56], 3, 0.3, 0.45); def(FLOWER_B, [110, 140, 252], 3, 0.3, 0.55);
-def(DEADBUSH, [150, 112, 66], 3, 0.5, 0.45); def(MUSHROOM, [224, 64, 52], 3, 0.42, 0.42); def(GLOWSHROOM, [120, 255, 210], 4, 0.36, 0.5);
-def(SHARD, [220, 150, 255], 4, 0.26, 0.8); def(EMBER, [255, 140, 40], 4, 0.26, 0.26); def(REED, [120, 146, 66], 3, 0.18, 0.95);
-def(PEBBLE, [130, 128, 132], 3, 0.6, 0.3);
+def(TUFT, [110, 184, 64], 3, 0.99, 0.61); def(FERN, [64, 140, 54], 3, 1.26, 0.95);
+def(FLOWER_R, [236, 58, 64], 3, 0.54, 0.95); def(FLOWER_Y, [252, 212, 56], 3, 0.54, 0.85); def(FLOWER_B, [110, 140, 252], 3, 0.54, 1.04);
+def(DEADBUSH, [150, 112, 66], 3, 0.90, 0.85); def(MUSHROOM, [224, 64, 52], 3, 0.76, 0.80); def(GLOWSHROOM, [120, 255, 210], 4, 0.65, 0.95);
+def(SHARD, [220, 150, 255], 4, 0.47, 1.52); def(EMBER, [255, 140, 40], 4, 0.47, 0.49); def(REED, [120, 146, 66], 3, 0.32, 1.80);
+def(PEBBLE, [130, 128, 132], 3, 1.08, 0.57);
 def(WATER, [40, 110, 170], 5); def(LAVAL, [255, 90, 20], 6);
 export const isSolid = id => KIND[id] === 1 || KIND[id] === 2;
 export const isWater = id => KIND[id] === 5;
@@ -71,6 +72,7 @@ function simplex(seed) {
 function fbm(n, x, z, oct) { let a = 1, f = 1, s = 0, m = 0; for (let o = 0; o < oct; o++) { s += a * n(x * f, z * f); m += a; a *= 0.5; f *= 2.03; } return s / m; }
 const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
 // mostly flat steps with steep rises between them: cliffs
+// (in the heroes' units: heights are doubled after blending)
 function terrace(h, step) { const f = h / step, i = Math.floor(f), t = f - i; return (i + clamp01((t - 0.72) / 0.28)) * step; }
 
 // ---------------------------------------------------------------- the world
@@ -163,7 +165,7 @@ export function createGen(seed = 1) {
     const best = weights(x, z);
     let h = 0;
     for (let b = 0; b < 6; b++) if (wts[b] > 0.002) h += wts[b] * heightOf(b, x, z);
-    h = Math.max(3, Math.min(WH - 20, Math.floor(h)));
+    h = Math.max(6, Math.min(WH - 20, Math.floor(h * 2)));
     let pick = best;
     if (wts[best] < 0.98) { let r = hash3(x, 0, z, seed + 5) * 0.999, acc = 0; for (let b = 0; b < 6; b++) { acc += wts[b]; if (r < acc) { pick = b; break; } } }
     out.h = h; out.biome = best; out.pick = pick;
@@ -171,13 +173,13 @@ export function createGen(seed = 1) {
   }
 
   // ---------------------------------------------------------------- a chunk's blocks
-  const M = 4, GW = CH + 2 * M;          // (the columns around a chunk, for trees reaching over its edge)
+  const M = 10, GW = CH + 2 * M;          // (the columns around a chunk, for trees reaching over its edge)
   const P = CH + 2;                       // (the blocks: the chunk and a ring of its neighbors' for the faces)
   const colH = new Int16Array(GW * GW), colB = new Uint8Array(GW * GW), colP = new Uint8Array(GW * GW);
   const V = new Uint8Array(P * P * WH);
   const at = (x, y, z) => (y * P + (z + 1)) * P + (x + 1);
   let top = 0;
-  function put(x, y, z, id, over = false) {
+  function put1(x, y, z, id, over = false) {
     if (x < -1 || x > CH || z < -1 || z > CH || y < 1 || y >= WH) return;
     const i = at(x, y, z);
     if (!over && V[i] && !isWater(V[i]) && KIND[V[i]] !== 3 && KIND[V[i]] !== 4) return;
@@ -188,8 +190,8 @@ export function createGen(seed = 1) {
     let topB, sub;
     const under = h < SEA;
     switch (pick) {
-      case FOREST: topB = h <= SEA + 1 ? SAND : GRASS; sub = h <= SEA + 1 ? SAND : DIRT; break;
-      case SNOW: topB = under ? DIRT : (h > 58 ? SNOWB : SNOWB); sub = h > 44 ? STONE : DIRT; break;
+      case FOREST: topB = h <= SEA + 2 ? SAND : GRASS; sub = h <= SEA + 2 ? SAND : DIRT; break;
+      case SNOW: topB = under ? DIRT : (h > 58 ? SNOWB : SNOWB); sub = h > 88 ? STONE : DIRT; break;
       case DESERT: topB = SAND; sub = SAND; break;
       case SWAMP: topB = under ? MUD : MUDGRASS; sub = MUD; break;
       case LAVA: topB = under ? BASALT : ASH; sub = BASALT; break;
@@ -198,7 +200,7 @@ export function createGen(seed = 1) {
     for (let y = 1; y <= h; y++) {
       let id;
       if (y === h) id = topB;
-      else if (y >= h - 3) id = sub;
+      else if (y >= h - 6) id = sub;
       else if (stone < 0) id = [SST1, SST2, SST3, SST1, SST3][((y * 7 + (y >> 2)) % 5)]; // banded rock
       else id = stone;
       V[at(x, y, z)] = id;
@@ -206,7 +208,7 @@ export function createGen(seed = 1) {
     V[at(x, 0, z)] = STONE;
     if (pick === LAVA && !under && hash3(x, h, z, seed + 9) < 0.05) V[at(x, h, z)] = MAGMA;
     // (glowing veins in the rock of the ash lands, seen on their cliffs)
-    if (pick === LAVA) for (let y = Math.max(1, h - 8); y < h; y++) if (hash3(x, y, z, seed + 19) < 0.06) V[at(x, y, z)] = MAGMA;
+    if (pick === LAVA) for (let y = Math.max(1, h - 16); y < h; y++) if (hash3(x, y, z, seed + 19) < 0.06) V[at(x, y, z)] = MAGMA;
     if (under) {
       const liq = pick === LAVA ? LAVAL : WATER;
       for (let y = h + 1; y <= SEA; y++) V[at(x, y, z)] = liq;
@@ -217,6 +219,8 @@ export function createGen(seed = 1) {
   // ---- the trees and rocks, one per 5 x 5 cell at most
   function tree(kind, x, h, z, r) {
     const b = h + 1;
+    // (the trees are drawn in the heroes' units: every block of theirs is a 2 x 2 x 2 cube of the land's)
+    const put = (ax, ay, az, id, over) => { const dx = ax - x, dy = ay - b, dz = az - z; for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) for (let k = 0; k < 2; k++) put1(x + 2 * dx + i, b + 2 * dy + j, z + 2 * dz + k, id, over); };
     if (kind === 'oak' || kind === 'birch') {
       const th = 4 + Math.floor(r() * 3), leaf = kind === 'oak' ? LEAVES : LEAVES2;
       for (let y = 0; y < th; y++) put(x, b + y, z, WOOD, true);
@@ -297,7 +301,7 @@ export function createGen(seed = 1) {
       case LAVA: d = r < 0.02 ? EMBER : r < 0.03 ? PEBBLE : 0; break;
       case CRYSTAL: d = r < 0.05 ? SHARD : r < 0.1 ? TUFT : 0; break;
     }
-    if (d) put(x, h + 1, z, d);
+    if (d) put1(x, h + 1, z, d);
   }
 
   // ---------------------------------------------------------------- meshing
@@ -379,7 +383,7 @@ export function createGen(seed = 1) {
       } else if (k === 3 || k === 4) {
         // a little box standing on the block below (grass, flowers, shards...)
         const w = DW[id] * (0.85 + 0.3 * hash3(wx, y, wz, 4)), hh = DH[id] * (0.8 + 0.4 * hash3(wx, y, wz, 6));
-        const jx = (hash3(wx, y, wz, 7) - 0.5) * (1 - w) * 0.8, jz = (hash3(wx, y, wz, 8) - 0.5) * (1 - w) * 0.8;
+        const jx = (hash3(wx, y, wz, 7) - 0.5) * 0.4, jz = (hash3(wx, y, wz, 8) - 0.5) * 0.4;
         const x0 = x + 0.5 - w / 2 + jx, z0 = z + 0.5 - w / 2 + jz, out = k === 4 ? B.glow : B.solid;
         const s = 0.85 + 0.3 * hash3(wx, y, wz, 9);
         for (let f = 0; f < 6; f++) {
@@ -413,7 +417,7 @@ export function createGen(seed = 1) {
     }
     for (let z = -1; z <= CH; z++) for (let x = -1; x <= CH; x++) { const i = (z + M) * GW + x + M; fillColumn(x, z, colH[i], colP[i]); }
     // trees: one candidate per 5 x 5 cell, from every cell whose tree could reach into this chunk
-    const C5 = 5, i0 = Math.floor((ox) / C5), i1 = Math.floor((ox + GW - 1) / C5), j0 = Math.floor(oz / C5), j1 = Math.floor((oz + GW - 1) / C5);
+    const C5 = 10, i0 = Math.floor((ox) / C5), i1 = Math.floor((ox + GW - 1) / C5), j0 = Math.floor(oz / C5), j1 = Math.floor((oz + GW - 1) / C5);
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const tx = i * C5 + Math.floor(hash3(i, j, seed, 41) * C5), tz = j * C5 + Math.floor(hash3(i, j, seed, 42) * C5);
       const lx = tx - ox, lz = tz - oz;
@@ -427,7 +431,7 @@ export function createGen(seed = 1) {
       if (r0 > dens) continue;
       // (no tree on a cliff edge)
       const hx = colH[gi + (lx < GW - 1 ? 1 : 0)], hz = colH[gi + (lz < GW - 1 ? GW : 0)];
-      if (Math.abs(hx - h) > 1 || Math.abs(hz - h) > 1) continue;
+      if (Math.abs(hx - h) > 2 || Math.abs(hz - h) > 2) continue;
       const r = rngOf((i * 73856093) ^ (j * 19349663) ^ seed);
       tree(kinds[Math.floor(r() * kinds.length)], tx - cx * CH, h, tz - cz * CH, r);
     }

@@ -170,8 +170,8 @@ export class World {
     for (let r = 0; r < 200; r += 3) for (let a = 0; a < 16; a++) {
       const x = Math.round(sx + Math.cos(a / 16 * Math.PI * 2) * r), z = Math.round(sz + Math.sin(a / 16 * Math.PI * 2) * r);
       const c = this.gen.column(x, z);
-      if (c.h > SEA + 2 && c.biome === 0) return [x + 0.5, c.h + 1, z + 0.5];
+      if (c.h > SEA + 4 && c.biome === 0) return [x + 0.5, c.h + 1, z + 0.5];
     }
-    return [sx, 60, sz];
+    return [sx, 120, sz];
   }
 }

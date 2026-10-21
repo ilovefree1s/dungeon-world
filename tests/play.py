@@ -107,7 +107,7 @@ with sync_playwright() as pw:
     page.evaluate('__dw.input.tJump = 0')
     if not args.phone: page.keyboard.up('Space')
     top = page.evaluate('__top')
-    check(top - y0 > 2.2, f'the jump button jumps ({top - y0:.2f} blocks high)')
+    check(4.5 < top - y0 < 9, f'the jump button jumps ({top - y0:.2f} blocks high)')
     page.wait_for_function('__dw.player.onGround', timeout=30000)
     check(True, 'the hero lands again')
     # a swipe turns the camera
@@ -127,6 +127,55 @@ with sync_playwright() as pw:
         print('  info pointer lock in headless Chromium:', page.evaluate('!!document.pointerLockElement'))
         page.evaluate('document.pointerLockElement && document.exitPointerLock()'); frames(5)
         if page.evaluate('__dw.UI.state') == 'menu': page.evaluate("document.getElementById('resume').click()")
+    page.evaluate('__dw.setQuality(1)')
+
+    # ---- the mage's combat: bolts, a blink, a bite
+    page.evaluate("document.getElementById('menuBtn').click()"); frames(2)
+    page.evaluate("[...document.querySelectorAll('#segHero button')][1].click()"); frames(2)
+    page.evaluate("document.getElementById('resume').click()"); frames(2)
+    page.evaluate('__dw.setQuality(0)')
+    check(page.evaluate('__dw.player.cls') == 1, 'the menu switches the hero to the mage')
+    page.wait_for_function('__dw.player.onGround', timeout=600000)
+    # a slime 8 blocks ahead, where the camera looks
+    # (a tree may stand in the way: turn and try again)
+    spawn_js = """(() => { const p = __dw.player, w = __dw.world; const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
+      __dw.monsters.list.slice().forEach(m => __dw.monsters.remove(m));
+      for (let d = 14; d >= 8; d--) { const x = p.pos.x + fx * d, z = p.pos.z + fz * d; const g = w.groundY(x, z); if (g >= 0 && !w.water(x, g + 1, z) && Math.abs(g + 1 - p.pos.y) < 5) { __dw.monsters.spawn(1, x, g + 1, z); return; } }
+      __dw.monsters.spawn(1, p.pos.x + fx * 10, p.pos.y, p.pos.z + fz * 10); })()"""
+    hit = False
+    for turn in range(4):
+        page.evaluate(spawn_js); frames(2)
+        hp0 = page.evaluate('__dw.monsters.list[0].hp')
+        for i in range(5):
+            page.evaluate('__dw.input.atkEdge = true'); frames(14)
+            if page.evaluate('__dw.monsters.list.length === 0 || __dw.monsters.list[0].hp < ' + str(hp0)): hit = True; break
+        if hit: break
+        page.evaluate('__dw.player.yaw += Math.PI / 2'); frames(3)
+    check(hit, f'the mage\'s bolts hit a slime ahead (hp {hp0} -> {page.evaluate("__dw.monsters.list.length ? __dw.monsters.list[0].hp : \"dead\"")})')
+    for i in range(10):
+        if page.evaluate('__dw.hero.kills') > 0: break
+        page.evaluate('__dw.input.atkEdge = true'); frames(14)
+    check(page.evaluate('__dw.hero.kills') > 0, 'the slime dies and counts as a kill')
+    check(page.evaluate('__dw.hero.xp') > 0, 'killing it gives XP')
+    page.screenshot(path=str(out / '05-mage.png'))
+    # the blink
+    moved = 0
+    for turn in range(4):
+        p0 = page.evaluate('__dw.player.pos.toArray()')
+        page.evaluate('__dw.input.specEdge = true'); frames(4)
+        p1 = page.evaluate('__dw.player.pos.toArray()')
+        moved = ((p1[0] - p0[0]) ** 2 + (p1[2] - p0[2]) ** 2) ** 0.5
+        if moved > 1.5: break
+        page.evaluate('__dw.player.yaw += Math.PI / 2; __dw.player.vel.set(0, 0, 0)'); frames(140)
+    check(moved > 3, f'the blink leaps ahead ({moved:.1f} blocks)')
+    # a bite: a slime right next to the hero
+    page.evaluate('__dw.monsters.spawn(1, __dw.player.pos.x + 2.4, __dw.player.pos.y, __dw.player.pos.z)')
+    page.wait_for_function('__dw.hero.hp < __dw.hero.maxHp', timeout=600000)
+    check(True, f'a slime bites the hero (hp {page.evaluate("__dw.hero.hp")}/{page.evaluate("__dw.hero.maxHp")})')
+    page.evaluate('__dw.monsters.list.slice().forEach(m => __dw.monsters.remove(m))')
+    page.evaluate("document.getElementById('menuBtn').click()"); frames(2)
+    page.evaluate("[...document.querySelectorAll('#segHero button')][0].click()"); frames(2)
+    page.evaluate("document.getElementById('resume').click()"); frames(2)
     page.evaluate('__dw.setQuality(1)')
 
     # every biome: the middle of its region
@@ -161,9 +210,9 @@ with sync_playwright() as pw:
     page.screenshot(path=str(out / '21-dawn.png'))
 
     # swimming: find water near the start and drop in
-    w = page.evaluate('''(() => { const g = __dw.world.gen; const [sx, sz] = g.site(0, 0); for (let r = 0; r < 260; r += 4) for (let a = 0; a < 24; a++) { const x = Math.round(sx + Math.cos(a / 24 * 6.283) * r), z = Math.round(sz + Math.sin(a / 24 * 6.283) * r); const c = g.column(x, z); if (c.h < 20 && c.biome === 0) return [x, z]; } return null; })()''')
+    w = page.evaluate('''(() => { const g = __dw.world.gen; const [sx, sz] = g.site(0, 0); for (let r = 0; r < 260; r += 4) for (let a = 0; a < 24; a++) { const x = Math.round(sx + Math.cos(a / 24 * 6.283) * r), z = Math.round(sz + Math.sin(a / 24 * 6.283) * r); const c = g.column(x, z); if (c.h < 40 && c.biome === 0) { let open = true; for (let dz = -10; dz <= 10 && open; dz += 5) for (let dx = -10; dx <= 10; dx += 5) if (g.column(x + dx, z + dz).h > 42) { open = false; break; } if (open) return [x, z]; } } return null; })()''')
     if w:
-        page.evaluate(f'__dw.sky.t = 0.45; __dw.player.place({w[0]} + 0.5, 30, {w[1]} + 0.5)')
+        page.evaluate(f'__dw.sky.t = 0.45; __dw.player.place({w[0]} + 0.5, 60, {w[1]} + 0.5)')
         page.wait_for_function('__dw.world.readyAround(__dw.player.pos.x, __dw.player.pos.z, 32) >= 1', timeout=120000)
         page.wait_for_function('__dw.player.inWater || __dw.player.onGround', timeout=600000)
         frames(3)
@@ -181,8 +230,9 @@ with sync_playwright() as pw:
     # cost per frame (JavaScript only: the GPU here is software)
     page.wait_for_timeout(2500)
     st = page.evaluate('__dw.stats()')
-    print('stats', json.dumps({k: st[k] for k in ('ready', 'pending', 'tris', 'calls', 'frameMs', 'worstMs', 'fps', 'genMs', 'meshMs', 'quality')}))
+    print('stats', json.dumps({k: st[k] for k in ('ready', 'pending', 'tris', 'calls', 'frameMs', 'worstMs', 'fps', 'genMs', 'meshMs', 'quality', 'monsters')}))
     check(st['pending'] < 40, 'chunks keep arriving')
+    print('monsters roaming now:', st['monsters'])
     b.close()
 
 errors = [e for e in errors if 'fonts.g' not in e]

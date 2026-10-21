@@ -29,6 +29,18 @@ button{font:inherit;color:inherit}
 #under{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;background:rgba(20,70,120,.45)}
 
 /* ---------- HUD */
+#nums{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.num{position:absolute;font-family:var(--display);font-size:24px;color:#fff;text-shadow:0 2px 0 #000,0 0 3px #000;transform:translate(-50%,-50%);white-space:nowrap}
+.num.crit{color:var(--gold);font-size:34px}.num.hurt{color:#ff6a55}
+#cross{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,255,255,.85);box-shadow:0 0 0 2px rgba(0,0,0,.45);display:none;pointer-events:none}
+html.locked #cross{display:block}
+#bars{position:absolute;left:calc(12px + env(safe-area-inset-left,0px));top:calc(54px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:6px;width:min(260px,44vw)}
+.bar{position:relative;height:12px;border-radius:999px;background:rgba(0,0,0,.55);box-shadow:inset 0 0 0 2px rgba(255,255,255,.1);overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;width:100%;border-radius:inherit;transition:width .15s}
+#hpfill{background:linear-gradient(90deg,#ff3b30,#ff8a5c)}#xpfill{background:linear-gradient(90deg,#3fb8ff,#a6f0ff);width:0}
+.brow{display:flex;align-items:center;gap:8px}
+.brow b{font-family:var(--display);font-weight:400;font-size:15px;text-shadow:0 2px 0 #000;min-width:54px;font-variant-numeric:tabular-nums;white-space:nowrap}
+#hpT{color:var(--hp)}#lvT{color:var(--gold)}
 #hud{position:absolute;inset:0;pointer-events:none;padding:calc(10px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) 12px calc(12px + env(safe-area-inset-left,0px))}
 .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border-radius:999px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);
   font-family:var(--display);font-size:16px;letter-spacing:.04em;text-shadow:0 2px 0 #000;white-space:nowrap}
@@ -52,7 +64,7 @@ button{font:inherit;color:inherit}
 #banner p{margin:4px 0 0;font-weight:900;letter-spacing:.3em;font-size:clamp(11px,2.3vw,15px);color:var(--text);text-shadow:0 2px 0 #000;text-transform:uppercase}
 #hint{position:absolute;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);font-weight:900;font-size:13px;letter-spacing:.12em;color:var(--dim);
   text-shadow:0 2px 0 #000;transition:opacity .6s;white-space:nowrap;pointer-events:none;text-transform:uppercase}
-#dbg{position:absolute;left:12px;top:calc(96px + env(safe-area-inset-top,0px));font:700 11px/1.35 ui-monospace,monospace;color:#cfe;background:rgba(0,0,0,.5);padding:4px 7px;border-radius:6px;white-space:pre;pointer-events:none}
+#dbg{position:absolute;left:12px;top:calc(110px + env(safe-area-inset-top,0px));font:700 11px/1.35 ui-monospace,monospace;color:#cfe;background:rgba(0,0,0,.5);padding:4px 7px;border-radius:6px;white-space:pre;pointer-events:none}
 
 /* ---------- touch controls */
 #touch{position:absolute;inset:0;pointer-events:none}
@@ -61,7 +73,10 @@ button{font:inherit;color:inherit}
 .tbtn{position:absolute;border:0;border-radius:50%;display:grid;place-items:center;font-family:var(--display);letter-spacing:.04em;color:#3a1c00;pointer-events:auto;touch-action:none;cursor:pointer}
 .tbtn.on{transform:translateY(4px) scale(.96);filter:brightness(1.1)}
 #tJump{right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(40px + env(safe-area-inset-bottom,0px));width:84px;height:84px;font-size:17px;background:linear-gradient(#ffd85a,#ffb31f);box-shadow:0 6px 0 #a3600a,0 12px 24px rgba(0,0,0,.4)}
-@media (max-width:640px){#compass{top:calc(58px + env(safe-area-inset-top,0px));width:min(260px,70vw)}#where{max-width:56vw}}
+#tAtk{right:calc(112px + env(safe-area-inset-right,0px));bottom:calc(36px + env(safe-area-inset-bottom,0px));width:76px;height:76px;font-size:15px;background:linear-gradient(#ffd85a,#ffb31f);box-shadow:0 6px 0 #a3600a,0 12px 24px rgba(0,0,0,.4)}
+#tJump{width:70px;height:70px;font-size:14px;background:linear-gradient(#b8f08a,#6cc244);box-shadow:0 5px 0 #2e6a1a,0 10px 20px rgba(0,0,0,.4)}
+#tSpec{right:calc(46px + env(safe-area-inset-right,0px));bottom:calc(126px + env(safe-area-inset-bottom,0px));width:64px;height:64px;font-size:12px;color:#fff;background:linear-gradient(#6aa8ff,#2f6ad0);box-shadow:0 5px 0 #1a3a80,0 10px 20px rgba(0,0,0,.4)}
+@media (max-width:640px){#compass{top:calc(58px + env(safe-area-inset-top,0px));width:min(260px,70vw)}#where{max-width:56vw}#bars{top:calc(96px + env(safe-area-inset-top,0px))}}
 @media (pointer:fine){html:not(.touchy) #touch{display:none}}
 html:not(.touchy) #hint .t{display:none}
 html.touchy #hint .k{display:none}
@@ -107,6 +122,9 @@ html.touchy .keys{display:none}
   <div id="vign"></div>
   <div id="hurt"></div>
   <div id="hud" hidden>
+    <div id="nums"></div>
+    <div id="cross"></div>
+    <div id="bars"><div class="brow"><b id="hpT">30/30</b><div class="bar"><i id="hpfill"></i></div></div><div class="brow"><b id="lvT">LV 1</b><div class="bar"><i id="xpfill"></i></div></div></div>
     <div id="where" class="chip"><i id="whereDot"></i><span id="whereName">WHISPERWOOD</span></div>
     <div id="compass"></div>
     <div id="tr">
@@ -114,12 +132,14 @@ html.touchy .keys{display:none}
       <button class="hbtn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="#f6eee2" stroke-width="2.6" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     </div>
     <div id="banner"><h1 id="bannerT"></h1><p id="bannerS"></p></div>
-    <div id="hint"><span class="t">Swipe the screen to look around</span><span class="k">Click the world to look around with the mouse · WASD to move · Space to jump · Esc for the menu</span></div>
+    <div id="hint"><span class="t">Swipe the screen to look around</span><span class="k">Click the world to look around · WASD to move · Space to jump · left click casts, right click blinks · Esc for the menu</span></div>
     <div id="dbg" hidden></div>
   </div>
   <div id="touch" hidden>
     <div id="stick"><div id="knob"></div></div>
+    <button class="tbtn" id="tAtk" aria-label="Attack">ATTACK</button>
     <button class="tbtn" id="tJump" aria-label="Jump">JUMP</button>
+    <button class="tbtn" id="tSpec" aria-label="Blink">BLINK</button>
   </div>
   <div id="title" class="scrim">
     <div class="panel">
@@ -143,7 +163,7 @@ html.touchy .keys{display:none}
       <div class="row"><span>Music</span><div class="seg" id="segM"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
       <div class="row"><span>Sounds</span><div class="seg" id="segS"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
       <button class="big" id="resume">BACK TO THE WORLD</button>
-      <div class="keys">Move: WASD · Look: the mouse (click the world to capture it), Q / E or ← → · Zoom: the scroll wheel · Jump: Space · Run: Shift · Menu: Esc<br>Controller: left stick moves, right stick looks, A / ✕ jumps, B / ○ runs, Start for this menu</div>
+      <div class="keys">Move: WASD · Look: the mouse (click the world to capture it), Q / E or ← → · Zoom: the scroll wheel · Jump: Space · Attack: left click, J · Blink: right click, K · Run: Shift · Menu: Esc<br>Controller: left stick moves, right stick looks, A / ✕ jumps, X / ▢ attacks, B / ○ blinks, RB runs, Start for this menu</div>
       <p class="small" id="where2" style="margin:12px 0 0"></p>
     </div>
   </div>

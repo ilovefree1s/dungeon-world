@@ -24,11 +24,11 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 
 export const scene = new THREE.Scene();
-scene.fog = new THREE.Fog('#a9d4ff', 60, 120);
+scene.fog = new THREE.Fog('#a9d4ff', 120, 240);
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
 
-export const camera = new THREE.PerspectiveCamera(60, 1, 0.15, 600);
+export const camera = new THREE.PerspectiveCamera(60, 1, 0.3, 900);
 export const hemi = new THREE.HemisphereLight('#cfe6ff', '#4a3c2c', 0.9);
 scene.add(hemi);
 export const sun = new THREE.DirectionalLight('#fff1d8', 2.2);
@@ -44,11 +44,11 @@ composer.addPass(new OutputPass());
 
 // quality: 0 fast, 1 good, 2 best (pixel ratio, shadows, bloom, how far you see)
 export const QUALITY = [
-  { name: 'FAST', pr: 1, shadow: 0, bloom: false, view: 80 },
-  { name: 'GOOD', pr: 1.5, shadow: 1024, bloom: false, view: 120 },
-  { name: 'BEST', pr: 2, shadow: 2048, bloom: true, view: IS_TOUCH ? 140 : 176 },
+  { name: 'FAST', pr: 1, shadow: 0, bloom: false, view: 128 },
+  { name: 'GOOD', pr: 1.5, shadow: 1024, bloom: false, view: 176 },
+  { name: 'BEST', pr: 2, shadow: 2048, bloom: true, view: IS_TOUCH ? 208 : 256 },
 ];
-export const view = { w: 1, h: 1, quality: 1, viewDist: 120, shadowR: 34 };
+export const view = { w: 1, h: 1, quality: 1, viewDist: 176, shadowR: 68 };
 export function resize() {
   const w = innerWidth, h = innerHeight;
   view.w = w; view.h = h;
@@ -66,8 +66,8 @@ export function setQuality(level) {
   sun.castShadow = q.shadow > 0;
   if (q.shadow) {
     if (sun.shadow.mapSize.x !== q.shadow) { sun.shadow.mapSize.set(q.shadow, q.shadow); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
-    view.shadowR = q.shadow > 1024 ? 48 : 30;
-    Object.assign(sun.shadow.camera, { left: -view.shadowR, right: view.shadowR, top: view.shadowR, bottom: -view.shadowR, near: 1, far: 260 });
+    view.shadowR = q.shadow > 1024 ? 96 : 60;
+    Object.assign(sun.shadow.camera, { left: -view.shadowR, right: view.shadowR, top: view.shadowR, bottom: -view.shadowR, near: 1, far: 520 });
     sun.shadow.camera.updateProjectionMatrix();
   }
   view.bloomOn = q.bloom;

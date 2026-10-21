@@ -6,10 +6,12 @@
 import { THREE, scene, camera, TEX, V3 } from './engine.js';
 import { buildHero, equipHeroWeapon, animHero } from './dh/models.js';
 
-const HW = 0.48, HH = 2.6;          // the hero's box: half its width, its height (blocks)
-const WALK = 7.5, RUN = 11.5, SWIM = 4.2;
-const GRAV = 34, JUMP_V = 14.4;     // (a jump clears about 3 blocks)
-export const HERO_SCALE = 1.28;     // (Dungeon Heart's heroes are 2.15 tall in its units; out here they stand 2.6 blocks)
+// (a block is half a stride: the hero stands 5.2 blocks tall, steps up 2 and jumps 6)
+const HW = 0.96, HH = 5.2;          // the hero's box: half its width, its height (blocks)
+const WALK = 15, RUN = 23, SWIM = 8.4;
+const GRAV = 68, JUMP_V = 28.8;
+export const HERO_SCALE = 2.56;     // (Dungeon Heart's heroes are 2.15 tall in its units)
+const STEP = 2;                     // (how many blocks the hero steps up without a jump)
 
 export class Player {
   constructor(world) {
@@ -18,12 +20,13 @@ export class Player {
     this.onGround = false; this.inWater = false; this.headUnder = false;
     this.face = 0;               // which way the hero faces (radians, 0 = +z)
     this.walk = 0; this.move = 0;
-    this.yaw = Math.PI * 0.25; this.pitch = 0.32; this.camDist = 10;
+    this.yaw = Math.PI * 0.25; this.pitch = 0.32; this.camDist = 20;
     this.camPos = new V3(); this.camFocus = new V3();
     this.lastLook = -10; this.visY = 0; this.hurtT = 0; this.coyote = 0; this.jumpBuf = 0;
+    this.castT = -1; this.invT = 0; this.aimFace = null;
     this.cls = -1; this.model = null;
     // a soft round shadow under the hero (always there, even with the real shadows off)
-    this.blob = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: TEX.shadow, transparent: true, depthWrite: false }));
+    this.blob = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 4.4), new THREE.MeshBasicMaterial({ map: TEX.shadow, transparent: true, depthWrite: false }));
     this.blob.rotation.x = -Math.PI / 2; this.blob.renderOrder = 1; scene.add(this.blob);
   }
   setClass(cls) {
@@ -63,10 +66,14 @@ export class Player {
         this.vel.y = 0;
         return false;
       }
-      // a step up: on the ground (or swimming), one block, with room overhead
+      // a step up: on the ground (or swimming), up to STEP blocks, with room overhead
       if ((this.onGround || this.inWater) && this.vel.y <= 0.5) {
-        const up = Math.floor(p.y) + 1.001;
-        if (up - p.y <= 1.05 && !this.hits(nx, up, nz) && !this.hits(p.x, up, p.z)) { p.set(nx, up, nz); this.stepped = true; continue; }
+        let ok = false;
+        for (let s = 1; s <= STEP && !ok; s++) {
+          const up = Math.floor(p.y) + s + 0.001;
+          if (up - p.y <= STEP + 0.05 && !this.hits(nx, up, nz) && !this.hits(p.x, up, p.z)) { p.set(nx, up, nz); this.stepped = true; ok = true; }
+        }
+        if (ok) continue;
       }
       if (ax === 0) this.vel.x = 0; else this.vel.z = 0;
       return false;
@@ -89,8 +96,8 @@ export class Player {
     let wx = fwdX * -my + rtX * mx, wz = fwdZ * -my + rtZ * mx;
     const wl = Math.hypot(wx, wz); if (wl > 0) { wx /= wl; wz /= wl; }
     // water: feet and head
-    const feetW = w.water(p.x, p.y + 0.4, p.z), chestW = w.water(p.x, p.y + 1.4, p.z);
-    this.inWater = feetW; this.headUnder = w.water(p.x, p.y + 1.9, p.z);
+    const feetW = w.water(p.x, p.y + 0.8, p.z), chestW = w.water(p.x, p.y + 2.8, p.z);
+    this.inWater = feetW; this.headUnder = w.water(p.x, p.y + 3.8, p.z);
     const speed = (this.inWater && chestW ? SWIM : inp.sprint || mag > 0.95 ? RUN : WALK) * mag;
     const accel = this.onGround || this.inWater ? 14 : 5;
     const k = 1 - Math.exp(-accel * dt);
@@ -103,20 +110,21 @@ export class Player {
     if (this.onGround) this.coyote = 0.1;
     if (chestW) {
       // swimming: float up to the surface, jump to climb out
-      this.vel.y += (inp.jump ? 9 : this.headUnder ? 5 : -2) * dt * 3;
+      this.vel.y += (inp.jump ? 18 : this.headUnder ? 10 : -4) * dt * 3;
       this.vel.y *= Math.exp(-3 * dt);
-      if (!this.headUnder && inp.jump && this.vel.y < 6 && this.wallAhead(wx, wz)) this.vel.y = 8.5;
-      this.vel.y = Math.max(-5, Math.min(6, this.vel.y));
+      if (!this.headUnder && inp.jump && this.vel.y < 12 && this.wallAhead(wx, wz)) this.vel.y = 17;
+      this.vel.y = Math.max(-10, Math.min(12, this.vel.y));
     } else {
       if (this.jumpBuf > 0 && this.coyote > 0) { this.vel.y = JUMP_V; this.jumpBuf = 0; this.coyote = 0; this.onGround = false; this.jumped = true; }
       // (let go of jump early for a short hop)
-      if (!inp.jump && this.vel.y > 4 && this.jumped) this.vel.y -= GRAV * 1.2 * dt;
+      if (!inp.jump && this.vel.y > 8 && this.jumped) this.vel.y -= GRAV * 1.2 * dt;
       this.vel.y -= GRAV * dt;
-      if (this.vel.y < -40) this.vel.y = -40;
+      if (this.vel.y < -80) this.vel.y = -80;
     }
     // lava: it throws you out
-    if (w.lava(p.x, p.y + 0.3, p.z)) { this.vel.y = 15; this.hurtT = 0.6; this.onHurt && this.onHurt(); }
-    this.hurtT = Math.max(0, this.hurtT - dt);
+    if (w.lava(p.x, p.y + 0.6, p.z)) { this.vel.y = 30; this.hurtT = 0.6; this.onHurt && this.onHurt(); }
+    this.hurtT = Math.max(0, this.hurtT - dt); this.invT = Math.max(0, this.invT - dt);
+    if (this.castT >= 0) { this.castT += dt / 0.38; if (this.castT >= 1) this.castT = -1; }
     // move, one axis at a time
     const wasGround = this.onGround;
     this.onGround = false; this.stepped = false;
@@ -126,17 +134,22 @@ export class Player {
     if (this.onGround) this.jumped = false;
     // (stay stuck to the ground walking down a single step)
     if (!this.onGround && wasGround && this.vel.y <= 0 && !this.inWater) {
-      if (this.hits(p.x, p.y - 1.05, p.z) && !this.hits(p.x, p.y - 0.02, p.z)) {
-        let y = p.y; while (!this.hits(p.x, y - 0.05, p.z) && y > p.y - 1.1) y -= 0.05;
+      if (this.hits(p.x, p.y - STEP - 0.05, p.z) && !this.hits(p.x, p.y - 0.02, p.z)) {
+        let y = p.y; while (!this.hits(p.x, y - 0.05, p.z) && y > p.y - STEP - 0.1) y -= 0.05;
         p.y = Math.floor(y + 0.01); if (this.hits(p.x, p.y, p.z)) p.y += 1; this.onGround = true; this.vel.y = 0;
       }
     }
     // stuck inside a block (a chunk arriving around you, say): climb out
     if (this.hits(p.x, p.y, p.z)) { p.y = Math.floor(p.y) + 1; this.vel.y = Math.max(0, this.vel.y); }
     if (p.y < -20) { const g = w.groundY(p.x, p.z); p.y = g + 1; this.vel.y = 0; }
+    this.aboveGround = p.y - (w.groundY(p.x, p.z, p.y + 1) + 1);
     // face where you walk
     const hs = Math.hypot(this.vel.x, this.vel.z);
-    if (hs > 0.4 && mag > 0.05) {
+    if (this.aimFace !== null) {
+      let d = this.aimFace - this.face; d = Math.atan2(Math.sin(d), Math.cos(d));
+      this.face += d * (1 - Math.exp(-20 * dt));
+      if (this.castT < 0) this.aimFace = null;
+    } else if (hs > 0.4 && mag > 0.05) {
       const target = Math.atan2(this.vel.x, this.vel.z);
       let d = target - this.face; d = Math.atan2(Math.sin(d), Math.cos(d));
       this.face += d * (1 - Math.exp(-14 * dt));
@@ -151,24 +164,38 @@ export class Player {
     this.animate(dt, hs);
     this.placeCamera(dt);
   }
-  wallAhead(wx, wz) { const p = this.pos; return this.world.solid(p.x + wx * 0.8, p.y + 0.5, p.z + wz * 0.8) || this.world.solid(p.x + wx * 0.8, p.y + 1.2, p.z + wz * 0.8); }
+  // the mage's blink: a leap ahead through the air, as far as the way is clear (up to 9 blocks)
+  blink(dx, dz) {
+    const p = this.pos, from = p.clone();
+    let x = p.x, y = p.y, z = p.z, n = 0;
+    for (let d = 1; d <= 18; d += 1) {
+      const nx = from.x + dx * d, nz = from.z + dz * d;
+      let ny = y;
+      if (this.hits(nx, ny, nz)) { ny = Math.floor(y) + 1.001; if (this.hits(nx, ny, nz)) ny = Math.floor(y) + 2.001; if (this.hits(nx, ny, nz)) break; }
+      x = nx; y = ny; z = nz; n = d;
+    }
+    if (n < 3) return false;
+    p.set(x, y, z); this.visY = y; this.vel.set(dx * 8, 2, dz * 8); this.invT = Math.max(this.invT, 0.35); this.snapCam = false;
+    return true;
+  }
+  wallAhead(wx, wz) { const p = this.pos; return this.world.solid(p.x + wx * 1.6, p.y + 1, p.z + wz * 1.6) || this.world.solid(p.x + wx * 1.6, p.y + 2.4, p.z + wz * 1.6); }
   animate(dt, hs) {
     const m = this.model, p = this.pos;
     if (!m) return;
     // (the model eases up a step instead of popping)
-    this.visY += (p.y - this.visY) * (this.stepped || Math.abs(p.y - this.visY) < 1.2 ? 1 - Math.exp(-18 * dt) : 1);
-    if (Math.abs(p.y - this.visY) > 1.5) this.visY = p.y;
-    const swimming = this.inWater && this.world.water(p.x, p.y + 1.4, p.z);
-    m.position.set(p.x, this.visY - (swimming ? 1.1 : 0), p.z);
+    this.visY += (p.y - this.visY) * (this.stepped || Math.abs(p.y - this.visY) < 2.4 ? 1 - Math.exp(-18 * dt) : 1);
+    if (Math.abs(p.y - this.visY) > 3) this.visY = p.y;
+    const swimming = this.inWater && this.world.water(p.x, p.y + 2.8, p.z);
+    m.position.set(p.x, this.visY - (swimming ? 2.2 : 0), p.z);
     m.rotation.y = this.face;
     this.move += (Math.min(1, hs / WALK) - this.move) * (1 - Math.exp(-10 * dt));
     this.walk += dt * (4 + hs * 1.15);
     const t = performance.now() / 1000;
-    animHero(m, t, { walk: this.walk, move: this.onGround || swimming ? this.move : 0.15, roll: 0, swing: -1, cast: -1, whirl: false });
+    animHero(m, t, { walk: this.walk, move: this.onGround || swimming ? this.move : 0.15, roll: 0, swing: -1, cast: this.castT, whirl: false });
     const u = m.userData;
     if (!this.onGround && !swimming) {
       // in the air: knees up, arms out
-      const k = Math.max(-1, Math.min(1, this.vel.y / 10));
+      const k = Math.max(-1, Math.min(1, this.vel.y / 20));
       u.legs[0].rotation.x = -0.6 - k * 0.2; u.legs[1].rotation.x = 0.25 - k * 0.3;
       u.arms[0].rotation.z = -0.5; u.arms[1].rotation.z = 0.5 + 0.1;
     } else { u.arms[0].rotation.z = 0; }
@@ -176,34 +203,34 @@ export class Player {
     // the hurt flash
     if (u.flash) u.flash(this.hurtT > 0 ? (Math.sin(t * 40) > 0 ? 0.8 : 0) : 0, '#ff5a2a');
     // the shadow on the ground below
-    const gy = this.world.groundY(p.x, p.z, p.y + 0.5);
+    const gy = this.world.groundY(p.x, p.z, p.y + 1);
     const h = p.y - (gy + 1);
     this.blob.position.set(p.x, gy + 1.02, p.z);
-    this.blob.material.opacity = Math.max(0, 0.75 - h * 0.08);
-    this.blob.scale.setScalar(1 + Math.min(1, h * 0.05));
+    this.blob.material.opacity = Math.max(0, 0.75 - h * 0.04);
+    this.blob.scale.setScalar(1 + Math.min(1, h * 0.025));
   }
   // ---------------------------------------------------------------- the camera
   placeCamera(dt) {
     const p = this.pos;
-    const fy = this.visY + 2.4;
+    const fy = this.visY + 4.8;
     if (this.snapCam) this.camFocus.set(p.x, fy, p.z);
     else this.camFocus.lerp(new V3(p.x, fy, p.z), 1 - Math.exp(-14 * dt));
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
     const dir = new V3(Math.sin(this.yaw) * cp, sp, Math.cos(this.yaw) * cp);
     // pull in when a hill or a tree is between the hero and the camera
     let dist = this.camDist;
-    for (let d = 0.6; d <= this.camDist; d += 0.25) {
+    for (let d = 1.2; d <= this.camDist; d += 0.5) {
       const x = this.camFocus.x + dir.x * d, y = this.camFocus.y + dir.y * d, z = this.camFocus.z + dir.z * d;
-      if (this.world.camBlock(x, y, z) || this.world.camBlock(x, y - 0.3, z)) { dist = Math.max(1, d - 0.45); break; }
+      if (this.world.camBlock(x, y, z) || this.world.camBlock(x, y - 0.6, z)) { dist = Math.max(2, d - 0.9); break; }
     }
     // (the camera eases back out, but snaps in)
     this.curDist = this.snapCam || dist < (this.curDist || dist) ? dist : this.curDist + (dist - this.curDist) * (1 - Math.exp(-4 * dt));
     this.camPos.copy(this.camFocus).addScaledVector(dir, this.curDist);
     camera.position.copy(this.camPos);
-    camera.lookAt(this.camFocus.x, this.camFocus.y + 0.2, this.camFocus.z);
+    camera.lookAt(this.camFocus.x, this.camFocus.y + 0.4, this.camFocus.z);
     this.snapCam = false;
     // the hero fades a little when the camera is right on top of it
-    const a = this.curDist < 2.2 ? 0.35 : 1;
+    const a = this.curDist < 4.4 ? 0.35 : 1;
     if (this.model && this.model.userData.fade && a !== this.alpha) { this.model.userData.fade(a); this.alpha = a; }
   }
   // the hero's shine follows the light of day

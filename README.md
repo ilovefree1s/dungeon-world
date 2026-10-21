@@ -8,7 +8,16 @@ into endless land: woods, frozen peaks, dunes, bog, ash fields and crystal cliff
 
 Made for a PC first (keyboard and mouse, or a controller); phones work too.
 
-## Stage 1 (this one): the world
+## Stage 2 (in progress): fighting
+- The mage casts bolts where the camera looks (a monster near the crosshair draws them in) and
+  blinks ahead through the air. The warrior's sword and the hunter's bow come next.
+- Monsters from Dungeon Heart roam each land and come for you when they see you: slimes, bats
+  and spiders in the woods; skeletons and ghosts in the snow; hell crabs in the dunes; ghosts and
+  vampire bats in the bog; imps and fire sprites in the ash; wisps in the crystal lands.
+- Health, damage numbers, XP and levels (each level: more health, harder bolts). Falling in
+  a fight puts you back at the start of the woods, nothing lost.
+
+## Stage 1: the world
 - Endless land in chunks of 32 x 32 blocks, 96 high, built in a background worker so the
   frame never waits for them, and dropped again far behind you.
 - Six biomes in regions about 300 blocks across. You start in the middle of the woods and
@@ -35,8 +44,10 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 | Move | WASD | left stick / d-pad | the stick |
 | Look | the mouse (click the world to capture it; Esc lets it go), Q / E, ← → | right stick | swipe the screen |
 | Zoom | the scroll wheel | | |
+| Attack | left click, J | X / ▢ | ATTACK |
+| Blink | right click, K | B / ○ | BLINK |
 | Jump | Space | A / ✕ | JUMP |
-| Run | Shift (the stick pushed all the way runs too) | B / ○ | push the stick to its edge |
+| Run | Shift (the stick pushed all the way runs too) | RB, LT or a stick's click | push the stick to its edge |
 | Menu | Esc, P | Start | the ☰ button |
 
 Mouse speed (slow, normal, fast) is in the menu.
@@ -53,6 +64,8 @@ boats and mounts.
 - `src/world.js`: which chunks to load (nearest first, ahead of the camera before behind),
   their meshes (three draw calls each: blocks, glowing blocks, water), and block lookups.
 - `src/player.js`: the hero's movement and collisions, the camera. `src/sky.js`: day and night.
+- `src/combat.js`: the monsters (where they live, how they wander, chase and bite), the
+  hero's bolts and aim, health, XP and levels. `src/fx.js`: sparks, rings and damage numbers.
 - `src/engine.js`: the renderer in Dungeon Heart's style (ACES, soft shadows, bloom) and the
   helpers its models use. `src/dh/` holds Dungeon Heart's model files, copied unchanged.
 - `src/input.js`: keyboard, mouse, touch and controllers. `src/audio.js` and
@@ -65,6 +78,6 @@ boats and mounts.
   whole game in one page, for the claude.ai artifact.
 - Tests: `npm i`, then `python3 tests/play.py` plays it in headless Chromium in a PC window
   (`--phone` for an iPhone-size touch screen): walks with W, jumps with Space, turns, zooms with
-  the wheel, swims, visits every biome by day and night, opens the menu, and saves
+  the wheel, casts bolts at a slime as the mage, blinks, gets bitten, swims, visits every biome by day and night, opens the menu, and saves
   screenshots to `shots/`. `?debug` shows frame time, chunks and triangles; `?seed=N` picks
   another world, `?fresh` ignores the save.

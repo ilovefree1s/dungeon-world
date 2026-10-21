@@ -12,7 +12,7 @@ const uni = {
   topCol: { value: C('#3a8ee6') }, horCol: { value: C('#b7dcff') }, groundCol: { value: C('#6a7f96') },
   sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: C('#fff2c8') }, night: { value: 0 }, dusk: { value: 0 },
 };
-const dome = new THREE.Mesh(new THREE.SphereGeometry(520, 32, 16), new THREE.ShaderMaterial({
+const dome = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), new THREE.ShaderMaterial({
   uniforms: uni, side: THREE.BackSide, depthWrite: false, fog: false,
   vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w; }`,
   fragmentShader: `
@@ -46,7 +46,7 @@ dome.renderOrder = -10; dome.frustumCulled = false;
 scene.add(dome);
 
 // ---------------------------------------------------------------- clouds
-const NCLOUD = 40, TILE = 720;
+const NCLOUD = 40, TILE = 1440;
 const cloudMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.88, fog: false });
 const clouds = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cloudMat, NCLOUD * 2);
 clouds.frustumCulled = false;
@@ -54,16 +54,16 @@ const cloudBase = [];
 {
   let s = 12345; const r = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
   for (let i = 0; i < NCLOUD; i++) {
-    const w = 18 + r() * 46, d = 14 + r() * 34;
-    cloudBase.push({ x: r() * TILE, z: r() * TILE, y: 112 + r() * 18, w, d, h: 4 + r() * 3 });
+    const w = 36 + r() * 92, d = 28 + r() * 68;
+    cloudBase.push({ x: r() * TILE, z: r() * TILE, y: 224 + r() * 36, w, d, h: 8 + r() * 6 });
     // (a second, smaller box on top of each)
-    cloudBase.push({ x: 0, z: 0, y: 0, w: w * (0.4 + r() * 0.3), d: d * (0.4 + r() * 0.3), h: 3, top: true, ox: (r() - 0.5) * w * 0.4, oz: (r() - 0.5) * d * 0.4 });
+    cloudBase.push({ x: 0, z: 0, y: 0, w: w * (0.4 + r() * 0.3), d: d * (0.4 + r() * 0.3), h: 6, top: true, ox: (r() - 0.5) * w * 0.4, oz: (r() - 0.5) * d * 0.4 });
   }
 }
 scene.add(clouds);
 const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
 function placeClouds(px, pz, t) {
-  const drift = t * 2.2;
+  const drift = t * 4.4;
   let prev = null;
   cloudBase.forEach((c, i) => {
     if (c.top) {
@@ -114,10 +114,10 @@ export function updateSky(dt, focus) {
   hemi.intensity = 0.95 + 0.05 * day;
   cloudMat.color.copy(tmp2.set('#2a3458').lerp(tmp.set('#ffffff'), day)).lerp(K.duskHor, dusk * 0.4);
   // light and shadow follow the hero (snapped, so the shadows don't shimmer as you walk)
-  const snap = 2;
+  const snap = 4;
   const fx = Math.round(focus.x / snap) * snap, fz = Math.round(focus.z / snap) * snap;
   sun.target.position.set(fx, focus.y, fz);
-  sun.position.set(fx + sky.lightDir.x * 140, focus.y + sky.lightDir.y * 140, fz + sky.lightDir.z * 140);
+  sun.position.set(fx + sky.lightDir.x * 280, focus.y + sky.lightDir.y * 280, fz + sky.lightDir.z * 280);
   dome.position.copy(camera.position);
   placeClouds(focus.x, focus.z, performance.now() / 1000);
 }

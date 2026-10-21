@@ -9,6 +9,8 @@ import { sky, updateSky, clock } from './sky.js';
 import { readInput, takeLook, menuKeys, initTouch, onFirstInput, input, lockMouse, unlockMouse, mouseLocked } from './input.js';
 import { startAudio, sfx, setSfx, setMusic, audioState } from './audio.js';
 import { BIOME_NAME, BIOME_SUB, CH } from './gen.js';
+import { Monsters, Bolts, stats, xpToNext, aimPoint } from './combat.js';
+import { burst, ring, stepFx } from './fx.js';
 
 const $ = id => document.getElementById(id);
 const Q = new URLSearchParams(location.search);
@@ -40,17 +42,70 @@ player.setClass(UI.cls);
 let start = save && save.seed === seed ? [save.x, save.y, save.z] : world.spawnPoint();
 player.place(...start);
 if (save && save.seed === seed) { player.yaw = save.yaw ?? player.yaw; sky.t = save.t ?? sky.t; }
+if (save && save.level) { stats.level = save.level; stats.xp = save.xp || 0; stats.maxHp = 30 + (stats.level - 1) * 6; stats.hp = Math.min(stats.maxHp, save.hp || stats.maxHp); stats.kills = save.kills || 0; }
+const spawn = start.slice();
+
+// ---------------------------------------------------------------- combat
+const monsters = new Monsters(world, player);
+const bolts = new Bolts(world, monsters);
+monsters.hooks.hurt = () => player.onHurt();
+monsters.hooks.level = lv => { sfx('levelup'); ring(player.pos.x, player.pos.y + 0.1, player.pos.z, '#ffe08a', 1, 10, 0.7); burst(player.pos.x, player.pos.y + 3, player.pos.z, '#ffe9a0', 20, 10, 1.6, true, 0.8); banner('LEVEL ' + lv, 'stronger, and all healed up'); };
+let deadT = 0;
+monsters.hooks.dead = () => { sfx('death'); deadT = 2.6; banner('YOU FELL', 'back to the woods...'); player.invT = 9; if (player.model.userData.fade) player.model.userData.fade(0.4); };
+let castCd = 0, blinkCd = 0;
+const BOLT_COL = '#9ad8ff';
+function heroCombat(dt, inp) {
+  castCd -= dt; blinkCd -= dt;
+  if (stats.hp <= 0) return;
+  if (player.cls !== 1) { inp.atkEdge = inp.specEdge = false; return; } // (the warrior and the hunter fight in a later stage)
+  // the mage's bolt: toward where the camera looks (a monster near the crosshair draws it in)
+  if ((inp.atkEdge || inp.atk) && castCd <= 0 && player.castT < 0) {
+    inp.atkEdge = false;
+    castCd = 0.34;
+    player.castT = 0;
+    const from = player.pos.clone(); from.y += 3.8;
+    const to = aimPoint(world, monsters, from);
+    const dir = to.sub(from); if (dir.length() < 1) dir.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)); dir.normalize();
+    player.aimFace = Math.atan2(dir.x, dir.z);
+    from.addScaledVector(dir, 1.8);
+    bolts.fire(from, dir, BOLT_COL);
+    sfx('cast');
+  }
+  inp.atkEdge = false;
+  // the blink: the way you're walking, else the way the camera looks
+  if (inp.specEdge) {
+    inp.specEdge = false;
+    if (blinkCd <= 0) {
+      let dx = player.vel.x, dz = player.vel.z;
+      if (Math.hypot(dx, dz) < 1) { dx = -Math.sin(player.yaw); dz = -Math.cos(player.yaw); }
+      const l = Math.hypot(dx, dz); dx /= l; dz /= l;
+      const from = player.pos.clone();
+      if (player.blink(dx, dz)) {
+        blinkCd = 2.2;
+        burst(from.x, from.y + 3, from.z, '#9ad8ff', 14, 12, 1.6, true, 0.5);
+        burst(player.pos.x, player.pos.y + 3, player.pos.z, '#9ad8ff', 14, 12, 1.6, true, 0.5);
+        sfx('blink');
+      } else sfx('nope');
+    } else sfx('nope');
+  }
+}
+function respawn() {
+  stats.hp = stats.maxHp;
+  player.place(spawn[0], spawn[1] + 1, spawn[2]); placed = false;
+  if (player.model.userData.fade) player.model.userData.fade(1);
+  player.invT = 2;
+}
 if (Q.has('t')) sky.t = +Q.get('t');
 let placed = !!(save && save.seed === seed); // (a new hero still has to find its footing)
 // put the hero on open ground once its chunk is here
 function settle() {
   const p = player.pos;
-  for (let r = 0; r < 12; r++) for (let a = 0; a < Math.max(1, r * 6); a++) {
+  for (let r = 0; r < 24; r++) for (let a = 0; a < Math.max(1, r * 6); a++) {
     const x = Math.floor(p.x + Math.cos(a / Math.max(1, r * 6) * Math.PI * 2) * r) + 0.5, z = Math.floor(p.z + Math.sin(a / Math.max(1, r * 6) * Math.PI * 2) * r) + 0.5;
     const g = world.groundY(x, z);
     if (g < 0 || world.water(x, g + 1, z) || world.lava(x, g + 1, z) || world.lava(x, g, z)) continue;
     // (on the ground, not up in a tree)
-    if (!player.hits(x, g + 1, z) && world.gen.column(Math.floor(x), Math.floor(z)).h >= g - 1) { player.place(x, g + 1, z); return true; }
+    if (!player.hits(x, g + 1, z) && world.gen.column(Math.floor(x), Math.floor(z)).h >= g - 2) { player.place(x, g + 1, z); return true; }
   }
   return false;
 }
@@ -71,6 +126,8 @@ function updateHud(dt) {
   marks.forEach((m, i) => place(cspans[i], m[1]));
   const p = player.pos;
   place(cspans[8], (Math.atan2(-p.x, p.z) * 180 / Math.PI + 360) % 360);
+  $('hpfill').style.width = (stats.hp / stats.maxHp * 100) + '%'; $('hpT').textContent = `${stats.hp}/${stats.maxHp}`;
+  $('xpfill').style.width = (stats.xp / xpToNext() * 100) + '%'; $('lvT').textContent = 'LV ' + stats.level;
   $('clockT').textContent = clock();
   $('sunIcon').textContent = sky.night > 0.5 ? '☾' : '☀';
   // the biome you're in: its name in the corner, a banner the first time each visit
@@ -178,7 +235,7 @@ function menuStep() {
 function writeSave() {
   if (UI.state === 'title') return;
   const p = player.pos;
-  ls.set(SAVE_KEY, JSON.stringify({ seed, cls: UI.cls, x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +player.yaw.toFixed(3), t: +sky.t.toFixed(4) }));
+  ls.set(SAVE_KEY, JSON.stringify({ seed, cls: UI.cls, x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +player.yaw.toFixed(3), t: +sky.t.toFixed(4), level: stats.level, xp: stats.xp, hp: stats.hp, kills: stats.kills }));
 }
 let saveT = 0;
 addEventListener('pagehide', writeSave);
@@ -198,11 +255,11 @@ function frame(now) {
   const inp = readInput();
   const look = takeLook();
   // the scroll wheel: nearer or farther
-  if (input.zoom) { player.camDist = Math.max(4, Math.min(20, player.camDist + input.zoom * 1.2)); input.zoom = 0; }
+  if (input.zoom) { player.camDist = Math.max(8, Math.min(40, player.camDist + input.zoom * 2.4)); input.zoom = 0; }
   if (look[0] || look[1] || inp.lookRX) { if (!looked && UI.state === 'play') { looked = true; } }
   const p = player.pos;
   // the hero waits until the ground under it has arrived
-  const ready = world.readyAround(p.x, p.z, 10) >= 1;
+  const ready = world.readyAround(p.x, p.z, 20) >= 1;
   if (ready && !placed) placed = settle();
   if (UI.state === 'title') {
     // the title: the camera circles the hero while the world builds
@@ -219,6 +276,8 @@ function frame(now) {
     const n = Math.min(6, Math.ceil(dt * 60 - 0.01));
     for (let i = 0; i < n; i++) player.update(dt / n, inp, i ? [0, 0] : look, !ready || !placed);
     if (player.jumped && wasGround && !player.onGround) sfx('roll');
+    heroCombat(dt, inp);
+    if (deadT > 0 && (deadT -= dt) <= 0) respawn();
     if (!wasGround && player.onGround && vy < -18) sfx('slam');
     hintT += dt;
     $('hint').style.opacity = !looked && hintT > 2 && hintT < 14 ? 1 : 0;
@@ -228,6 +287,8 @@ function frame(now) {
   }
   fwd.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   world.update(p.x, p.z, fwd.x, fwd.z);
+  if (UI.state === 'play') { monsters.update(dt); bolts.update(dt); }
+  stepFx(dt);
   updateSky(dt, p);
   player.dayLight(0.25 + 0.75 * sky.day);
   if (UI.state !== 'title') updateHud(dt);
@@ -263,9 +324,9 @@ document.getElementById('boot')?.remove();
 
 // a hook for testing
 window.__dw = {
-  world, player, sky, UI, input, view, renderer, scene, THREE,
+  world, player, sky, UI, input, view, renderer, scene, THREE, monsters, bolts, hero: stats,
   start(cls = 0) { pickHero(cls); },
   teleport(x, z) { player.place(x + 0.5, 90, z + 0.5); placed = false; },
   setQuality(q) { UI.autoQ = false; UI.quality = q; setQuality(q); },
-  stats() { const c = world.counts(); return { ...c, ...world.stats, fps, frameMs, worstMs, state: UI.state, placed, pos: player.pos.toArray(), onGround: player.onGround, tris: renderer.info.render.triangles, calls: renderer.info.render.calls, quality: UI.quality, biome: biomeNow }; },
+  stats() { const c = world.counts(); return { ...c, ...world.stats, fps, frameMs, worstMs, state: UI.state, placed, pos: player.pos.toArray(), onGround: player.onGround, tris: renderer.info.render.triangles, calls: renderer.info.render.calls, quality: UI.quality, biome: biomeNow, monsters: monsters.list.length, hp: stats.hp, level: stats.level, kills: stats.kills }; },
 };
