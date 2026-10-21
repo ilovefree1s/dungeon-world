@@ -31,9 +31,12 @@ const dome = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), new THREE.Sha
       vec3 col = mix(horCol, topCol, pow(clamp(h, 0.0, 1.0), 0.55));
       col = mix(col, groundCol, clamp(-h * 3.0, 0.0, 1.0));
       float sd = max(dot(d, sunDir), 0.0);
-      col += sunCol * (pow(sd, 9.0) * 0.28 * (1.0 - night) + pow(sd, 3.0) * 0.18 * dusk);
-      col = mix(col, vec3(1.6,1.5,1.25), squareDisc(d, sunDir, 0.055) * (1.0 - night * 0.9));
-      col = mix(col, vec3(1.15,1.2,1.35), squareDisc(d, -sunDir, 0.04) * night);
+      // (a soft warmth around the sun, and a disc no brighter than white: anything brighter would bloom
+      // into a glare across the screen whenever the sun is ahead of you)
+      col += sunCol * (pow(sd, 12.0) * 0.16 * (1.0 - night) + pow(sd, 3.0) * 0.14 * dusk);
+      col = mix(col, vec3(1.0, 0.97, 0.88), squareDisc(d, sunDir, 0.05) * (1.0 - night * 0.9));
+      col = mix(col, vec3(0.9, 0.93, 1.0), squareDisc(d, -sunDir, 0.04) * night);
+      col = min(col, vec3(1.0));
       vec3 s = floor(d * 240.0);
       float r = fract(sin(dot(s, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
       col += vec3(step(0.9972, r) * night * clamp(h * 4.0, 0.0, 1.0) * (0.6 + 0.4 * fract(r * 91.0)));
