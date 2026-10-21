@@ -62,7 +62,7 @@ export class Player {
       if (!this.hits(nx, ny, nz)) { p.set(nx, ny, nz); continue; }
       if (ax === 1) {
         // land on the block (or bump your head)
-        if (sd < 0) { p.y = Math.floor(p.y + sd) + 1; this.onGround = true; } else p.y = Math.ceil(p.y + sd + HH) - HH - 0.001;
+        if (sd < 0) { p.y = Math.floor(p.y + sd) + 1; this.onGround = true; } else p.y = Math.floor(p.y + sd + HH - 0.001) - HH - 0.001; // (the head just under the block it hit)
         this.vel.y = 0;
         return false;
       }

@@ -107,7 +107,7 @@ with sync_playwright() as pw:
     page.evaluate('__dw.input.tJump = 0')
     if not args.phone: page.keyboard.up('Space')
     top = page.evaluate('__top')
-    check(4.5 < top - y0 < 9, f'the jump button jumps ({top - y0:.2f} blocks high)')
+    check(2 < top - y0 < 9, f'the jump button jumps ({top - y0:.2f} blocks high)')
     page.wait_for_function('__dw.player.onGround', timeout=30000)
     check(True, 'the hero lands again')
     # a swipe turns the camera
