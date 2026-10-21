@@ -127,7 +127,13 @@ html.touchy .keys{display:none}
 .fwrap{display:grid;grid-template-columns:360px 1fr;gap:16px}
 @media (max-width:700px){.fwrap{grid-template-columns:1fr}}
 #forgeGl{width:100%;height:300px;display:block;border-radius:16px;background:radial-gradient(ellipse at 50% 40%,rgba(255,220,170,.14),rgba(0,0,0,.35));box-shadow:inset 0 0 0 1px var(--line);touch-action:none;cursor:grab}
-#forge .panel.drawing #forgeGl{height:170px}
+/* while drawing, the pad takes the wide side of the panel and the controls move to a narrow column */
+#forge .panel.drawing #forgeGl{height:150px}
+#forge .panel.drawing .fwrap{grid-template-columns:minmax(0,1fr) 400px}
+#forge .panel.drawing #fPad{height:min(680px,calc(94vh - 290px))}
+#forge .panel.drawing .frow .seg button{padding:4px 7px;font-size:10px}
+#forge .panel.drawing .frow .seg button.sw{padding-left:20px}
+@media (max-width:900px){#forge .panel.drawing .fwrap{grid-template-columns:1fr}#forge .panel.drawing #fPad{height:min(520px,60vh)}}
 @media (max-width:700px){#forgeGl{height:220px}#fPad{height:360px}}
 #forgeStats{margin-top:8px;font-size:12px;font-weight:800;color:var(--dim);line-height:1.6}
 #forgeStats b{color:var(--gold);font-family:var(--display);font-weight:400;letter-spacing:.06em;margin:0 2px 0 6px}
