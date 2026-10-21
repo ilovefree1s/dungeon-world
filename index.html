@@ -122,6 +122,37 @@ h2{margin:0 0 12px;font-family:var(--display);font-weight:400;font-size:30px;col
 .big.focus{outline:3px solid #fff;outline-offset:2px}
 .keys{margin-top:14px;font-size:12px;color:var(--dim);font-weight:800;line-height:1.6}
 html.touchy .keys{display:none}
+/* ---------- the forge */
+#forge .panel{width:min(860px,96vw);max-height:94vh;padding:16px 18px 14px;text-align:left}
+.fwrap{display:grid;grid-template-columns:300px 1fr;gap:14px}
+@media (max-width:700px){.fwrap{grid-template-columns:1fr}}
+#forgeGl{width:100%;height:300px;display:block;border-radius:16px;background:radial-gradient(ellipse at 50% 40%,rgba(255,220,170,.14),rgba(0,0,0,.35));box-shadow:inset 0 0 0 1px var(--line);touch-action:none;cursor:grab}
+@media (max-width:700px){#forgeGl{height:220px}}
+#forgeStats{margin-top:8px;font-size:12px;font-weight:800;color:var(--dim);line-height:1.6}
+#forgeStats b{color:var(--gold);font-family:var(--display);font-weight:400;letter-spacing:.06em;margin:0 2px 0 6px}
+.fcol{display:flex;flex-direction:column;gap:7px;min-width:0}
+.frow{display:grid;grid-template-columns:78px 1fr;align-items:center;gap:8px;font-weight:900;font-size:12px;letter-spacing:.08em;color:var(--dim)}
+.frow .seg{justify-content:flex-start}
+.frow .seg button{padding:5px 8px;font-size:11px}
+.seg button.sw{padding-left:22px;position:relative}
+.seg button.sw::before{content:"";position:absolute;left:7px;top:50%;width:10px;height:10px;margin-top:-5px;border-radius:3px;background:var(--sw);box-shadow:inset 0 -2px 0 rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.4)}
+.frow input[type=range]{width:100%;accent-color:var(--gold)}
+.fname{display:flex;gap:6px}
+.fname input{flex:1;min-width:0;border:0;border-radius:10px;padding:8px 10px;background:rgba(0,0,0,.4);box-shadow:inset 0 0 0 1px var(--line);color:var(--text);font:900 13px var(--display);letter-spacing:.06em;text-transform:uppercase}
+.fbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.fbtns button{border:0;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px var(--line);font-family:var(--display);font-size:14px;letter-spacing:.05em;cursor:pointer}
+.fbtns button.gold{background:linear-gradient(#ffd85a,#ffb31f);color:#3a1c00;box-shadow:0 4px 0 #a3600a}
+#fSaved{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.fchip{display:inline-flex;align-items:stretch;border-radius:10px;overflow:hidden;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px var(--line)}
+.fchip button{border:0;background:transparent;padding:6px 9px;font-weight:900;font-size:11px;letter-spacing:.05em;cursor:pointer}
+.fchip .load{text-transform:uppercase}
+.fchip .eqb{color:var(--gold);border-left:1px solid var(--line)}
+.fchip.eq{box-shadow:inset 0 0 0 2px var(--gold)}
+.fchip.eq .eqb{background:var(--gold);color:#3a1c00}
+.fchip .del{color:var(--dim);border-left:1px solid var(--line)}
+.fhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.fhead h2{margin:0}
+.fhead .small{text-align:right}
 #fail{position:fixed;inset:0;display:grid;place-items:center;background:#0b0908;color:#ffd8c0;font:700 18px Nunito,sans-serif;z-index:99;padding:24px;text-align:center}
 </style>
 </head>
@@ -164,6 +195,33 @@ html.touchy .keys{display:none}
       <div class="small" id="loadT">BUILDING THE WORLD...</div>
     </div>
   </div>
+  <div id="forge" class="scrim" hidden>
+    <div class="panel">
+      <div class="fhead"><h2>THE FORGE</h2><span class="small">BUILD IT, NAME IT, AND THE WARRIOR WIELDS IT</span></div>
+      <div class="fwrap">
+        <div>
+          <canvas id="forgeGl"></canvas>
+          <div id="forgeStats"></div>
+          <div class="fname" style="margin-top:8px"><input id="fName" placeholder="NAME IT" maxlength="28"><button type="button" class="hbtn" id="fDice" aria-label="A name" title="A name">🎲</button></div>
+          <div class="fbtns"><button type="button" id="fRandom">RANDOM</button><button type="button" id="fSave">SAVE</button><button type="button" class="gold" id="fWield">SAVE &amp; WIELD</button><button type="button" id="fUnequip">BACK TO THE PLAIN SWORD</button></div>
+          <div id="fSaved"></div>
+        </div>
+        <div class="fcol">
+          <div class="frow"><span>TYPE</span><div class="seg" id="fType"></div></div>
+          <div class="frow"><span>HEAD</span><div class="seg" id="fHead"></div></div>
+          <div class="frow"><span>MATERIAL</span><div class="seg" id="fMat"></div></div>
+          <div class="frow" id="fGuardRow"><span>GUARD</span><div class="seg" id="fGuard"></div></div>
+          <div class="frow"><span>GRIP</span><div class="seg" id="fGrip"></div></div>
+          <div class="frow"><span>GRIP COLOR</span><div class="seg" id="fGripCol"></div></div>
+          <div class="frow"><span>POMMEL</span><div class="seg" id="fPommel"></div></div>
+          <div class="frow"><span>GEM</span><div class="seg" id="fAccent"></div></div>
+          <div class="frow"><span>LENGTH</span><input type="range" id="fLen" min="0.7" max="1.5" step="0.01"></div>
+          <div class="frow"><span>WIDTH</span><input type="range" id="fWid" min="0.7" max="1.5" step="0.01"></div>
+          <button class="big" id="fClose">BACK</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="menu" class="scrim" hidden>
     <div class="panel">
       <h2>PAUSED</h2>
@@ -172,6 +230,7 @@ html.touchy .keys{display:none}
       <div class="row"><span>Mouse speed</span><div class="seg" id="segMouse"><button data-v="0.5">Slow</button><button data-v="1">Normal</button><button data-v="1.7">Fast</button></div></div>
       <div class="row"><span>Music</span><div class="seg" id="segM"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
       <div class="row"><span>Sounds</span><div class="seg" id="segS"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+      <button class="big" id="forgeBtn" style="background:linear-gradient(#9fe0ff,#3f8ccf);box-shadow:0 5px 0 #1a4a80;color:#06203a">THE FORGE: BUILD A WEAPON</button>
       <button class="big" id="resume">BACK TO THE WORLD</button>
       <div class="keys">Move: WASD · Look: the mouse (click the world to capture it), Q / E or ← → · Zoom: the scroll wheel · Jump: Space · Attack: left click, J · Abilities: 1, 2, 3 (or right click / K, Q, E) · Run: Shift · Menu: Esc<br>Controller: left stick moves, right stick looks, A / ✕ jumps, X / ▢ attacks, B / ○, Y / △ and LB are the abilities, RB runs, Start for this menu</div>
       <p class="small" id="where2" style="margin:12px 0 0"></p>

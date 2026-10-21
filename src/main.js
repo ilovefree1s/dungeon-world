@@ -11,6 +11,7 @@ import { startAudio, sfx, setSfx, setMusic, audioState } from './audio.js';
 import { BIOME_NAME, BIOME_SUB, CH } from './gen.js';
 import { Monsters, Bolts, stats, xpToNext } from './combat.js';
 import { Abilities, KITS } from './abilities.js';
+import { forge, openForge, closeForge, equippedSpec } from './forge.js';
 import { burst, ring, stepFx } from './fx.js';
 
 const $ = id => document.getElementById(id);
@@ -160,6 +161,11 @@ function openMenu() {
   markMenuFocus();
 }
 function closeMenu() { UI.state = 'play'; $('menu').hidden = true; writeSave(); }
+// the forge: opened from the menu; what it makes goes into the warrior's hand
+$('forgeBtn').addEventListener('click', () => { UI.state = 'forge'; $('menu').hidden = true; openForge(); });
+forge.onClose = () => { UI.state = 'menu'; $('menu').hidden = false; syncMenu(); };
+forge.onEquip = spec => player.equipForged(spec);
+player.equipForged(equippedSpec());
 $('menuBtn').addEventListener('click', openMenu);
 $('resume').addEventListener('click', () => { closeMenu(); if (!IS_TOUCH) lockMouse(); });
 // the mouse: captured by a click in the world while you play; letting it go (Esc) opens the menu
@@ -189,6 +195,8 @@ function menuStep() {
       else if (k === 'ok') pickHero(focusI);
     } else if (UI.state === 'play') {
       if (k === 'pause') openMenu();
+    } else if (UI.state === 'forge') {
+      if (k === 'pause' || k === 'back') closeForge();
     } else if (UI.state === 'menu') {
       const bs = [...document.querySelectorAll('#menu button')];
       // (the Esc that let the mouse go has already opened this menu: it doesn't close it again)

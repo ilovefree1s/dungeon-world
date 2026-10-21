@@ -5,6 +5,7 @@
 // ============================================================================
 import { THREE, scene, camera, TEX, V3 } from './engine.js';
 import { buildHero, equipHeroWeapon, animHero } from './dh/models.js';
+import { buildForged, statsOf } from './weaponkit.js';
 
 // (a block is half a stride: the hero stands 5.2 blocks tall, steps up 2 and jumps 6)
 const HW = 0.96, HH = 5.2;          // the hero's box: half its width, its height (blocks)
@@ -42,6 +43,20 @@ export class Player {
     m.traverse(o => { if (o.isMesh && o.material && o.material.envMapIntensity !== undefined) { const ms = [].concat(o.material); for (const mm of ms) { if (mm.userData.env0 === undefined) mm.userData.env0 = mm.envMapIntensity; this.mats.push(mm); } } });
     scene.add(m);
     this.model = m;
+    if (this.forgedSpec) this.equipForged(this.forgedSpec);
+  }
+  // a weapon from the forge in the warrior's hand (null: back to Dungeon Heart's sword)
+  equipForged(spec) {
+    this.forgedSpec = spec;
+    this.forged = spec ? statsOf(spec) : null;
+    const u = this.model && this.model.userData;
+    if (!u || this.cls !== 0 || !u.sword) return;
+    if (!spec) { equipHeroWeapon(this.model, 0, 1, 0); return; }
+    for (const c of [...u.sword.children]) u.sword.remove(c);
+    const w = buildForged(spec);
+    w.rotation.x = Math.PI / 2;
+    u.sword.add(w);
+    u.wtick = null; u.bladeMat = w.userData.bladeMat; u.bladeBase = u.bladeMat.emissive.clone(); u.bladeBaseI = u.bladeMat.emissiveIntensity;
   }
   place(x, y, z) { this.pos.set(x, y, z); this.vel.set(0, 0, 0); this.visY = y; this.snapCam = true; }
   // ---------------------------------------------------------------- collisions
