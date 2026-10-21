@@ -92,7 +92,8 @@ function render() {
   seg('fAccent', ACCENTS.map(([c, n]) => [n, n, c]), s.accent, (v, i) => { s.accent = i; });
   seg('fAura', AURAS.map(a => [a.id, a.name, a.color || null]), s.aura || 'none', v => { s.aura = v; });
   seg('fGripCol', GRIP_COLORS.map(([c, n]) => [n, n, c]), s.gripColor, (v, i) => { s.gripColor = i; });
-  $('fLen').value = s.length; $('fWid').value = s.width;
+  $('fLen').value = s.length; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1;
+  $('fPowRow').hidden = !s.aura || s.aura === 'none';
   $('fName').value = s.name || '';
   // the saved ones
   const list = $('fSaved'); list.innerHTML = '';
@@ -118,6 +119,7 @@ function wire() {
   if (wired) return; wired = true;
   $('fLen').addEventListener('input', e => { forge.spec.length = +e.target.value; rebuild(); });
   $('fWid').addEventListener('input', e => { forge.spec.width = +e.target.value; rebuild(); });
+  $('fPow').addEventListener('input', e => { forge.spec.auraPower = +e.target.value; rebuild(); });
   $('fName').addEventListener('input', e => { forge.spec.name = e.target.value.toUpperCase().slice(0, 28); });
   $('fDice').addEventListener('click', () => { forge.spec.name = nameOf(forge.spec); $('fName').value = forge.spec.name; sfx('pickup'); });
   $('fRandom').addEventListener('click', () => { forge.spec = randomSpec(); forge.spec.name = nameOf(forge.spec); sfx('pickup'); render(); });
