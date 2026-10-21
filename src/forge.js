@@ -99,7 +99,7 @@ function render() {
   const drawable = canDraw(s);
   $('fShapeRow').hidden = !drawable; $('fPadWrap').hidden = !drawable || !s.shape;
   if (!drawable) s.shape = null;
-  seg('fShape', [['preset', 'PRESET'], ['points', 'POINTS'], ['draw', 'DRAW']], s.shape ? shapeMode : 'preset', v => {
+  seg('fShape', [['preset', 'OFF'], ['points', 'DRAG CORNERS'], ['draw', 'FREEHAND']], s.shape ? shapeMode : 'preset', v => {
     if (v === 'preset') { s.shape = null; }
     else { if (!s.shape) s.shape = presetShape(s); shapeMode = v; }
   });

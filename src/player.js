@@ -354,6 +354,8 @@ export class Player {
     // (the camera eases back out, but snaps in)
     this.curDist = this.snapCam || dist < (this.curDist || dist) ? dist : this.curDist + (dist - this.curDist) * (1 - Math.exp(-4 * dt));
     this.camPos.copy(this.camFocus).addScaledVector(dir, this.curDist);
+    // (never under the land: a steep face right behind the hero lifts the camera over it)
+    if (this.world.poly) { const g = this.world.ground(this.camPos.x, this.camPos.z); if (g !== null && this.camPos.y < g + 1.5) this.camPos.y = g + 1.5; }
     if (this.shake > 0) { this.shake = Math.max(0, this.shake - dt * 1.6); const k = this.shake * 0.5; this.camPos.x += (Math.random() - 0.5) * k; this.camPos.y += (Math.random() - 0.5) * k; this.camPos.z += (Math.random() - 0.5) * k; }
     camera.position.copy(this.camPos);
     camera.lookAt(this.camFocus.x, this.camFocus.y + 0.4, this.camFocus.z);

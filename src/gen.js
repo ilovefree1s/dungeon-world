@@ -159,14 +159,19 @@ export function createGen(seed = 1, flat = false) {
     }
     return 30;
   }
+  const FLAT_BASE = [30, 34, 29, 23.4, 29, 32]; // (each biome's plain, in the heroes' units)
   const out = { h: 0, biome: 0, pick: 0, water: 0 };
   // one column: its height (the top solid block's y), the biome, the biome its surface shows
   // (dithered between neighbors at a border), the liquid over it
   function column(x, z) {
     if (flat) { out.h = 60; out.hf = 60; out.biome = 0; out.pick = 0; return out; } // (a flat meadow, for tests)
     const best = weights(x, z);
-    let h = 0;
-    for (let b = 0; b < 6; b++) if (wts[b] > 0.002) h += wts[b] * heightOf(b, x, z);
+    let h = 0, base = 0;
+    for (let b = 0; b < 6; b++) if (wts[b] > 0.002) { h += wts[b] * heightOf(b, x, z); base += wts[b] * FLAT_BASE[b]; }
+    // plains: broad regions where the land settles to its biome's level, with the gentlest of rolls;
+    // the hills and cliffs are what stands between them
+    const plain = clamp01((nW(x / 420 + 7.3, z / 420 + 3.1) + 0.25) * 2.0);
+    if (plain > 0) h += (base + 1.2 * fbm(nB, x / 80, z / 80, 2) - h) * plain;
     out.hf = Math.max(6, Math.min(WH - 20, h * 2)); // (the land's true height, for the low-poly skin)
     h = Math.max(6, Math.min(WH - 20, Math.floor(h * 2)));
     let pick = best;

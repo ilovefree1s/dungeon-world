@@ -64,7 +64,7 @@ with sync_playwright() as pw:
             got = page.evaluate(f'__dw.abilities.slots()[{i}].name')
             page.evaluate(f'__dw.input.abEdge[{i}] = true'); frames(6)
             frz = page.evaluate('__dw.monsters.list.map(m => m.frz)')
-            frames(24)
+            frames(40 if aname == 'RAIN' else 24)
             hp1 = page.evaluate('__dw.monsters.list.map(m => m.hp)'); p1 = page.evaluate('__dw.player.pos.toArray()')
             moved = ((p1[0] - p0[0]) ** 2 + (p1[2] - p0[2]) ** 2) ** 0.5
             hurt = len(hp1) < 3 or min(hp1) < 14

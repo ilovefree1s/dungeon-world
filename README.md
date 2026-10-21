@@ -25,8 +25,8 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   other way round, longer reaches farther; a wand casts fast and light, a crossbow shoots hard
   and slow; a staff's gem colors the mage's bolts. Name it (or roll one), save up to sixteen,
   wield one per hero; they stay in hand across reloads.
-  **Draw the shape yourself** (SHAPE: POINTS or DRAW, on blades and on axe, hammer and mace
-  heads): drag the corners of the outline (click an edge to add one, double-click to remove), or
+  **Draw the shape yourself** (DRAW IT: DRAG CORNERS or FREEHAND, on blades and on axe, hammer
+  and mace heads; the pad appears under the preview): drag the corners of the outline (click an edge to add one, double-click to remove), or
   trace the silhouette freehand and it's cleaned into an outline; MIRROR shapes one half and
   reflects it, or off, the whole outline. The drawing's area and length count: a fat blade hits
   harder and swings slower, a short one reaches less. Hafts and shafts (axes, hammers, maces,
@@ -42,8 +42,13 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   a fight puts you back at the start of the woods, nothing lost.
 
 ## Stage 1: the world
-- Endless land in chunks of 32 x 32 blocks, 96 high, built in a background worker so the
-  frame never waits for them, and dropped again far behind you.
+- A low-poly toy-diorama land: a faceted heightfield with vertex colors (grass, dirt paths, sand
+  by the water, rock on the steep faces, snow, ash, prism moss), low-poly trees, rocks and bushes
+  (icosahedron crowns, chunky trunks, angular rocks, a different kit per biome), and thousands of
+  instanced grass blades that sway in the wind and bend away from whoever walks through. Broad
+  plains with the hills and cliffs between them. Built in chunks of 32 x 32 in a background
+  worker so the frame never waits, and dropped again far behind you. (The block land is still in
+  the code behind `?blocks`, for digging underground later.)
 - Six biomes in regions about 300 blocks across. You start in the middle of the woods and
   every other biome borders it:
   | Biome | Land | Trees and things |
