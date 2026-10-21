@@ -25,6 +25,9 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   other way round, longer reaches farther; a wand casts fast and light, a crossbow shoots hard
   and slow; a staff's gem colors the mage's bolts. Name it (or roll one), save up to sixteen,
   wield one per hero; they stay in hand across reloads.
+  An **aura** rides the blade, the staff's head or the bow's limbs: flame, lightning, water,
+  wind, frost, shadow or holy (one cloud of particles per weapon, a single draw call), and it
+  colors the mage's bolts.
 - Monsters from Dungeon Heart roam each land and come for you when they see you: slimes, bats
   and spiders in the woods; skeletons and ghosts in the snow; hell crabs in the dunes; ghosts and
   vampire bats in the bog; imps and fire sprites in the ash; wisps in the crystal lands.

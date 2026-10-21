@@ -51,6 +51,17 @@ export const MATERIALS = [
 export const GUARDS = ['none', 'bar', 'cross', 'wings', 'ring', 'upswept'];
 export const GRIPS = ['leather', 'wrapped', 'wood', 'bone', 'chain'];
 export const POMMELS = ['none', 'ball', 'disc', 'spike', 'gem', 'ring'];
+// auras: particles living on the blade (or the staff's head, the bow's limbs); color: the bolts' color too
+export const AURAS = [
+  { id: 'none', name: 'NONE' },
+  { id: 'flame', name: 'FLAME', color: '#ff8a2a' },
+  { id: 'lightning', name: 'LIGHTNING', color: '#9fe0ff' },
+  { id: 'water', name: 'WATER', color: '#4aa8ff' },
+  { id: 'wind', name: 'WIND', color: '#d8f0e8' },
+  { id: 'frost', name: 'FROST', color: '#bfe8ff' },
+  { id: 'shadow', name: 'SHADOW', color: '#7a3cff' },
+  { id: 'holy', name: 'HOLY', color: '#ffe08a' },
+];
 export const ACCENTS = [['#ff3b3b', 'RUBY'], ['#3b8cff', 'SAPPHIRE'], ['#4fd36a', 'EMERALD'], ['#ffd23b', 'TOPAZ'], ['#c25cff', 'AMETHYST'], ['#ffffff', 'DIAMOND'], ['#ff8c2a', 'AMBER'], ['#1b1a1d', 'ONYX']];
 export const GRIP_COLORS = [['#5a3a22', 'BROWN'], ['#1e1e24', 'BLACK'], ['#7a1c22', 'RED'], ['#1e2c5a', 'BLUE'], ['#2c4a20', 'GREEN'], ['#6a4426', 'OAK'], ['#efe4c8', 'IVORY'], ['#f0b73c', 'GOLD']];
 
@@ -58,9 +69,9 @@ export function randomSpec(rnd = Math.random) {
   const pick = a => a[Math.floor(rnd() * a.length)];
   const t = pick(TYPES);
   return { type: t.id, head: pick(t.heads), material: pick(MATERIALS).id, guard: pick(GUARDS), grip: pick(GRIPS), pommel: pick(POMMELS),
-    accent: Math.floor(rnd() * ACCENTS.length), gripColor: Math.floor(rnd() * GRIP_COLORS.length), length: 0.8 + rnd() * 0.5, width: 0.8 + rnd() * 0.5, name: '' };
+    accent: Math.floor(rnd() * ACCENTS.length), gripColor: Math.floor(rnd() * GRIP_COLORS.length), length: 0.8 + rnd() * 0.5, width: 0.8 + rnd() * 0.5, aura: rnd() < 0.5 ? 'none' : pick(AURAS).id, name: '' };
 }
-export const defaultSpec = () => ({ type: 'sword', head: 'straight', material: 'steel', guard: 'cross', grip: 'leather', pommel: 'ball', accent: 0, gripColor: 0, length: 1, width: 1, name: '' });
+export const defaultSpec = () => ({ type: 'sword', head: 'straight', material: 'steel', guard: 'cross', grip: 'leather', pommel: 'ball', accent: 0, gripColor: 0, length: 1, width: 1, aura: 'none', name: '' });
 
 // ---------------------------------------------------------------- names
 const ADJ = { steel: 'STEEL', iron: 'IRON', bronze: 'BRONZE', gold: 'GILDED', obsidian: 'BLACK', bone: 'BONE', jade: 'JADE', crystal: 'PRISM', ember: 'EMBER', frost: 'FROST' };
@@ -81,7 +92,8 @@ export function statsOf(spec) {
   const reach = 4.6 * t.reach * (0.7 + spec.length * 0.3);
   // (for staffs and bows the reach is how fast the shot flies)
   const shot = t.reach * (0.8 + spec.length * 0.2);
-  return { dmg: +dmg.toFixed(2), spd: +spd.toFixed(2), reach: +reach.toFixed(1), shot: +shot.toFixed(2), glow: !!m.glow, cls: t.cls, color: ACCENTS[spec.accent % ACCENTS.length][0] };
+  const aura = AURAS.find(a => a.id === spec.aura);
+  return { dmg: +dmg.toFixed(2), spd: +spd.toFixed(2), reach: +reach.toFixed(1), shot: +shot.toFixed(2), glow: !!m.glow, cls: t.cls, color: aura && aura.color ? aura.color : ACCENTS[spec.accent % ACCENTS.length][0], aura: spec.aura || 'none' };
 }
 
 // ---------------------------------------------------------------- the model
@@ -234,7 +246,93 @@ export function buildForged(spec) {
   }
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.userData.bladeMat = metal;
+  // the aura, along the business end
+  if (spec.aura && spec.aura !== 'none') {
+    const a0 = (spec.type === 'bow' || spec.type === 'crossbow') ? -g.userData.tipY : y0;
+    const auraTick = attachAura(g, spec.aura, a0, g.userData.tipY, spec.type === 'bow' || spec.type === 'crossbow');
+    const base = g.userData.tick;
+    g.userData.tick = t => { if (base) base(t); auraTick(t); };
+  }
   if (!g.userData.tick) g.userData.tick = null;
   g.userData.spec = spec;
   return g;
+}
+
+// ---------------------------------------------------------------- auras
+// one cloud of points per weapon (a single draw call), moving in the weapon's own frame but
+// knowing which way the world's up is, so flames rise and water falls however the blade is held
+const upW = new THREE.Vector3(0, 1, 0), qW = new THREE.Quaternion(), upL = new THREE.Vector3();
+function attachAura(g, kind, y0, y1, flat) {
+  const N = kind === 'lightning' ? 48 : 110, span = Math.max(0.3, y1 - y0);
+  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), ph = new Float32Array(N);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const C = {
+    flame: ['#ffd070', '#ff6a1a'], lightning: ['#ffffff', '#7ac8ff'], water: ['#9fd8ff', '#2a70d0'], wind: ['#ffffff', '#b8e8d8'],
+    frost: ['#ffffff', '#8ad0ff'], shadow: ['#9a5cff', '#2a0848'], holy: ['#fff6d0', '#ffb830'],
+  }[kind];
+  const c0 = new THREE.Color(C[0]), c1 = new THREE.Color(C[1]), cc = new THREE.Color();
+  const size = { flame: 0.5, lightning: 0.3, water: 0.26, wind: 0.3, frost: 0.28, shadow: 0.6, holy: 0.3 }[kind];
+  const mat = new THREE.PointsMaterial({ size, map: TEX.soft, vertexColors: true, transparent: true, depthWrite: false, blending: kind === 'shadow' ? THREE.NormalBlending : THREE.AdditiveBlending, opacity: kind === 'shadow' ? 0.75 : 1, sizeAttenuation: true });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
+  // a few jagged lines for lightning
+  let line = null, lpos = null;
+  if (kind === 'lightning') {
+    const L = 3, S = 7; lpos = new Float32Array(L * S * 2 * 3);
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(lpos, 3));
+    line = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#cfeeff', transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    line.frustumCulled = false; g.add(line);
+  }
+  const rnd = () => Math.random();
+  const spawn = i => {
+    const y = y0 + rnd() * span, r = 0.04 + rnd() * 0.09, a = rnd() * Math.PI * 2;
+    pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = y; pos[i * 3 + 2] = Math.sin(a) * r;
+    if (flat) { pos[i * 3] = (rnd() - 0.5) * 0.1; pos[i * 3 + 2] = 0.05 + rnd() * 0.15; }
+    max[i] = { flame: 0.45, lightning: 0.14, water: 0.55, wind: 0.7, frost: 1.1, shadow: 1.0, holy: 1.0 }[kind] * (0.6 + rnd() * 0.8);
+    life[i] = max[i] * (kind === 'lightning' ? rnd() : 0);
+    ph[i] = rnd() * Math.PI * 2;
+    vel[i * 3] = (rnd() - 0.5) * 0.3; vel[i * 3 + 1] = (rnd() - 0.5) * 0.3; vel[i * 3 + 2] = (rnd() - 0.5) * 0.3;
+  };
+  for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
+  let last = -1, flick = 0;
+  return t => {
+    const dt = last < 0 ? 0.016 : Math.min(0.05, t - last); last = t;
+    g.getWorldQuaternion(qW); upL.copy(upW).applyQuaternion(qW.invert());
+    for (let i = 0; i < N; i++) {
+      life[i] += dt;
+      if (life[i] >= max[i]) { spawn(i); }
+      const k = life[i] / max[i], o = i * 3;
+      let fade;
+      switch (kind) {
+        case 'flame': pos[o] += (vel[o] * 0.5 + upL.x * 1.4) * dt; pos[o + 1] += (vel[o + 1] * 0.5 + upL.y * 1.4) * dt; pos[o + 2] += (vel[o + 2] * 0.5 + upL.z * 1.4) * dt; fade = (1 - k) * Math.min(1, k * 6); break;
+        case 'water': pos[o] += (vel[o] * 0.3 - upL.x * 0.9 * k) * dt; pos[o + 1] += (vel[o + 1] * 0.3 - upL.y * 0.9 * k) * dt; pos[o + 2] += (vel[o + 2] * 0.3 - upL.z * 0.9 * k) * dt; fade = 1 - k * k; break;
+        case 'frost': pos[o] += (Math.sin(t * 3 + ph[i]) * 0.1 - upL.x * 0.25) * dt; pos[o + 1] += (-upL.y * 0.25) * dt; pos[o + 2] += (Math.cos(t * 3 + ph[i]) * 0.1 - upL.z * 0.25) * dt; fade = Math.sin(k * Math.PI); break;
+        case 'wind': { const a = ph[i] + t * 7, r = 0.2 + 0.08 * Math.sin(t * 2 + ph[i]); pos[o] = Math.cos(a) * r; pos[o + 2] = Math.sin(a) * r; pos[o + 1] += 0.5 * dt; fade = Math.sin(k * Math.PI); break; }
+        case 'holy': { const a = ph[i] + t * 1.8, r = 0.16 + 0.12 * Math.sin(k * Math.PI); pos[o] = Math.cos(a) * r; pos[o + 2] = Math.sin(a) * r; pos[o + 1] += upL.y * 0.15 * dt; fade = Math.sin(k * Math.PI); break; }
+        case 'shadow': pos[o] += (vel[o] * 0.4 - upL.x * 0.3) * dt; pos[o + 1] += (vel[o + 1] * 0.4 - upL.y * 0.3) * dt; pos[o + 2] += (vel[o + 2] * 0.4 - upL.z * 0.3) * dt; fade = Math.sin(k * Math.PI); break;
+        default: fade = 1 - k; // lightning sparks
+      }
+      cc.copy(c0).lerp(c1, k).multiplyScalar(Math.max(0, fade));
+      col[o] = cc.r; col[o + 1] = cc.g; col[o + 2] = cc.b;
+    }
+    geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
+    if (line) {
+      // new jagged paths every few frames, flickering
+      if ((flick -= dt) <= 0) {
+        flick = 0.05 + rnd() * 0.06;
+        let q = 0;
+        for (let l = 0; l < 3; l++) {
+          const ya = y0 + rnd() * span * 0.5, yb = ya + span * (0.3 + rnd() * 0.5);
+          let px = (rnd() - 0.5) * 0.1, pz = (rnd() - 0.5) * 0.1;
+          for (let sIdx = 0; sIdx < 7; sIdx++) {
+            const nx = (rnd() - 0.5) * 0.16, nz = (rnd() - 0.5) * 0.16, y1s = ya + (yb - ya) * sIdx / 7, y2s = ya + (yb - ya) * (sIdx + 1) / 7;
+            lpos[q++] = px; lpos[q++] = y1s; lpos[q++] = pz; lpos[q++] = nx; lpos[q++] = y2s; lpos[q++] = nz;
+            px = nx; pz = nz;
+          }
+        }
+        line.geometry.attributes.position.needsUpdate = true;
+        line.material.opacity = 0.4 + rnd() * 0.6;
+      }
+    }
+  };
 }

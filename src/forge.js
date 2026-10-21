@@ -6,7 +6,7 @@
 // ============================================================================
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { TYPES, MATERIALS, GUARDS, GRIPS, POMMELS, ACCENTS, GRIP_COLORS, HERO_NAME, clsOf, randomSpec, defaultSpec, nameOf, statsOf, buildForged } from './weaponkit.js';
+import { TYPES, MATERIALS, GUARDS, GRIPS, POMMELS, ACCENTS, GRIP_COLORS, AURAS, HERO_NAME, clsOf, randomSpec, defaultSpec, nameOf, statsOf, buildForged } from './weaponkit.js';
 import { sfx } from './audio.js';
 
 const $ = id => document.getElementById(id);
@@ -54,14 +54,14 @@ function rebuild() {
   const span = Math.max(size.y, size.z * 1.2, size.x * 1.2);
   camera.position.set(0, 0.1, span * 1.75 + 0.6); camera.lookAt(0, 0, 0);
   const st = statsOf(forge.spec);
-  $('forgeStats').innerHTML = `<b>FOR THE</b> ${HERO_NAME[st.cls]} <b>DAMAGE</b> ${Math.round(st.dmg * 100)}% <b>SPEED</b> ${Math.round(st.spd * 100)}% ` + (st.cls === 0 ? `<b>REACH</b> ${st.reach} blocks` : `<b>SHOT</b> ${Math.round(st.shot * 100)}%`) + (st.glow ? ' <b>GLOWS</b>' : '');
+  $('forgeStats').innerHTML = (st.aura !== 'none' ? `<b>AURA</b> ${st.aura.toUpperCase()} ` : '') + `<b>FOR THE</b> ${HERO_NAME[st.cls]} <b>DAMAGE</b> ${Math.round(st.dmg * 100)}% <b>SPEED</b> ${Math.round(st.spd * 100)}% ` + (st.cls === 0 ? `<b>REACH</b> ${st.reach} blocks` : `<b>SHOT</b> ${Math.round(st.shot * 100)}%`) + (st.glow ? ' <b>GLOWS</b>' : '');
 }
 function frame(now) {
   if (!forge.open) return;
   raf = requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (!dragging) turn += dt * 0.6 * spin;
-  if (model) { model.rotation.y = turn; model.rotation.z = Math.sin(now / 1000 * 0.5) * 0.1; }
+  if (model) { model.rotation.y = turn; model.rotation.z = Math.sin(now / 1000 * 0.5) * 0.1; if (model.userData.tick) model.userData.tick(now / 1000); }
   renderer.render(scene, camera);
 }
 
@@ -90,6 +90,7 @@ function render() {
   seg('fGrip', GRIPS.map(x => [x, x.toUpperCase()]), s.grip, v => { s.grip = v; });
   seg('fPommel', POMMELS.map(x => [x, x.toUpperCase()]), s.pommel, v => { s.pommel = v; });
   seg('fAccent', ACCENTS.map(([c, n]) => [n, n, c]), s.accent, (v, i) => { s.accent = i; });
+  seg('fAura', AURAS.map(a => [a.id, a.name, a.color || null]), s.aura || 'none', v => { s.aura = v; });
   seg('fGripCol', GRIP_COLORS.map(([c, n]) => [n, n, c]), s.gripColor, (v, i) => { s.gripColor = i; });
   $('fLen').value = s.length; $('fWid').value = s.width;
   $('fName').value = s.name || '';

@@ -44,6 +44,10 @@ with sync_playwright() as pw:
     n = page.evaluate("""(async () => { const K = await import('./src/weaponkit.js'); let n = 0;
       for (const t of K.TYPES) for (const h of t.heads) for (const m of K.MATERIALS) { const s = K.defaultSpec(); s.type = t.id; s.head = h; s.material = m.id; s.guard = K.GUARDS[n % 6]; s.grip = K.GRIPS[n % 5]; s.pommel = K.POMMELS[n % 6]; K.buildForged(s); n++; } return n; })()""")
     check(n == 400, f'every type, head and material combination builds ({n})')
+    n = page.evaluate("""(async () => { const K = await import('./src/weaponkit.js'); let n = 0;
+      for (const a of K.AURAS) for (const t of ['sword', 'staff', 'bow']) { const s = K.defaultSpec(); s.type = t; s.head = K.TYPES.find(x => x.id === t).heads[0]; s.aura = a.id; const g = K.buildForged(s); if (a.id !== 'none' && !g.userData.tick) throw new Error('no aura tick'); if (g.userData.tick) { g.userData.tick(1); g.userData.tick(1.05); } n++; } return n; })()""")
+    check(n == 24, f'every aura builds and ticks on a blade, a staff and a bow ({n})')
+    check(page.evaluate("document.querySelectorAll('#fAura button').length") == 8, 'eight aura choices')
     page.evaluate("document.getElementById('fRandom').click()"); frames(2)
     name = page.evaluate("document.getElementById('fName').value")
     check(len(name) > 2, f'random gives a named weapon ({name})')
