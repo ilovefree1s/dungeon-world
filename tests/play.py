@@ -16,6 +16,7 @@ ap.add_argument('--out', default=str(ROOT / 'shots'))
 ap.add_argument('--phone', action='store_true', help='an iPhone-size touch screen instead of a 1152 x 648 PC window')
 ap.add_argument('--page', default='index.html')
 ap.add_argument('--quick', action='store_true')
+ap.add_argument('--flat', action='store_true', help='a flat meadow with no trees or monsters of its own')
 args = ap.parse_args()
 out = pathlib.Path(args.out); out.mkdir(parents=True, exist_ok=True)
 
@@ -54,7 +55,7 @@ with sync_playwright() as pw:
     page.route('https://fonts.googleapis.com/**', lambda r: r.fulfill(status=200, body='', content_type='text/css'))
     page.on('pageerror', lambda e: errors.append(str(e)))
     page.on('console', lambda m: (errors if m.type == 'error' else logs).append(m.text))
-    q = 'q=1&t=0.42&fresh&debug'
+    q = 'q=1&t=0.42&fresh&debug' + ('&flat' if args.flat else '')
     page.goto(base + args.page + '?' + q)
     page.wait_for_function('window.__dw', timeout=60000)
     t0 = time.time()
@@ -162,7 +163,7 @@ with sync_playwright() as pw:
     moved = 0
     for turn in range(4):
         p0 = page.evaluate('__dw.player.pos.toArray()')
-        page.evaluate('__dw.input.specEdge = true'); frames(4)
+        page.evaluate('__dw.input.abEdge[0] = true'); frames(4)
         p1 = page.evaluate('__dw.player.pos.toArray()')
         moved = ((p1[0] - p0[0]) ** 2 + (p1[2] - p0[2]) ** 2) ** 0.5
         if moved > 1.5: break

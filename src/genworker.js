@@ -3,7 +3,7 @@ import { createGen } from './gen.js';
 let gen = null;
 onmessage = e => {
   const m = e.data;
-  if (m.type === 'init') { gen = createGen(m.seed); return; }
+  if (m.type === 'init') { gen = createGen(m.seed, m.flat); return; }
   if (m.type === 'gen') {
     const c = gen.chunk(m.cx, m.cz);
     c.id = m.id;

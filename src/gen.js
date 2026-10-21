@@ -77,7 +77,7 @@ function terrace(h, step) { const f = h / step, i = Math.floor(f), t = f - i; re
 
 // ---------------------------------------------------------------- the world
 export const REGION = 300; // (the size of a biome region)
-export function createGen(seed = 1) {
+export function createGen(seed = 1, flat = false) {
   const nA = simplex(seed * 7 + 1), nB = simplex(seed * 7 + 2), nC = simplex(seed * 7 + 3), nD = simplex(seed * 7 + 4), nW = simplex(seed * 7 + 5), nT = simplex(seed * 7 + 6);
   // biome regions: a jittered grid of sites; the one at 0,0 is the woods where you start, and its eight
   // neighbors hold every other biome, so all of them are a short walk away
@@ -162,6 +162,7 @@ export function createGen(seed = 1) {
   // one column: its height (the top solid block's y), the biome, the biome its surface shows
   // (dithered between neighbors at a border), the liquid over it
   function column(x, z) {
+    if (flat) { out.h = 60; out.biome = 0; out.pick = 0; return out; } // (a flat meadow, for tests)
     const best = weights(x, z);
     let h = 0;
     for (let b = 0; b < 6; b++) if (wts[b] > 0.002) h += wts[b] * heightOf(b, x, z);
@@ -423,7 +424,7 @@ export function createGen(seed = 1) {
       const lx = tx - ox, lz = tz - oz;
       if (lx < 0 || lz < 0 || lx >= GW || lz >= GW) continue;
       const gi = lz * GW + lx, h = colH[gi], b = colP[gi];
-      if (h <= SEA) continue;
+      if (h <= SEA || flat) continue;
       const [p, kinds] = TREES[b];
       const r0 = hash3(i, j, seed, 43);
       // (fewer trees in the meadows: a slow noise thins the woods)

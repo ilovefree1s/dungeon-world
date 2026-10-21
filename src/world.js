@@ -20,9 +20,9 @@ const UNLOADED = 255;
 const key = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
 
 export class World {
-  constructor(seed) {
-    this.seed = seed;
-    this.gen = createGen(seed);
+  constructor(seed, flat = false) {
+    this.seed = seed; this.flat = flat;
+    this.gen = createGen(seed, flat);
     this.chunks = new Map();       // key -> { cx, cz, vox, group, state }
     this.group = new THREE.Group(); scene.add(this.group);
     this.inbox = [];               // finished chunks waiting for their meshes
@@ -37,7 +37,7 @@ export class World {
         const w = new Worker(url, globalThis.__DW_WORKER_URL ? undefined : { type: 'module' });
         w.onmessage = e => { this.inflight--; w.busy--; this.inbox.push(e.data); };
         w.onerror = e => { console.warn('chunk worker failed, building on the main thread', e.message); this.dropWorkers(); };
-        w.postMessage({ type: 'init', seed });
+        w.postMessage({ type: 'init', seed, flat });
         w.busy = 0;
         this.workers.push(w);
       }

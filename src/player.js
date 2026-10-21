@@ -24,6 +24,7 @@ export class Player {
     this.camPos = new V3(); this.camFocus = new V3();
     this.lastLook = -10; this.visY = 0; this.hurtT = 0; this.coyote = 0; this.jumpBuf = 0;
     this.castT = -1; this.invT = 0; this.aimFace = null;
+    this.swingT = -1; this.whirl = false; this.swingLen = 0.3; this.dash = null; this.slamming = false; this.onLand = null;
     this.cls = -1; this.model = null;
     // a soft round shadow under the hero (always there, even with the real shadows off)
     this.blob = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 4.4), new THREE.MeshBasicMaterial({ map: TEX.shadow, transparent: true, depthWrite: false }));
@@ -103,6 +104,12 @@ export class Player {
     const k = 1 - Math.exp(-accel * dt);
     this.vel.x += (wx * speed - this.vel.x) * k;
     this.vel.z += (wz * speed - this.vel.z) * k;
+    // a charge or a roll: straight ahead at its own speed, the ground no matter
+    if (this.dash) {
+      const D = this.dash; D.t -= dt;
+      this.vel.x = D.dx * D.spd; this.vel.z = D.dz * D.spd;
+      if (D.t <= 0) { this.dash = null; this.vel.x *= 0.3; this.vel.z *= 0.3; }
+    }
     // jumping (a moment's grace after leaving a ledge, and a press just before landing still counts)
     if (inp.jumpEdge) this.jumpBuf = 0.14;
     inp.jumpEdge = false;
@@ -125,6 +132,7 @@ export class Player {
     if (w.lava(p.x, p.y + 0.6, p.z)) { this.vel.y = 30; this.hurtT = 0.6; this.onHurt && this.onHurt(); }
     this.hurtT = Math.max(0, this.hurtT - dt); this.invT = Math.max(0, this.invT - dt);
     if (this.castT >= 0) { this.castT += dt / 0.38; if (this.castT >= 1) this.castT = -1; }
+    if (this.swingT >= 0) { this.swingT += dt / (this.whirl ? this.swingLen : 0.3); if (this.swingT >= 1) { this.swingT = -1; this.whirl = false; } }
     // move, one axis at a time
     const wasGround = this.onGround;
     this.onGround = false; this.stepped = false;
@@ -132,6 +140,7 @@ export class Player {
     this.moveAxis(2, this.vel.z * dt);
     this.moveAxis(1, this.vel.y * dt);
     if (this.onGround) this.jumped = false;
+    if (this.onGround && !wasGround && this.onLand) { const f = this.onLand; this.onLand = null; f(); }
     // (stay stuck to the ground walking down a single step)
     if (!this.onGround && wasGround && this.vel.y <= 0 && !this.inWater) {
       if (this.hits(p.x, p.y - STEP - 0.05, p.z) && !this.hits(p.x, p.y - 0.02, p.z)) {
@@ -191,9 +200,11 @@ export class Player {
     this.move += (Math.min(1, hs / WALK) - this.move) * (1 - Math.exp(-10 * dt));
     this.walk += dt * (4 + hs * 1.15);
     const t = performance.now() / 1000;
-    animHero(m, t, { walk: this.walk, move: this.onGround || swimming ? this.move : 0.15, roll: 0, swing: -1, cast: this.castT, whirl: false });
+    const rolling = this.dash && this.dash.roll ? Math.max(0.01, this.dash.t / 0.42) : 0;
+    animHero(m, t, { walk: this.walk, move: this.onGround || swimming ? this.move : 0.15, roll: rolling, swing: this.swingT, cast: this.castT, whirl: this.whirl });
+    if (this.slamming && !this.onGround) { const u0 = m.userData; u0.arms[0].rotation.x = -2.8; u0.arms[1].rotation.x = -2.8; u0.body.rotation.x = 0.3; }
     const u = m.userData;
-    if (!this.onGround && !swimming) {
+    if (!this.onGround && !swimming && !rolling && !this.slamming) {
       // in the air: knees up, arms out
       const k = Math.max(-1, Math.min(1, this.vel.y / 20));
       u.legs[0].rotation.x = -0.6 - k * 0.2; u.legs[1].rotation.x = 0.25 - k * 0.3;
@@ -226,6 +237,7 @@ export class Player {
     // (the camera eases back out, but snaps in)
     this.curDist = this.snapCam || dist < (this.curDist || dist) ? dist : this.curDist + (dist - this.curDist) * (1 - Math.exp(-4 * dt));
     this.camPos.copy(this.camFocus).addScaledVector(dir, this.curDist);
+    if (this.shake > 0) { this.shake = Math.max(0, this.shake - dt * 1.6); const k = this.shake * 0.5; this.camPos.x += (Math.random() - 0.5) * k; this.camPos.y += (Math.random() - 0.5) * k; this.camPos.z += (Math.random() - 0.5) * k; }
     camera.position.copy(this.camPos);
     camera.lookAt(this.camFocus.x, this.camFocus.y + 0.4, this.camFocus.z);
     this.snapCam = false;

@@ -13,10 +13,10 @@ import { CH } from './gen.js';
 // ---------------------------------------------------------------- the hero's numbers
 export const stats = { hp: 30, maxHp: 30, xp: 0, level: 1, kills: 0, dead: 0 };
 export const xpToNext = () => 18 + stats.level * 10;
-const heroDamage = () => {
+export const heroDamage = (mult = 1) => {
   const base = 5 + stats.level * 1.5;
   const crit = Math.random() < 0.12;
-  return { d: Math.round(base * (0.85 + Math.random() * 0.3) * (crit ? 2 : 1)), crit };
+  return { d: Math.max(1, Math.round(base * mult * (0.85 + Math.random() * 0.3) * (crit ? 2 : 1))), crit };
 };
 export function gainXp(n, onLevel) {
   stats.xp += n;
@@ -60,7 +60,7 @@ export class Monsters {
     scene.add(root);
     const k = KIND[type];
     const m = { type, k, root, pos: new V3(x, y, z), vel: new V3(), home: new V3(x, y, z), face: Math.random() * 6.28, seed: Math.random() * 10,
-      hp: D.MON_BASE_HP[type] * 3 + stats.level * 2, atk: D.MON_BASE_ATK[type] + Math.floor(stats.level / 2), state: 'wander', t: Math.random() * 2, atkCd: 0, flash: 0, kb: new V3(), onGround: false, moving: false, bob: Math.random() * 6 };
+      hp: D.MON_BASE_HP[type] * 3 + stats.level * 2, atk: D.MON_BASE_ATK[type] + Math.floor(stats.level / 2), state: 'wander', t: Math.random() * 2, atkCd: 0, flash: 0, frz: 0, kb: new V3(), onGround: false, moving: false, bob: Math.random() * 6 };
     m.maxHp = m.hp;
     this.list.push(m);
     return m;
@@ -121,13 +121,14 @@ export class Monsters {
     const w = this.world, p = this.player, hero = p.pos, t = performance.now() / 1000;
     this.timer += dt * 60;
     this.spawnT -= dt;
-    if (this.spawnT <= 0) { this.spawnT = 1.4; this.trySpawn(); }
+    if (this.spawnT <= 0 && !this.world.flat) { this.spawnT = 1.4; this.trySpawn(); }
     for (let i = this.list.length - 1; i >= 0; i--) {
       const m = this.list[i], k = m.k;
       const d = m.pos.distanceTo(hero);
       if (d > DESPAWN) { this.remove(m); continue; }
       if (!w.loaded(m.pos.x, m.pos.z)) continue;
       m.t -= dt; m.atkCd -= dt;
+      const frozen = m.frz > 0; if (frozen) m.frz -= dt;
       // what it wants
       const alive = stats.hp > 0;
       if (m.state === 'wander') {
@@ -145,6 +146,7 @@ export class Monsters {
         const stop = m.state === 'chase' ? k.r + 1.8 : 1.2;
         if (l > stop) { gx /= l; gz /= l; want = k.spd * (m.state === 'chase' ? 1 : 0.45); } else { gx = gz = 0; if (m.state === 'wander') m.rest = true; }
       }
+      if (frozen) want = 0;
       const acc = 1 - Math.exp(-8 * dt);
       m.vel.x += (gx * want + m.kb.x - m.vel.x) * acc; m.vel.z += (gz * want + m.kb.z - m.vel.z) * acc;
       m.kb.multiplyScalar(Math.exp(-9 * dt));
@@ -172,8 +174,10 @@ export class Monsters {
         m.pos.y = ny;
         if (m.pos.y < 0) { this.remove(m); continue; }
       }
+      // the warrior's charge runs them down
+      if (p.dash && p.dash.onTouch && d < k.r + 2.2 && Math.abs(m.pos.y - hero.y) < 5) p.dash.onTouch(m);
       // biting
-      if (m.state === 'chase' && alive && d < k.r + 3 && m.atkCd <= 0 && Math.abs(m.pos.y - hero.y) < 6) {
+      if (m.state === 'chase' && alive && !frozen && d < k.r + 3 && m.atkCd <= 0 && Math.abs(m.pos.y - hero.y) < 6) {
         m.atkCd = 1.1; m.lunge = 0.3;
         this.bite(m);
       }
@@ -186,8 +190,10 @@ export class Monsters {
       m.root.position.copy(m.pos);
       if (m.lunge > 0) { const a = Math.sin(m.lunge / 0.3 * Math.PI); m.root.position.x += Math.sin(m.face) * a * 1.2; m.root.position.z += Math.cos(m.face) * a * 1.2; }
       m.root.rotation.y = m.face;
-      m.root.userData.anim(t, { moving: m.moving, seed: m.seed, timer: Math.floor(this.timer + m.seed * 20), attack: m.lunge > 0 });
-      if (m.flash > 0) { m.flash -= dt; m.root.userData.flash(m.flash > 0 ? 1 : 0); }
+      if (!frozen) m.root.userData.anim(t, { moving: m.moving, seed: m.seed, timer: Math.floor(this.timer + m.seed * 20), attack: m.lunge > 0 });
+      // hit: a white flash; frozen: an icy tint
+      if (m.flash > 0) { m.flash -= dt; m.root.userData.flash(m.flash > 0 ? 1 : (frozen ? 0.5 : 0), m.flash > 0 ? '#ffffff' : '#8ad8ff'); m.wasFrz = frozen; }
+      else if (frozen !== !!m.wasFrz) { m.root.userData.flash(frozen ? 0.5 : 0, '#8ad8ff'); m.wasFrz = frozen; }
     }
   }
 }
@@ -196,13 +202,19 @@ export class Monsters {
 const boltGeo = new THREE.SphereGeometry(0.56, 12, 8);
 export class Bolts {
   constructor(world, monsters) { this.world = world; this.monsters = monsters; this.list = []; }
-  fire(from, dir, color = '#9ad8ff') {
+  // opts: speed, arrow (a shaft, no glow), big (a meteor), mult (damage), onEnd(pos) when it lands
+  fire(from, dir, color = '#9ad8ff', opts = {}) {
     const g = new THREE.Group();
-    const core = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.6) }));
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.soft, color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-    glow.scale.setScalar(4.4);
-    g.add(core, glow); g.position.copy(from); scene.add(g);
-    this.list.push({ g, glow, pos: from.clone(), vel: dir.clone().multiplyScalar(68), t: 0, color });
+    const sz = opts.big ? 2.6 : opts.arrow ? 0.55 : 1;
+    const core = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), opts.arrow ? 0 : 0.6) }));
+    core.scale.set(sz, sz, opts.arrow ? 5 : sz);
+    g.add(core);
+    let glow = null;
+    if (!opts.arrow) { glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.soft, color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); glow.scale.setScalar(4.4 * sz); g.add(glow); }
+    g.position.copy(from);
+    g.lookAt(from.clone().add(dir));
+    scene.add(g);
+    this.list.push({ g, glow, pos: from.clone(), vel: dir.clone().multiplyScalar(opts.speed || 68), t: 0, color, r: opts.big ? 2.5 : 1, mult: opts.mult || 1, big: !!opts.big, arrow: !!opts.arrow, onEnd: opts.onEnd || null, life: opts.big ? 4 : 1.8 });
   }
   update(dt) {
     for (let i = this.list.length - 1; i >= 0; i--) {
@@ -210,20 +222,21 @@ export class Bolts {
       const steps = 4; let gone = false;
       for (let s = 0; s < steps && !gone; s++) {
         b.pos.addScaledVector(b.vel, dt / steps);
-        if (this.world.solid(b.pos.x, b.pos.y, b.pos.z) || b.pos.y < 0) { burst(b.pos.x, b.pos.y, b.pos.z, b.color, 6, 8, 1.2, true, 0.3); gone = true; break; }
+        if (this.world.solid(b.pos.x, b.pos.y, b.pos.z) || b.pos.y < 0) { if (b.onEnd) b.onEnd(b.pos); else burst(b.pos.x, b.pos.y, b.pos.z, b.color, 6, 8, 1.2, true, 0.3); gone = true; break; }
         for (const m of this.monsters.list) {
           const cy = m.pos.y + m.k.h * 0.5;
-          if (Math.hypot(b.pos.x - m.pos.x, (b.pos.y - cy) * 0.8, b.pos.z - m.pos.z) < m.k.r + 1) {
-            const { d, crit } = heroDamage();
+          if (Math.hypot(b.pos.x - m.pos.x, (b.pos.y - cy) * 0.8, b.pos.z - m.pos.z) < m.k.r + b.r) {
+            if (b.onEnd) { b.onEnd(b.pos); gone = true; break; }
+            const { d, crit } = heroDamage(b.mult * (m.frz > 0 ? 1.5 : 1));
             this.monsters.hit(m, d, crit, b.vel.clone().normalize());
             gone = true; break;
           }
         }
       }
-      if (gone || b.t > 1.8) { scene.remove(b.g); b.g.traverse(o => o.material && o.material.dispose()); this.list.splice(i, 1); continue; }
+      if (gone || b.t > b.life) { scene.remove(b.g); b.g.traverse(o => o.material && o.material.dispose()); this.list.splice(i, 1); continue; }
       b.g.position.copy(b.pos);
-      b.glow.scale.setScalar(4.4 + Math.sin(b.t * 30) * 0.6);
-      if (Math.random() < 0.6) burst(b.pos.x, b.pos.y, b.pos.z, b.color, 1, 1.2, 1.1, true, 0.3, 0);
+      if (b.glow) b.glow.scale.setScalar(4.4 * (b.big ? 2.6 : 1) + Math.sin(b.t * 30) * 0.6);
+      if (!b.arrow && Math.random() < (b.big ? 1 : 0.6)) burst(b.pos.x, b.pos.y, b.pos.z, b.color, b.big ? 3 : 1, b.big ? 3 : 1.2, b.big ? 2.4 : 1.1, true, 0.3, 0);
     }
   }
 }

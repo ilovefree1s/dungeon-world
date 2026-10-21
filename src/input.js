@@ -7,14 +7,14 @@ export const input = {
   mx: 0, my: 0,          // move: -1..1 (my: -1 is forward)
   lookX: 0, lookY: 0,    // look this frame (radians, from swipes and the mouse)
   lookRX: 0, lookRY: 0,  // look rate (the right stick, the turn keys)
-  jump: false, jumpEdge: false, sprint: false, atk: false, atkEdge: false, specEdge: false,
+  jump: false, jumpEdge: false, sprint: false, atk: false, atkEdge: false, abEdge: [false, false, false],
   menuEdge: [], lastDevice: 'kb', stickX: 0, stickY: 0, stickId: null,
   mouseSpeed: 1, zoom: 0, wantLock: null, onLockChange: null,
 };
 const keys = {};
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyD: 'right',
-  ArrowLeft: 'turnL', ArrowRight: 'turnR', KeyQ: 'turnL', KeyE: 'turnR', Space: 'jump', ShiftLeft: 'sprint', ShiftRight: 'sprint',
-  KeyJ: 'atk', KeyZ: 'atk', KeyK: 'spec', KeyX: 'spec', KeyL: 'spec', KeyF: 'spec',
+  ArrowLeft: 'turnL', ArrowRight: 'turnR', Space: 'jump', ShiftLeft: 'sprint', ShiftRight: 'sprint',
+  KeyJ: 'atk', KeyZ: 'atk', Digit1: 'ab0', KeyK: 'ab0', Digit2: 'ab1', KeyQ: 'ab1', KeyL: 'ab1', Digit3: 'ab2', KeyE: 'ab2',
   Escape: 'pause', KeyP: 'pause', Enter: 'ok', NumpadEnter: 'ok' };
 let onAny = () => { };
 export function onFirstInput(f) { onAny = f; }
@@ -24,7 +24,7 @@ addEventListener('keydown', e => {
   if (!k) return;
   e.preventDefault();
   onAny(); input.lastDevice = 'kb';
-  if (!keys[k]) { keys[k] = 1; if (k === 'jump') input.jumpEdge = true; if (k === 'atk') input.atkEdge = true; if (k === 'spec') input.specEdge = true; if (MENU_KEYS[k]) input.menuEdge.push(MENU_KEYS[k]); }
+  if (!keys[k]) { keys[k] = 1; if (k === 'jump') input.jumpEdge = true; if (k === 'atk') input.atkEdge = true; if (k.startsWith('ab')) input.abEdge[+k[2]] = true; if (MENU_KEYS[k]) input.menuEdge.push(MENU_KEYS[k]); }
 });
 addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) { keys[k] = 0; e.preventDefault(); } });
 addEventListener('blur', () => { for (const k in keys) keys[k] = 0; input.stickX = input.stickY = 0; });
@@ -51,14 +51,19 @@ export function initTouch(canvas) {
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
     el.addEventListener('contextmenu', e => e.preventDefault());
   };
-  btn('tJump', 'tJump', 'jumpEdge'); btn('tAtk', 'tAtk', 'atkEdge'); btn('tSpec', 'tSpec', 'specEdge');
+  btn('tJump', 'tJump', 'jumpEdge'); btn('tAtk', 'tAtk', 'atkEdge');
+  // the ability bar: a tap fires one
+  document.querySelectorAll('#abil .slot').forEach((el, i) => {
+    el.addEventListener('pointerdown', e => { e.preventDefault(); onAny(); input.abEdge[i] = true; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 120); });
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  });
   // swipes on the open screen (or a mouse drag) turn the camera
   const looks = new Map();
   canvas.addEventListener('pointerdown', e => {
     onAny();
     // on a PC, a click in the world captures the mouse (Esc lets it go)
     if (e.pointerType === 'mouse' && input.wantLock && input.wantLock()) { lockMouse(canvas); return; }
-    if (mouseLocked()) { if (e.button === 0) { input.mAtk = 1; input.atkEdge = true; } else if (e.button === 2) input.specEdge = true; return; }
+    if (mouseLocked()) { if (e.button === 0) { input.mAtk = 1; input.atkEdge = true; } else if (e.button === 2) input.abEdge[0] = true; return; }
     looks.set(e.pointerId, { x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse' });
     try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
   });
@@ -106,13 +111,14 @@ function pollPad() {
   const dz = v => Math.abs(v) > 0.18 ? (v - Math.sign(v) * 0.18) / 0.82 : 0;
   const ax = dz(gp.axes[0] || 0), ay = dz(gp.axes[1] || 0), rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
   // A / cross jumps, X / square attacks, B / circle blinks or rolls, the sticks' clicks, LT and RB run
-  const now = { jump: on(0), atk: on(2), spec: on(1), sprint: on(10) || on(6) || on(5) || on(7), up: on(12) || ay < -0.5, down: on(13) || ay > 0.5, left: on(14) || ax < -0.5, right: on(15) || ax > 0.5, start: on(9), back: on(1), ok: on(0) || on(2) };
+  // A / cross jumps, X / square attacks, B / circle, Y / triangle and LB the three abilities, RB, LT and the sticks' clicks run
+  const now = { jump: on(0), atk: on(2), ab0: on(1), ab1: on(3), ab2: on(4), sprint: on(10) || on(6) || on(5) || on(7), up: on(12) || ay < -0.5, down: on(13) || ay > 0.5, left: on(14) || ax < -0.5, right: on(15) || ax > 0.5, start: on(9), back: on(1), ok: on(0) || on(2) };
   const menuMap = { up: 'up', down: 'down', left: 'left', right: 'right', start: 'pause', ok: 'ok', back: 'back' };
   for (const k in now) if (now[k] && !padPrev[k]) {
     onAny(); input.lastDevice = 'pad';
     if (k === 'jump') input.jumpEdge = true;
     if (k === 'atk') input.atkEdge = true;
-    if (k === 'spec') input.specEdge = true;
+    if (k.startsWith('ab')) input.abEdge[+k[2]] = true;
     if (menuMap[k]) input.menuEdge.push(menuMap[k]);
   }
   padPrev = now;
