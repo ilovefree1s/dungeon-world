@@ -9,6 +9,7 @@ export const input = {
   lookRX: 0, lookRY: 0,  // look rate (the right stick, the turn keys)
   jump: false, jumpEdge: false, sprint: false,
   menuEdge: [], lastDevice: 'kb', stickX: 0, stickY: 0, stickId: null,
+  mouseSpeed: 1, zoom: 0, wantLock: null, onLockChange: null,
 };
 const keys = {};
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyD: 'right',
@@ -51,21 +52,44 @@ export function initTouch(canvas) {
   const looks = new Map();
   canvas.addEventListener('pointerdown', e => {
     onAny();
+    // on a PC, a click in the world captures the mouse (Esc lets it go)
+    if (e.pointerType === 'mouse' && input.wantLock && input.wantLock()) { lockMouse(canvas); return; }
+    if (mouseLocked()) return;
     looks.set(e.pointerId, { x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse' });
     try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
   });
   canvas.addEventListener('pointermove', e => {
     const l = looks.get(e.pointerId);
-    if (!l) return;
+    if (!l || mouseLocked()) return;
     // (a finger turns a little faster than a mouse: the screen is small)
-    const k = l.touch ? 0.0085 : 0.0055;
+    const k = l.touch ? 0.0085 : 0.0055 * input.mouseSpeed;
     input.lookX += (e.clientX - l.x) * k; input.lookY += (e.clientY - l.y) * k;
     l.x = e.clientX; l.y = e.clientY;
   });
   const lend = e => looks.delete(e.pointerId);
   canvas.addEventListener('pointerup', lend); canvas.addEventListener('pointercancel', lend); canvas.addEventListener('lostpointercapture', lend);
   canvas.addEventListener('contextmenu', e => e.preventDefault());
+  // the captured mouse: every movement turns the camera
+  document.addEventListener('mousemove', e => {
+    if (!mouseLocked()) return;
+    input.lastDevice = 'kb';
+    input.lookX += e.movementX * 0.0024 * input.mouseSpeed;
+    input.lookY += e.movementY * 0.0024 * input.mouseSpeed;
+  });
+  // the scroll wheel brings the camera nearer or farther
+  canvas.addEventListener('wheel', e => { e.preventDefault(); input.zoom += Math.sign(e.deltaY); }, { passive: false });
+  document.addEventListener('pointerlockchange', () => { input.onLockChange && input.onLockChange(mouseLocked()); });
 }
+export const mouseLocked = () => !!document.pointerLockElement;
+export function lockMouse(canvas = document.getElementById('gl')) {
+  if (mouseLocked() || !canvas.requestPointerLock) return;
+  try {
+    // (raw movement where the browser has it: no mouse acceleration)
+    const p = canvas.requestPointerLock({ unadjustedMovement: true });
+    if (p && p.catch) p.catch(() => { try { const q = canvas.requestPointerLock(); q && q.catch && q.catch(() => { }); } catch (x) { } });
+  } catch (x) { }
+}
+export function unlockMouse() { if (mouseLocked()) document.exitPointerLock(); }
 
 // ---------------------------------------------------------------- controllers
 let padPrev = {};

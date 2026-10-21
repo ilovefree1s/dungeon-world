@@ -6,7 +6,7 @@ import { THREE, renderer, scene, camera, resize, render, setQuality, view, IS_TO
 import { World } from './world.js';
 import { Player } from './player.js';
 import { sky, updateSky, clock } from './sky.js';
-import { readInput, takeLook, menuKeys, initTouch, onFirstInput, input } from './input.js';
+import { readInput, takeLook, menuKeys, initTouch, onFirstInput, input, lockMouse, unlockMouse, mouseLocked } from './input.js';
 import { startAudio, sfx, setSfx, setMusic, audioState } from './audio.js';
 import { BIOME_NAME, BIOME_SUB, CH } from './gen.js';
 
@@ -26,8 +26,9 @@ const UI = { state: 'title', autoQ: opts.quality === undefined || opts.quality <
 UI.quality = Q.has('q') ? +Q.get('q') : UI.autoQ ? (IS_TOUCH ? 1 : 2) : opts.quality;
 if (Q.has('q')) UI.autoQ = false;
 audioState.music = opts.music ?? 0.45; audioState.sfx = opts.sfx ?? 0.8;
+input.mouseSpeed = opts.mouse ?? 1;
 setSfx(audioState.sfx);
-function saveOpts() { ls.set(OPT_KEY, JSON.stringify({ quality: UI.autoQ ? -1 : UI.quality, music: audioState.music, sfx: audioState.sfx })); }
+function saveOpts() { ls.set(OPT_KEY, JSON.stringify({ quality: UI.autoQ ? -1 : UI.quality, music: audioState.music, sfx: audioState.sfx, mouse: input.mouseSpeed })); }
 setQuality(UI.quality);
 
 // ---------------------------------------------------------------- the world and the hero
@@ -108,6 +109,8 @@ function pickHero(i) {
   if (player.cls !== i) player.setClass(i);
   UI.cls = i;
   wantStart = i;
+  // (on a PC the click that picks the hero also captures the mouse for looking around)
+  if (!IS_TOUCH && world.readyAround(player.pos.x, player.pos.z, Math.min(64, view.viewDist)) >= 1) lockMouse();
   $('loadT').textContent = 'ALMOST THERE...';
 }
 function beginPlay() {
@@ -118,18 +121,24 @@ function beginPlay() {
   hintT = 0;
   writeSave();
 }
+let menuAt = 0;
 function openMenu() {
   if (UI.state !== 'play') return;
+  menuAt = performance.now();
+  unlockMouse();
   UI.state = 'menu'; $('menu').hidden = false; syncMenu();
   menuFocus = [...document.querySelectorAll('#menu button')].indexOf($('resume'));
   markMenuFocus();
 }
 function closeMenu() { UI.state = 'play'; $('menu').hidden = true; writeSave(); }
 $('menuBtn').addEventListener('click', openMenu);
-$('resume').addEventListener('click', closeMenu);
+$('resume').addEventListener('click', () => { closeMenu(); if (!IS_TOUCH) lockMouse(); });
+// the mouse: captured by a click in the world while you play; letting it go (Esc) opens the menu
+input.wantLock = () => UI.state === 'play' && !mouseLocked();
+input.onLockChange = locked => { document.documentElement.classList.toggle('locked', locked); if (!locked && UI.state === 'play') openMenu(); };
 function syncMenu() {
   const on = (seg, v) => [...$(seg).children].forEach(b => b.classList.toggle('on', +b.dataset.v === v));
-  on('segHero', UI.cls); on('segQ', UI.autoQ ? -1 : UI.quality); on('segM', audioState.music > 0 ? 1 : 0); on('segS', audioState.sfx > 0 ? 1 : 0);
+  on('segHero', UI.cls); on('segQ', UI.autoQ ? -1 : UI.quality); on('segM', audioState.music > 0 ? 1 : 0); on('segS', audioState.sfx > 0 ? 1 : 0); on('segMouse', input.mouseSpeed);
   const p = player.pos;
   $('where2').textContent = `${BIOME_NAME[biomeNow] || ''} · ${Math.round(p.x)}, ${Math.round(p.z)} · ${QUALITY[UI.quality].name} graphics`;
 }
@@ -138,6 +147,7 @@ seg('segHero', v => { if (v !== player.cls) { player.setClass(v); UI.cls = v; } 
 seg('segQ', v => { if (v < 0) { UI.autoQ = true; } else { UI.autoQ = false; UI.quality = v; setQuality(v); } });
 seg('segM', v => setMusic(v ? 0.45 : 0));
 seg('segS', v => setSfx(v ? 0.8 : 0));
+seg('segMouse', v => { input.mouseSpeed = v; });
 // (the menus by controller and keyboard: a focus that moves, ok presses it)
 let menuFocus = 0;
 function markMenuFocus() { const bs = [...document.querySelectorAll('#menu button')]; bs.forEach((b, i) => b.classList.toggle('focus', i === menuFocus && input.lastDevice !== 'touch')); }
@@ -152,7 +162,8 @@ function menuStep() {
       if (k === 'pause') openMenu();
     } else if (UI.state === 'menu') {
       const bs = [...document.querySelectorAll('#menu button')];
-      if (k === 'pause' || k === 'back') { closeMenu(); continue; }
+      // (the Esc that let the mouse go has already opened this menu: it doesn't close it again)
+      if ((k === 'pause' || k === 'back') && performance.now() - menuAt > 350) { closeMenu(); continue; }
       if (k === 'left' || k === 'up') menuFocus = (menuFocus - 1 + bs.length) % bs.length;
       else if (k === 'right' || k === 'down') menuFocus = (menuFocus + 1) % bs.length;
       else if (k === 'ok') bs[menuFocus].click();
@@ -186,6 +197,8 @@ function frame(now) {
   menuStep();
   const inp = readInput();
   const look = takeLook();
+  // the scroll wheel: nearer or farther
+  if (input.zoom) { player.camDist = Math.max(4, Math.min(20, player.camDist + input.zoom * 1.2)); input.zoom = 0; }
   if (look[0] || look[1] || inp.lookRX) { if (!looked && UI.state === 'play') { looked = true; } }
   const p = player.pos;
   // the hero waits until the ground under it has arrived

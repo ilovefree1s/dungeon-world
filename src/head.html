@@ -114,7 +114,7 @@ html.touchy .keys{display:none}
       <button class="hbtn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="#f6eee2" stroke-width="2.6" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     </div>
     <div id="banner"><h1 id="bannerT"></h1><p id="bannerS"></p></div>
-    <div id="hint"><span class="t">Swipe the screen to look around</span><span class="k">WASD to move · drag the mouse or Q / E to look · Space to jump</span></div>
+    <div id="hint"><span class="t">Swipe the screen to look around</span><span class="k">Click the world to look around with the mouse · WASD to move · Space to jump · Esc for the menu</span></div>
     <div id="dbg" hidden></div>
   </div>
   <div id="touch" hidden>
@@ -139,10 +139,11 @@ html.touchy .keys{display:none}
       <h2>PAUSED</h2>
       <div class="row"><span>Hero</span><div class="seg" id="segHero"><button data-v="0">Warrior</button><button data-v="1">Mage</button><button data-v="2">Hunter</button></div></div>
       <div class="row"><span>Graphics</span><div class="seg" id="segQ"><button data-v="-1">Auto</button><button data-v="0">Fast</button><button data-v="1">Good</button><button data-v="2">Best</button></div></div>
+      <div class="row"><span>Mouse speed</span><div class="seg" id="segMouse"><button data-v="0.5">Slow</button><button data-v="1">Normal</button><button data-v="1.7">Fast</button></div></div>
       <div class="row"><span>Music</span><div class="seg" id="segM"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
       <div class="row"><span>Sounds</span><div class="seg" id="segS"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
       <button class="big" id="resume">BACK TO THE WORLD</button>
-      <div class="keys">Move: WASD · Look: drag the mouse, Q / E or the arrow keys · Jump: Space · Run: Shift · Menu: Esc<br>Controller: left stick moves, right stick looks, A / ✕ jumps, B / ○ runs, Start for this menu</div>
+      <div class="keys">Move: WASD · Look: the mouse (click the world to capture it), Q / E or ← → · Zoom: the scroll wheel · Jump: Space · Run: Shift · Menu: Esc<br>Controller: left stick moves, right stick looks, A / ✕ jumps, B / ○ runs, Start for this menu</div>
       <p class="small" id="where2" style="margin:12px 0 0"></p>
     </div>
   </div>

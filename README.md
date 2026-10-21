@@ -6,6 +6,8 @@ into endless land: woods, frozen peaks, dunes, bog, ash fields and crystal cliff
 
 **Play:** https://ilovefree1s.github.io/dungeon-world/
 
+Made for a PC first (keyboard and mouse, or a controller); phones work too.
+
 ## Stage 1 (this one): the world
 - Endless land in chunks of 32 x 32 blocks, 96 high, built in a background worker so the
   frame never waits for them, and dropped again far behind you.
@@ -31,10 +33,13 @@ into endless land: woods, frozen peaks, dunes, bog, ash fields and crystal cliff
 | | Keyboard and mouse | Controller | Phone |
 |---|---|---|---|
 | Move | WASD | left stick / d-pad | the stick |
-| Look | drag the mouse, Q / E, ← → | right stick | swipe the screen |
+| Look | the mouse (click the world to capture it; Esc lets it go), Q / E, ← → | right stick | swipe the screen |
+| Zoom | the scroll wheel | | |
 | Jump | Space | A / ✕ | JUMP |
 | Run | Shift (the stick pushed all the way runs too) | B / ○ | push the stick to its edge |
 | Menu | Esc, P | Start | the ☰ button |
+
+Mouse speed (slow, normal, fast) is in the menu.
 
 ## Next stages
 3D combat and roaming monsters; gear, talents and pets; villages and merchants; dungeon
@@ -52,12 +57,14 @@ boats and mounts.
   helpers its models use. `src/dh/` holds Dungeon Heart's model files, copied unchanged.
 - `src/input.js`: keyboard, mouse, touch and controllers. `src/audio.js` and
   `music/dungeon_echoes.mp3` come from Dungeon Heart.
-- Graphics: Fast / Good / Best (pixel ratio, shadows, bloom, how far you see). Phones start
-  on Good and step down by themselves if the frame rate stays under 40, until you pick one.
+- Graphics: Fast / Good / Best (pixel ratio, shadows, bloom, how far you see). A PC starts on
+  Best, a phone on Good; either steps down by itself if the frame rate stays under 40, until you
+  pick one.
 - `src/head.html` is the page; `python3 build.py` writes `index.html` from it (three.js 0.160
   from jsDelivr, as in Dungeon Heart). `node tools/artifact.mjs` builds `dist/play.html`, the
   whole game in one page, for the claude.ai artifact.
-- Tests: `npm i`, then `python3 tests/play.py` plays it in headless Chromium at phone size:
-  walks, jumps, turns, swims, visits every biome by day and night, opens the menu, and saves
+- Tests: `npm i`, then `python3 tests/play.py` plays it in headless Chromium in a PC window
+  (`--phone` for an iPhone-size touch screen): walks with W, jumps with Space, turns, zooms with
+  the wheel, swims, visits every biome by day and night, opens the menu, and saves
   screenshots to `shots/`. `?debug` shows frame time, chunks and triangles; `?seed=N` picks
   another world, `?fresh` ignores the save.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Plays the game in headless Chromium (software WebGL: SwiftShader) at phone size and checks it.
+"""Plays the game in headless Chromium (software WebGL: SwiftShader) in a PC-size window and checks it.
 
-  python3 tests/play.py [--out shots] [--desktop]
+  python3 tests/play.py [--out shots] [--phone] [--quick]
 
 Serves the repo, loads index.html (three.js comes from node_modules instead of the CDN: npm i),
 picks a hero, walks, jumps, swims, visits every biome by day and the woods by night, and saves
@@ -13,7 +13,7 @@ from playwright.sync_api import sync_playwright
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ap = argparse.ArgumentParser()
 ap.add_argument('--out', default=str(ROOT / 'shots'))
-ap.add_argument('--desktop', action='store_true')
+ap.add_argument('--phone', action='store_true', help='an iPhone-size touch screen instead of a 1152 x 648 PC window')
 ap.add_argument('--page', default='index.html')
 ap.add_argument('--quick', action='store_true')
 args = ap.parse_args()
@@ -42,12 +42,14 @@ def check(ok, what):
 
 with sync_playwright() as pw:
     b = pw.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'])
-    if args.desktop:
-        ctx = b.new_context(viewport={'width': 1280, 'height': 720})
+    if not args.phone:
+        ctx = b.new_context(viewport={'width': 1152, 'height': 648})
     else:
         ctx = b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True,
                             user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1')
     page = ctx.new_page()
+    # (software rendering is slow, a PC-size window slower still: be patient)
+    page.set_default_timeout(240000)
     page.route('https://cdn.jsdelivr.net/npm/three@0.160.0/**', cdn)
     page.route('https://fonts.googleapis.com/**', lambda r: r.fulfill(status=200, body='', content_type='text/css'))
     page.on('pageerror', lambda e: errors.append(str(e)))
@@ -75,16 +77,18 @@ with sync_playwright() as pw:
     # (the moving tests run on FAST graphics: software rendering is slow, and they wait for frames, not seconds)
     page.evaluate('__dw.setQuality(0)')
     page.evaluate('window.__fc = 0; (function f(){ __fc++; requestAnimationFrame(f); })()')
-    def frames(n, timeout=120000):
+    def frames(n, timeout=900000):
         page.evaluate('window.__f0 = __fc')
         page.wait_for_function(f'__fc - __f0 >= {n}', timeout=timeout)
     # walk with the touch stick: try a few directions (a tree may stand in the way of one)
     best = 0
-    for turn in range(4):
+    for turn in range(3):
         p0 = page.evaluate('__dw.player.pos.toArray()')
-        page.evaluate('__dw.input.stickY = -1')
+        if args.phone: page.evaluate('__dw.input.stickY = -1')
+        else: page.keyboard.down('w')
         frames(60)
-        page.evaluate('__dw.input.stickY = 0')
+        if args.phone: page.evaluate('__dw.input.stickY = 0')
+        else: page.keyboard.up('w')
         frames(5)
         p1 = page.evaluate('__dw.player.pos.toArray()')
         moved = ((p1[0] - p0[0]) ** 2 + (p1[2] - p0[2]) ** 2) ** 0.5
@@ -92,14 +96,17 @@ with sync_playwright() as pw:
         if moved > 8: break
         page.evaluate('__dw.input.lookX += 1.6')
         frames(3)
-    check(best > 8, f'the stick walks the hero ({best:.1f} blocks in 60 frames)')
+    check(best > 8, f'{"the stick" if args.phone else "W"} walks the hero ({best:.1f} blocks in 60 frames)')
     page.screenshot(path=str(out / '03-walked.png'))
     # jump
     page.wait_for_function('__dw.player.onGround', timeout=30000)
     y0 = page.evaluate('__dw.player.pos.y')
-    page.evaluate('__dw.input.jumpEdge = true; __dw.input.tJump = 1; window.__top = 0; (function f(){ __top = Math.max(__top, __dw.player.pos.y); if (__fc - __f0 < 60) requestAnimationFrame(f); })()')
+    if args.phone: page.evaluate('__dw.input.jumpEdge = true; __dw.input.tJump = 1')
+    else: page.keyboard.down('Space')
+    page.evaluate('window.__top = 0; (function f(){ __top = Math.max(__top, __dw.player.pos.y); if (__fc - __f0 < 60) requestAnimationFrame(f); })()')
     frames(40)
     page.evaluate('__dw.input.tJump = 0')
+    if not args.phone: page.keyboard.up('Space')
     top = page.evaluate('__top')
     check(top - y0 > 2.2, f'the jump button jumps ({top - y0:.2f} blocks high)')
     page.wait_for_function('__dw.player.onGround', timeout=30000)
@@ -110,6 +117,17 @@ with sync_playwright() as pw:
     frames(2)
     yaw1 = page.evaluate('__dw.player.yaw')
     check(abs(yaw1 - yaw0) > 0.5, 'a swipe turns the camera')
+    if not args.phone:
+        # the scroll wheel zooms; a click in the world captures the mouse (where the headless browser allows it)
+        d0 = page.evaluate('__dw.player.camDist')
+        page.mouse.move(576, 324); page.mouse.wheel(0, 300); frames(3)
+        d1 = page.evaluate('__dw.player.camDist')
+        check(d1 > d0, f'the scroll wheel pulls the camera back ({d0:.1f} -> {d1:.1f})')
+        page.mouse.wheel(0, -300); frames(3)
+        page.mouse.click(576, 324); frames(5)
+        print('  info pointer lock in headless Chromium:', page.evaluate('!!document.pointerLockElement'))
+        page.evaluate('document.pointerLockElement && document.exitPointerLock()'); frames(5)
+        if page.evaluate('__dw.UI.state') == 'menu': page.evaluate("document.getElementById('resume').click()")
     page.evaluate('__dw.setQuality(1)')
 
     # every biome: the middle of its region
