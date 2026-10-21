@@ -58,7 +58,7 @@ export class ShapePad {
     this.changed(true);
   }
   up(e) {
-    if (this.mode === 'erase') { if (this.erasing) { this.erasing = false; this.bmp = null; this.changed(); } return; }
+    if (this.mode === 'erase') { if (this.erasing) { this.erasing = false; this.finishErase(); } return; }
     if (this.mode === 'draw' && this.stroke) { this.finishStroke(); this.stroke = null; return; }
     if (this.drag >= 0) { this.drag = -1; this.changed(); }
   }
@@ -68,23 +68,34 @@ export class ShapePad {
     const sh = this.shape;
     if (!this.bmp) {
       // the bitmap: the pad at a quarter of its size, the whole outline filled in (mirrored shapes become full outlines here)
-      const G = 4, bw = Math.ceil(w / G), bh = Math.ceil(h / G);
+      const G = 1, bw = Math.ceil(w / G), bh = Math.ceil(h / G);
       const c = document.createElement('canvas'); c.width = bw; c.height = bh; const x = c.getContext('2d');
-      x.fillStyle = '#fff'; x.beginPath();
+      x.fillStyle = 'rgb(210,216,224)'; x.beginPath();
       fullOutline(sh).forEach((p, i) => { const [qx, qy] = this.toPx(p, w, h); i ? x.lineTo(qx / G, qy / G) : x.moveTo(qx / G, qy / G); });
       x.closePath(); x.fill();
-      this.bmp = { c, x, G, bw, bh };
+      this.bmp = { c, x, G, bw, bh, last: null };
     }
-    const { x, G } = this.bmp;
+    const B = this.bmp, { x, G } = B;
+    // rub a round-capped stroke from where the brush last was to here, so a fast drag leaves no gaps
     x.globalCompositeOperation = 'destination-out';
+    x.lineCap = 'round'; x.lineWidth = this.brush * 2 / G; x.strokeStyle = '#000';
+    x.beginPath(); const l = B.last || [px, py]; x.moveTo(l[0] / G, l[1] / G); x.lineTo(px / G, py / G); x.stroke();
     x.beginPath(); x.arc(px / G, py / G, this.brush / G, 0, 7); x.fill();
     x.globalCompositeOperation = 'source-over';
+    B.last = [px, py];
+    this.draw();
+  }
+  // when the stroke ends: the outline comes back off the bitmap
+  finishErase() {
+    const sh = this.shape, B = this.bmp; if (!B) return;
+    const [, , w, h] = this.local({ clientX: 0, clientY: 0 });
     const outline = this.traceBitmap();
     if (outline && outline.length >= 3) {
       sh.mirror = false;
-      sh.pts = outline.map(([gx, gy]) => { const p = this.toPt(gx * G, gy * G, w, h); return [+p[0].toFixed(3), +p[1].toFixed(3)]; });
+      sh.pts = outline.map(([gx, gy]) => { const p = this.toPt(gx * B.G, gy * B.G, w, h); return [+p[0].toFixed(3), +p[1].toFixed(3)]; });
     }
-    this.draw(); this.onChange && this.onChange(sh, true);
+    this.bmp = null;
+    this.changed();
   }
   // the outline of the biggest solid piece on the bitmap, as grid coordinates, shaved of the pixel stairs
   traceBitmap() {
@@ -125,9 +136,8 @@ export class ShapePad {
       // (straight on otherwise)
     } while ((cx !== sx || cy !== sy || dir !== 0) && --guard > 0);
     // every lattice step is a corner; shave the stairs and cap the count
-    let out = simplify(pts, 0.9);
-    if (out.length > 64) out = simplify(pts, 1.6);
-    if (out.length > 64) out = simplify(pts, 2.6);
+    let out = simplify(pts, 1.1 / this.bmp.G);
+    for (const tol of [1.6, 2.2, 3, 4]) if (out.length > 220) out = simplify(pts, tol / this.bmp.G);
     return out;
   }
   // after an erase: drop corners that sit on a straight line, keep the count sane
@@ -217,8 +227,11 @@ export class ShapePad {
     x.font = '900 10px Nunito, sans-serif'; x.fillStyle = 'rgba(255,240,220,.4)'; x.textAlign = 'center';
     x.fillText('GRIP', w / 2, h - 12); x.fillText('TIP', w / 2, 16);
     if (!this.shape) return;
+    if (this.bmp) {
+      x.save(); x.scale(this.bmp.G, this.bmp.G); x.globalAlpha = 0.9; x.drawImage(this.bmp.c, 0, 0); x.restore();
+    }
     const full = fullOutline(this.shape);
-    if (full.length >= 3) {
+    if (full.length >= 3 && !this.bmp) {
       x.beginPath(); full.forEach((p, i) => { const [px, py] = this.toPx(p, w, h); i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.closePath();
       x.fillStyle = 'rgba(200,208,218,.55)'; x.fill(); x.strokeStyle = '#ffffff'; x.lineWidth = 1.5; x.stroke();
     }
