@@ -12,14 +12,14 @@ const alias = {
 const common = { bundle: true, minify: true, write: false, plugins: [alias], target: 'es2020', logLevel: 'warning' };
 const worker = (await esbuild.build({ ...common, entryPoints: [path.join(root, 'src/genworker.js')], format: 'iife' })).outputFiles[0].text;
 const main = (await esbuild.build({ ...common, entryPoints: [path.join(root, 'src/main.js')], format: 'esm' })).outputFiles[0].text;
-const head = fs.readFileSync(path.join(root, 'src/head.html'), 'utf8');
+// (the artifact host wraps the page in its own <html>/<head>/<body>: hand it the inside only)
+const head = fs.readFileSync(path.join(root, 'src/head.html'), 'utf8')
+  .replace(/<!doctype html>\s*/i, '').replace(/<html[^>]*>\s*/i, '').replace(/<\/?head>\s*/gi, '').replace(/<body>\s*/i, '');
 const esc = s => s.replace(/<\/script/gi, '<\\/script');
 const html = head + `
 <div id="boot" style="position:fixed;inset:0;display:grid;place-items:center;background:#0b0908;color:#ffc93c;font:900 28px 'Luckiest Guy',Nunito,sans-serif;z-index:99;letter-spacing:.04em">LOADING THE WORLD...</div>
 <script>window.__DW_WORKER_URL = URL.createObjectURL(new Blob([${JSON.stringify(esc(worker))}], { type: 'text/javascript' }));</script>
 <script type="module">${esc(main)}</script>
-</body>
-</html>
 `;
 fs.mkdirSync(path.join(root, 'dist/music'), { recursive: true });
 fs.writeFileSync(path.join(root, 'dist/play.html'), html);
