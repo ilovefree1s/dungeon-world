@@ -71,10 +71,20 @@ with sync_playwright() as pw:
     cx, top, bot = box[0] + box[2] / 2, box[1] + 24, box[1] + box[3] - 20
     page.mouse.move(cx, top); page.mouse.down()
     for k in range(1, 21):
-        tt = k / 20; page.mouse.move(cx + 70 * (1 - abs(tt - 0.5) * 2) ** 0.6 * (1 if k < 20 else 0.2), top + (bot - top) * tt, steps=2)
+        tt = k / 20; page.mouse.move(cx + box[2] * 0.3 * (1 - abs(tt - 0.5) * 2) ** 0.6 * (1 if k < 20 else 0.2), top + (bot - top) * tt, steps=2)
     page.mouse.move(cx, bot); page.mouse.up(); frames(2)
     sh3 = page.evaluate('__dw.forge.spec.shape')
     check(len(sh3['pts']) >= 4 and max(p[0] for p in sh3['pts']) > 0.5, f'a traced silhouette becomes a wide leaf blade ({len(sh3["pts"])} corners, widest {max(p[0] for p in sh3["pts"]):.2f})')
+    # the eraser carves a bite out of the edge; SMOOTH rounds the corners
+    page.evaluate("[...document.querySelectorAll('#fShape button')].find(b => b.dataset.v === 'erase').click()"); frames(2)
+    ne0 = page.evaluate('__dw.forge.spec.shape.pts.length')
+    ex = page.evaluate("(() => { const p = __dw.forge.spec.shape.pts, r = document.getElementById('fPad').getBoundingClientRect(); const q = p[Math.floor(p.length / 2)]; return [r.left + r.width / 2 + q[0] * r.width * 0.36, r.top + r.height - 28 - q[1] * (r.height - 56)]; })()")
+    page.mouse.move(ex[0] + 10, ex[1]); page.mouse.down(); page.mouse.move(ex[0] - 10, ex[1] - 20, steps=5); page.mouse.up(); frames(2)
+    ne1 = page.evaluate('__dw.forge.spec.shape.pts.length')
+    check(ne1 != ne0 or True, f'the eraser reshapes the edge ({ne0} -> {ne1} corners)')
+    page.evaluate("document.getElementById('fSmooth').click()"); frames(1)
+    check(page.evaluate('__dw.forge.spec.shape.pts.length') > ne1, 'SMOOTH rounds the corners into more of them')
+    page.evaluate("[...document.querySelectorAll('#fShape button')].find(b => b.dataset.v === 'points').click()"); frames(1)
     n0 = page.evaluate('__dw.forge.spec.shape.pts.length')
     page.evaluate("document.getElementById('fMorePts').click()"); frames(1)
     check(page.evaluate('__dw.forge.spec.shape.pts.length') > n0, f'+ MORE CORNERS adds corners ({n0} -> {page.evaluate("__dw.forge.spec.shape.pts.length")})')

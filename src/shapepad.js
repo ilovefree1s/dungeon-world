@@ -10,7 +10,7 @@ import { fullOutline } from './weaponkit.js';
 export class ShapePad {
   constructor(canvas, onChange) {
     this.c = canvas; this.x = canvas.getContext('2d'); this.onChange = onChange;
-    this.shape = null; this.mode = 'points'; this.drag = -1; this.stroke = null;
+    this.shape = null; this.mode = 'points'; this.drag = -1; this.stroke = null; this.brush = 26; this.erasing = false; this.hover = null;
     canvas.addEventListener('pointerdown', e => this.down(e));
     canvas.addEventListener('pointermove', e => this.move(e));
     canvas.addEventListener('pointerup', e => this.up(e)); canvas.addEventListener('pointercancel', e => this.up(e));
@@ -31,6 +31,7 @@ export class ShapePad {
     e.preventDefault(); this.c.setPointerCapture(e.pointerId);
     const [px, py, w, h] = this.local(e);
     if (this.mode === 'draw') { this.stroke = [[px, py]]; this.draw(); return; }
+    if (this.mode === 'erase') { this.erasing = true; this.eraseAt(px, py, w, h); return; }
     // a corner to drag?
     const H = this.handles();
     let best = -1, bd = 14;
@@ -47,6 +48,8 @@ export class ShapePad {
   move(e) {
     if (!this.shape) return;
     const [px, py, w, h] = this.local(e);
+    this.hover = [px, py];
+    if (this.mode === 'erase') { if (this.erasing) this.eraseAt(px, py, w, h); else this.draw(); return; }
     if (this.mode === 'draw') { if (this.stroke) { this.stroke.push([px, py]); this.draw(); } return; }
     if (this.drag < 0) return;
     let p = this.toPt(px, py, w, h);
@@ -55,8 +58,47 @@ export class ShapePad {
     this.changed(true);
   }
   up(e) {
+    if (this.mode === 'erase') { if (this.erasing) { this.erasing = false; this.tidy(); this.changed(); } return; }
     if (this.mode === 'draw' && this.stroke) { this.finishStroke(); this.stroke = null; return; }
     if (this.drag >= 0) { this.drag = -1; this.changed(); }
+  }
+  // the eraser: a round brush that carves the outline. Edges crossing the brush get corners where
+  // they cross, and every corner inside the brush is pushed out to its rim: drag it along and it cuts a curve
+  eraseAt(px, py, w, h) {
+    const sh = this.shape, R = this.brush, P = sh.pts.map(p => this.toPx(p, w, h)), closed = !sh.mirror;
+    const out = [], n = P.length;
+    const inside = q => Math.hypot(q[0] - px, q[1] - py) < R;
+    for (let i = 0; i < n; i++) {
+      const a = P[i], b = P[(i + 1) % n];
+      out.push(a);
+      if (i === n - 1 && !closed) break;
+      // where this edge crosses the rim
+      const dx = b[0] - a[0], dy = b[1] - a[1], fx = a[0] - px, fy = a[1] - py;
+      const A = dx * dx + dy * dy, B = 2 * (fx * dx + fy * dy), C = fx * fx + fy * fy - R * R, D = B * B - 4 * A * C;
+      if (A > 0 && D > 0) { const sq = Math.sqrt(D); for (const t of [(-B - sq) / (2 * A), (-B + sq) / (2 * A)]) if (t > 0.02 && t < 0.98) out.push([a[0] + dx * t, a[1] + dy * t]); }
+    }
+    const pushed = out.map(q => { if (!inside(q)) return q; let vx = q[0] - px, vy = q[1] - py; const l = Math.hypot(vx, vy) || 1; if (l < 0.01) { vx = 0; vy = -1; } return [px + vx / l * (R + 0.5), py + vy / l * (R + 0.5)]; });
+    sh.pts = pushed.map(q => { const p = this.toPt(q[0], q[1], w, h); if (sh.mirror && p[0] < 0) p[0] = 0; return [+p[0].toFixed(3), +p[1].toFixed(3)]; });
+    this.draw(); this.onChange && this.onChange(sh, true);
+  }
+  // after an erase: drop corners that sit on a straight line, keep the count sane
+  tidy() {
+    const sh = this.shape; if (!sh || sh.pts.length <= 4) return;
+    const px = sh.pts.map(([x, y]) => [x * 200, y * 300]);
+    const s = simplify(px, 1.2).map(([x, y]) => [+(x / 200).toFixed(3), +(y / 300).toFixed(3)]);
+    if (s.length >= 3) sh.pts = s;
+    if (sh.pts.length > 48) { const s2 = simplify(sh.pts.map(([x, y]) => [x * 200, y * 300]), 2.5); sh.pts = s2.map(([x, y]) => [+(x / 200).toFixed(3), +(y / 300).toFixed(3)]); }
+  }
+  // round every corner (Chaikin's cut: each corner becomes two, a quarter in from each side)
+  smooth() {
+    const sh = this.shape; if (!sh || sh.pts.length < 3) return;
+    const P = sh.pts, n = P.length, closed = !sh.mirror, out = [];
+    const cut = (a, b) => [[+(a[0] * 0.75 + b[0] * 0.25).toFixed(3), +(a[1] * 0.75 + b[1] * 0.25).toFixed(3)], [+(a[0] * 0.25 + b[0] * 0.75).toFixed(3), +(a[1] * 0.25 + b[1] * 0.75).toFixed(3)]];
+    if (closed) { for (let i = 0; i < n; i++) out.push(...cut(P[i], P[(i + 1) % n])); }
+    else { out.push(P[0]); for (let i = 0; i < n - 1; i++) { const [c1, c2] = cut(P[i], P[i + 1]); if (i > 0) out.push(c1); if (i < n - 2) out.push(c2); } out.push(P[n - 1]); }
+    sh.pts = out;
+    if (sh.pts.length > 48) this.tidy();
+    this.changed();
   }
   // a corner in the middle of every edge (the longest ones first, up to 24 corners)
   addPoints() {
@@ -131,7 +173,8 @@ export class ShapePad {
       x.beginPath(); full.forEach((p, i) => { const [px, py] = this.toPx(p, w, h); i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.closePath();
       x.fillStyle = 'rgba(200,208,218,.55)'; x.fill(); x.strokeStyle = '#ffffff'; x.lineWidth = 1.5; x.stroke();
     }
-    if (this.mode === 'points') {
+    if (this.mode === 'erase' && this.hover) { x.beginPath(); x.arc(this.hover[0], this.hover[1], this.brush, 0, 7); x.strokeStyle = '#ff6a55'; x.lineWidth = 2; x.setLineDash([4, 4]); x.stroke(); x.setLineDash([]); }
+    if (this.mode === 'points' || this.mode === 'erase') {
       this.handles().forEach(p => { const [px, py] = this.toPx(p, w, h); x.beginPath(); x.arc(px, py, 5, 0, 7); x.fillStyle = '#ffc93c'; x.fill(); x.strokeStyle = '#3a1c00'; x.lineWidth = 1.5; x.stroke(); });
     } else if (this.stroke) {
       x.beginPath(); this.stroke.forEach(([px, py], i) => i ? x.lineTo(px, py) : x.moveTo(px, py));

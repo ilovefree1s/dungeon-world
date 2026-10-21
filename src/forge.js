@@ -101,12 +101,12 @@ function render() {
   $('forge').querySelector('.panel').classList.toggle('drawing', drawable && !!s.shape);
   if (renderer) sizePreview();
   if (!drawable) s.shape = null;
-  seg('fShape', [['preset', 'OFF'], ['points', 'DRAG CORNERS'], ['draw', 'FREEHAND']], s.shape ? shapeMode : 'preset', v => {
+  seg('fShape', [['preset', 'OFF'], ['points', 'DRAG CORNERS'], ['draw', 'FREEHAND'], ['erase', 'ERASER']], s.shape ? shapeMode : 'preset', v => {
     if (v === 'preset') { s.shape = null; }
     else { if (!s.shape) s.shape = presetShape(s); shapeMode = v; }
   });
   $('fHeadRow').hidden = drawable && !!s.shape;
-  if (s.shape) { pad.set(s.shape, shapeMode); $('fMirror').classList.toggle('on', !!s.shape.mirror); $('fPadHint').textContent = shapeMode === 'draw' ? 'TRACE THE SILHOUETTE IN ONE STROKE' : 'DRAG THE CORNERS · CLICK AN EDGE TO ADD ONE · DOUBLE-CLICK ONE TO REMOVE IT'; }
+  if (s.shape) { pad.set(s.shape, shapeMode); $('fMirror').classList.toggle('on', !!s.shape.mirror); $('fPadHint').textContent = shapeMode === 'draw' ? 'TRACE THE SILHOUETTE IN ONE STROKE' : shapeMode === 'erase' ? 'RUB THE BRUSH ALONG THE EDGE TO CARVE A CURVE INTO IT' : 'DRAG THE CORNERS · CLICK AN EDGE TO ADD ONE · DOUBLE-CLICK ONE TO REMOVE IT'; }
   $('fLen').value = s.length; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1;
   $('fPowRow').hidden = !s.aura || s.aura === 'none';
   $('fName').value = s.name || '';
@@ -143,6 +143,8 @@ function wire() {
     sfx('pickup'); render();
   });
   $('fShapeReset').addEventListener('click', () => { forge.spec.shape = presetShape(forge.spec); sfx('pickup'); render(); });
+  $('fSmooth').addEventListener('click', () => { if (!forge.spec.shape) return; pad.smooth(); sfx('pickup'); });
+  $('fBrush').addEventListener('input', e => { pad.brush = +e.target.value; pad.draw(); });
   $('fMorePts').addEventListener('click', () => { if (shapeMode !== 'points') { shapeMode = 'points'; render(); } pad.addPoints(); sfx('pickup'); });
   $('fSpin').addEventListener('click', () => { spin = spin ? 0 : 1; $('fSpin').classList.toggle('on', !!spin); $('fSpin').textContent = spin ? 'SPINNING' : 'STILL'; });
   $('fLen').addEventListener('input', e => { forge.spec.length = +e.target.value; rebuild(); });
