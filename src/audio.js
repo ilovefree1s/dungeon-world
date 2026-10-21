@@ -28,6 +28,8 @@ export function setMusic(v) {
   if (v > 0 && audioState.started) music.play().catch(() => { });
   else music.pause();
 }
+// (the world's ambience plugs in here)
+export const audioNodes = () => AC ? { AC, master } : null;
 export function setSfx(v) { audioState.sfx = v; if (sfxGain) sfxGain.gain.value = v * 0.6; }
 function noiseBuf() { const b = AC.createBuffer(1, AC.sampleRate, AC.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
 function tone(f0, f1, dur, type = 'sine', vol = 0.3, delay = 0, attack = 0.008) {

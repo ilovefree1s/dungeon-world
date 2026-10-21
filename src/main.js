@@ -14,6 +14,7 @@ import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec } from './forge.js';
 import { burst, ring, stepFx } from './fx.js';
 import { grassUniforms } from './flora.js';
+import { updateAmbience } from './ambience.js';
 
 const $ = id => document.getElementById(id);
 const Q = new URLSearchParams(location.search);
@@ -159,7 +160,7 @@ function pickHero(i) {
 function beginPlay() {
   UI.state = 'play';
   $('title').hidden = true; $('hud').hidden = false; $('touch').hidden = false;
-  player.pitch = 0.3;
+  player.pitch = 0.55;
   player.yaw = player.face + Math.PI;
   hintT = 0;
   writeSave();
@@ -294,6 +295,8 @@ function frame(now) {
   grassUniforms.uHero.value.copy(p);
   for (let i = 0; i < 4; i++) { const m = monsters.list[i]; if (m) grassUniforms.uMon.value[i].copy(m.pos); else grassUniforms.uMon.value[i].set(0, -999, 0); }
   world.setGrass(QUALITY[UI.quality].grass, QUALITY[UI.quality].grassRange);
+  // the world's sounds
+  if (audioState.started) updateAmbience(dt, sky.day, biomeNow < 0 ? 0 : biomeNow, world.poly ? (world.seaAt(p.x + 6, p.z) || world.seaAt(p.x - 6, p.z) || world.seaAt(p.x, p.z + 6) || world.seaAt(p.x, p.z - 6)) : false, Math.hypot(player.vel.x, player.vel.z), UI.state === 'play');
   updateSky(dt, p);
   player.dayLight(0.25 + 0.75 * sky.day);
   if (UI.state !== 'title') updateHud(dt);

@@ -23,7 +23,7 @@ export class Player {
     this.onGround = false; this.inWater = false; this.headUnder = false;
     this.face = 0;               // which way the hero faces (radians, 0 = +z)
     this.walk = 0; this.move = 0;
-    this.yaw = Math.PI * 0.25; this.pitch = 0.32; this.camDist = 20;
+    this.yaw = Math.PI * 0.25; this.pitch = 0.55; this.camDist = 24;
     this.camPos = new V3(); this.camFocus = new V3();
     this.lastLook = -10; this.visY = 0; this.hurtT = 0; this.coyote = 0; this.jumpBuf = 0;
     this.castT = -1; this.invT = 0; this.aimFace = null;
