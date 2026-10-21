@@ -13,6 +13,7 @@ import { Monsters, Bolts, stats, xpToNext } from './combat.js';
 import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec } from './forge.js';
 import { burst, ring, stepFx } from './fx.js';
+import { grassUniforms } from './flora.js';
 
 const $ = id => document.getElementById(id);
 const Q = new URLSearchParams(location.search);
@@ -37,7 +38,7 @@ setQuality(UI.quality);
 
 // ---------------------------------------------------------------- the world and the hero
 const seed = Q.has('seed') ? (+Q.get('seed') || 1) : save ? save.seed : 1;
-const world = new World(seed, Q.has('flat'));
+const world = new World(seed, Q.has('flat'), !Q.has('blocks'));
 const player = new Player(world);
 player.onHurt = () => { sfx('hurt'); $('hurt').style.opacity = 1; setTimeout(() => $('hurt').style.opacity = 0, 250); };
 player.setClass(UI.cls);
@@ -71,6 +72,18 @@ let placed = !!(save && save.seed === seed); // (a new hero still has to find it
 // put the hero on open ground once its chunk is here
 function settle() {
   const p = player.pos;
+  if (world.poly) {
+    // the nearest dry, clear spot on the low-poly land
+    for (let r = 0; r < 30; r += 1.5) for (let a = 0; a < Math.max(1, r * 4); a++) {
+      const x = p.x + Math.cos(a / Math.max(1, r * 4) * Math.PI * 2) * r, z = p.z + Math.sin(a / Math.max(1, r * 4) * Math.PI * 2) * r;
+      const g = world.ground(x, z);
+      if (g === null || world.seaAt(x, z)) continue;
+      const [cx2, cz2] = world.clearOfTrunks(x, z, 1.2);
+      if (cx2 !== x || cz2 !== z) continue;
+      player.place(x, g + 0.1, z); return true;
+    }
+    return false;
+  }
   for (let r = 0; r < 24; r++) for (let a = 0; a < Math.max(1, r * 6); a++) {
     const x = Math.floor(p.x + Math.cos(a / Math.max(1, r * 6) * Math.PI * 2) * r) + 0.5, z = Math.floor(p.z + Math.sin(a / Math.max(1, r * 6) * Math.PI * 2) * r) + 0.5;
     const g = world.groundY(x, z);
@@ -124,7 +137,7 @@ function updateHud(dt) {
 }
 let biomeSince = 0;
 // the hint for looking around, until you've done it
-let hintT = 0, looked = false;
+let hintT = 0, looked = false, compiled = false;
 
 // ---------------------------------------------------------------- screens
 const heroes = [...document.querySelectorAll('.hero')];
@@ -252,6 +265,8 @@ function frame(now) {
     player.update(dt, inp, [0, 0], true);
     if (player.model) { player.animate(dt, 0); player.face = player.yaw + Math.PI * 0.85; }
     const prog = world.readyAround(p.x, p.z, Math.min(64, view.viewDist));
+    // (the land's and the plants' shaders are built now, on the title screen, not as a hitch on the first step)
+    if (!compiled && prog >= 0.6) { compiled = true; try { renderer.compile(scene, camera); } catch (e) { } }
     $('loadFill').style.width = Math.round(prog * 100) + '%';
     if (prog >= 1 && wantStart < 0) $('loadT').textContent = IS_TOUCH ? 'TAP A HERO TO BEGIN' : 'PICK A HERO TO BEGIN';
     if (wantStart >= 0 && placed && prog >= 0.9) { wantStart = -1; beginPlay(); }
@@ -274,6 +289,11 @@ function frame(now) {
   world.update(p.x, p.z, fwd.x, fwd.z);
   if (UI.state === 'play') { monsters.update(dt); bolts.update(dt); }
   stepFx(dt);
+  // the grass: the wind, and who walks through it
+  grassUniforms.uTime.value = performance.now() / 1000;
+  grassUniforms.uHero.value.copy(p);
+  for (let i = 0; i < 4; i++) { const m = monsters.list[i]; if (m) grassUniforms.uMon.value[i].copy(m.pos); else grassUniforms.uMon.value[i].set(0, -999, 0); }
+  world.setGrass(QUALITY[UI.quality].grass, QUALITY[UI.quality].grassRange);
   updateSky(dt, p);
   player.dayLight(0.25 + 0.75 * sky.day);
   if (UI.state !== 'title') updateHud(dt);

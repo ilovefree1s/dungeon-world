@@ -5,9 +5,9 @@ onmessage = e => {
   const m = e.data;
   if (m.type === 'init') { gen = createGen(m.seed, m.flat); return; }
   if (m.type === 'gen') {
-    const c = gen.chunk(m.cx, m.cz);
+    const c = m.poly ? gen.polyChunk(m.cx, m.cz) : gen.chunk(m.cx, m.cz);
     c.id = m.id;
-    const t = [c.vox.buffer];
+    const t = m.poly ? [c.hf.buffer, c.trees.buffer, c.grass.buffer] : [c.vox.buffer];
     for (const k of ['solid', 'glow', 'water']) for (const a of ['p', 'n', 'c', 'i']) t.push(c[k][a].buffer);
     postMessage(c, t);
   }

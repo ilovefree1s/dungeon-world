@@ -4,7 +4,8 @@
 //  again far behind you. Also answers "what block is here?" for walking.
 // ============================================================================
 import { THREE, scene, view } from './engine.js';
-import { createGen, CH, WH, SEA, isSolid, isWater, isLava, isLeaf, STONE } from './gen.js';
+import { createGen, CH, WH, SEA, isSolid, isWater, isLava, isLeaf, STONE, LAVA } from './gen.js';
+import { buildFlora, buildGrass } from './flora.js';
 
 // (the blocks' colors are written as sRGB bytes: turn them linear in the shader)
 function linearColors(m) {
@@ -13,6 +14,8 @@ function linearColors(m) {
 }
 export const MAT = {
   solid: linearColors(new THREE.MeshLambertMaterial({ vertexColors: true })),
+  land: linearColors(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide })),
+  flora: linearColors(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })),
   glow: linearColors(new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.9, 1.9, 1.9) })),
   water: linearColors(new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, opacity: 0.74, shininess: 110, specular: new THREE.Color('#d8ecff'), depthWrite: false })),
 };
@@ -20,8 +23,9 @@ const UNLOADED = 255;
 const key = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
 
 export class World {
-  constructor(seed, flat = false) {
-    this.seed = seed; this.flat = flat;
+  constructor(seed, flat = false, poly = true) {
+    this.seed = seed; this.flat = flat; this.poly = poly;
+    this.grassDensity = 0.5; this.grassRange = 2; // (chunks of grass around the hero; set by the quality)
     this.gen = createGen(seed, flat);
     this.chunks = new Map();       // key -> { cx, cz, vox, group, state }
     this.group = new THREE.Group(); scene.add(this.group);
@@ -65,7 +69,7 @@ export class World {
   camBlock(x, y, z) { const id = this.get(x, y, z); return id !== UNLOADED && isSolid(id) && !isLeaf(id); }
   water(x, y, z) { return isWater(this.get(x, y, z)); }
   lava(x, y, z) { return isLava(this.get(x, y, z)); }
-  loaded(x, z) { const c = this.chunks.get(key(Math.floor(x / CH), Math.floor(z / CH))); return !!(c && c.vox); }
+  loaded(x, z) { const c = this.chunks.get(key(Math.floor(x / CH), Math.floor(z / CH))); return !!(c && (c.vox || c.hf)); }
   // the top solid block under a point (or -1)
   groundY(x, z, from = WH - 1) { for (let y = Math.min(WH - 1, Math.floor(from)); y >= 0; y--) if (this.solid(x, y, z)) return y; return -1; }
 
@@ -91,12 +95,12 @@ export class World {
         if (this.inflight >= cap) break;
         const w = this.workers.reduce((a, b) => (a.busy <= b.busy ? a : b));
         w.busy++; this.inflight++;
-        w.postMessage({ type: 'gen', id: ++this.jobId, cx, cz });
+        w.postMessage({ type: 'gen', id: ++this.jobId, cx, cz, poly: this.poly });
         this.chunks.set(key(cx, cz), { cx, cz, vox: null, group: null, state: 1 });
       } else {
         // (no workers: one chunk a frame here)
         const t = performance.now();
-        const c = this.gen.chunk(cx, cz);
+        const c = this.poly ? this.gen.polyChunk(cx, cz) : this.gen.chunk(cx, cz);
         this.stats.genMs = performance.now() - t;
         this.chunks.set(key(cx, cz), { cx, cz, vox: null, group: null, state: 1 });
         this.inbox.push(c);
@@ -107,21 +111,33 @@ export class World {
     const t0 = performance.now();
     let n = 0;
     while (this.inbox.length && (n < 1 || performance.now() - t0 < 4) && n < 4) { this.build(this.inbox.shift(), px, pz); n++; }
-    // drop far ones
+    // drop far ones; grass only near the hero
+    const gcx = Math.floor(px / CH), gcz = Math.floor(pz / CH);
     for (const [k, c] of this.chunks) {
       if (c.state !== 2) continue;
       const d = Math.hypot(c.cx * CH + CH / 2 - px, c.cz * CH + CH / 2 - pz);
-      if (d > R + CH * 2) this.unload(k, c);
+      if (d > R + CH * 2) { this.unload(k, c); continue; }
+      if (this.poly && c.grassSpots) {
+        const near = Math.abs(c.cx - gcx) <= this.grassRange && Math.abs(c.cz - gcz) <= this.grassRange;
+        if (near && !c.grass && this.grassDensity > 0) { c.grass = buildGrass(c.grassSpots, this.grassDensity, 0, 0); if (c.grass) { c.group.add(c.grass); c.grass.updateMatrixWorld(true); } else c.grassSpots = null; }
+        else if (!near && c.grass) { c.group.remove(c.grass); c.grass.dispose(); c.grass = null; }
+      }
     }
+  }
+  // the grass follows the quality: how thick, how far
+  setGrass(density, range) {
+    if (density === this.grassDensity && range === this.grassRange) return;
+    this.grassDensity = density; this.grassRange = range;
+    for (const c of this.chunks.values()) if (c.grass) { c.group.remove(c.grass); c.grass.dispose(); c.grass = null; }
   }
   build(d, px, pz) {
     const k = key(d.cx, d.cz), c = this.chunks.get(k);
     if (!c) return; // (unloaded while it was being built)
     const t = performance.now();
-    c.vox = d.vox; c.state = 2;
+    c.vox = d.vox || null; c.hf = d.hf || null; c.state = 2;
     const g = new THREE.Group();
     g.position.set(d.cx * CH, 0, d.cz * CH);
-    const sphere = new THREE.Sphere(new THREE.Vector3(CH / 2, d.top / 2, CH / 2), Math.hypot(CH / 2, CH / 2, d.top / 2) + 1);
+    const sphere = new THREE.Sphere(new THREE.Vector3(CH / 2, d.top / 2, CH / 2), Math.hypot(CH / 2, CH / 2, d.top / 2) + 12);
     for (const kind of ['solid', 'glow', 'water']) {
       const b = d[kind];
       if (!b.i.length) continue;
@@ -131,12 +147,18 @@ export class World {
       geo.setAttribute('color', new THREE.BufferAttribute(b.c, 3, true));
       geo.setIndex(new THREE.BufferAttribute(b.i, 1));
       geo.boundingSphere = sphere;
-      const m = new THREE.Mesh(geo, MAT[kind]);
+      const m = new THREE.Mesh(geo, kind === 'solid' && d.poly ? MAT.land : MAT[kind]);
       m.matrixAutoUpdate = false;
       if (kind === 'solid') { m.castShadow = true; m.receiveShadow = true; }
       if (kind === 'water') m.renderOrder = 2;
       g.add(m);
       this.stats.tris += b.i.length / 3;
+    }
+    if (d.poly) {
+      // the trees and rocks, and the trunks to walk around; the grass comes when the hero is near
+      const f = buildFlora(d.trees, MAT.flora, MAT.glow);
+      for (const m of f.meshes) g.add(m);
+      c.trunks = f.trunks; c.grassSpots = d.grass.length ? d.grass : null; c.grass = null;
     }
     g.updateMatrixWorld(true);
     g.matrixAutoUpdate = false;
@@ -147,11 +169,43 @@ export class World {
   }
   unload(k, c) {
     if (c.group) {
-      c.group.traverse(o => { if (o.geometry) { this.stats.tris -= o.geometry.index.count / 3; o.geometry.dispose(); } });
+      c.group.traverse(o => { if (o.isInstancedMesh) o.dispose(); else if (o.geometry && o.geometry.index) { this.stats.tris -= (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; o.geometry.dispose(); } });
       this.group.remove(c.group);
     }
     this.chunks.delete(k);
   }
+  // ---------------------------------------------------------------- the low-poly land
+  // the ground's height under a point (the same triangles the mesh shows), or null where no chunk is yet
+  ground(x, z) {
+    const cx = Math.floor(x / CH), cz = Math.floor(z / CH), c = this.chunks.get(key(cx, cz));
+    if (!c || !c.hf) return null;
+    const PV = CH / 2 + 1, lx = (x - cx * CH) / 2, lz = (z - cz * CH) / 2;
+    const i = Math.min(PV - 2, Math.floor(lx)), j = Math.min(PV - 2, Math.floor(lz)), fx = lx - i, fz = lz - j, k = j * PV + i, H = c.hf;
+    const h00 = H[k], h10 = H[k + 1], h01 = H[k + PV], h11 = H[k + PV + 1];
+    if ((i + j) & 1) { // the diagonal from (0,0) to (1,1)
+      return fx > fz ? h00 + (h10 - h00) * fx + (h11 - h10) * fz : h00 + (h01 - h00) * fz + (h11 - h01) * fx;
+    }
+    // the diagonal from (1,0) to (0,1)
+    return fx + fz < 1 ? h00 + (h10 - h00) * fx + (h01 - h00) * fz : h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz);
+  }
+  // the trunks within reach of a point: [x, z, r] triples from this chunk and its neighbors
+  trunksNear(x, z) {
+    const out = [];
+    const cx = Math.floor(x / CH), cz = Math.floor(z / CH);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const c = this.chunks.get(key(cx + dx, cz + dz)); if (c && c.trunks) out.push([c.trunks, (cx + dx) * CH, (cz + dz) * CH]); }
+    return out;
+  }
+  // pushed out of any trunk: returns [x, z] moved clear
+  clearOfTrunks(x, z, rad) {
+    for (const [T, ox, oz] of this.trunksNear(x, z)) for (let i = 0; i < T.length; i += 3) {
+      const tx = ox + T[i], tz = oz + T[i + 1], r = T[i + 2] + rad, dx = x - tx, dz = z - tz, d = Math.hypot(dx, dz);
+      if (d < r) { const k = (r - d) / (d || 1); x += dx * k || r; z += dz * k; }
+    }
+    return [x, z];
+  }
+  // water (or lava) over the land here: the sea's surface where the ground dips under it
+  seaAt(x, z) { const g = this.ground(x, z); return g !== null && g < SEA + 0.86; }
+  lavaAt(x, z) { return this.seaAt(x, z) && this.gen.column(Math.floor(x), Math.floor(z)).pick === LAVA; }
   // how many of the chunks within r of a point are ready
   readyAround(px, pz, r = 48) {
     let need = 0, have = 0;

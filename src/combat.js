@@ -77,11 +77,12 @@ export class Monsters {
       // (not in front of the camera: they appear behind you and off to the sides)
       const fx = -Math.sin(this.player.yaw), fz = -Math.cos(this.player.yaw);
       if (((x - p.x) * fx + (z - p.z) * fz) / d > 0.3 && d < 80) continue;
-      const g = w.groundY(x, z);
-      if (g < 0 || w.water(x, g + 1, z) || w.lava(x, g + 1, z) || w.lava(x, g, z)) continue;
+      let gy;
+      if (w.poly) { const g = w.ground(x, z); if (g === null || w.seaAt(x, z)) continue; gy = g; }
+      else { const g = w.groundY(x, z); if (g < 0 || w.water(x, g + 1, z) || w.lava(x, g + 1, z) || w.lava(x, g, z)) continue; gy = g + 1; }
       const biome = w.gen.column(Math.floor(x), Math.floor(z)).biome;
       const types = BY_BIOME[biome], type = types[Math.floor(Math.random() * types.length)];
-      this.spawn(type, x, g + 1 + (KIND[type].fly ? 5 : 0), z);
+      this.spawn(type, x, gy + (KIND[type].fly ? 5 : 0), z);
       return;
     }
   }
@@ -152,7 +153,22 @@ export class Monsters {
       m.kb.multiplyScalar(Math.exp(-9 * dt));
       // ground monsters: step, fall, stay out of the water; flyers hover
       const nx = m.pos.x + m.vel.x * dt, nz = m.pos.z + m.vel.z * dt;
-      if (k.fly) {
+      if (w.poly) {
+        // the low-poly land: a height to walk on (or hover over), the sea to keep out of
+        if (k.fly) {
+          const g = w.ground(nx, nz);
+          if (g !== null) { m.pos.x = nx; m.pos.z = nz; m.pos.y += (g + 5.2 + Math.sin(t * 2 + m.bob) * 0.8 - m.pos.y) * (1 - Math.exp(-3 * dt)); }
+        } else {
+          const g = w.ground(nx, nz);
+          if (g !== null && !w.seaAt(nx, nz) && g - m.pos.y < 2.6) { const [cx2, cz2] = w.clearOfTrunks(nx, nz, k.r * 0.6); m.pos.x = cx2; m.pos.z = cz2; }
+          else { m.vel.x *= -0.2; m.vel.z *= -0.2; if (m.state === 'wander') m.t = 0; }
+          m.vel.y -= 60 * dt;
+          const gh = w.ground(m.pos.x, m.pos.z);
+          let ny = m.pos.y + m.vel.y * dt;
+          if (gh !== null && ny <= gh) { ny = gh; m.vel.y = 0; m.onGround = true; } else m.onGround = false;
+          m.pos.y = ny;
+        }
+      } else if (k.fly) {
         const g = w.groundY(nx, nz, m.pos.y + 12);
         const hover = g + 5.2 + Math.sin(t * 2 + m.bob) * 0.8;
         m.pos.x = nx; m.pos.z = nz;
@@ -222,7 +238,8 @@ export class Bolts {
       const steps = 4; let gone = false;
       for (let s = 0; s < steps && !gone; s++) {
         b.pos.addScaledVector(b.vel, dt / steps);
-        if (this.world.solid(b.pos.x, b.pos.y, b.pos.z) || b.pos.y < 0) { if (b.onEnd) b.onEnd(b.pos); else burst(b.pos.x, b.pos.y, b.pos.z, b.color, 6, 8, 1.2, true, 0.3); gone = true; break; }
+        const gnd = this.world.poly ? this.world.ground(b.pos.x, b.pos.z) : null;
+        if ((this.world.poly ? (gnd !== null && b.pos.y < gnd) : this.world.solid(b.pos.x, b.pos.y, b.pos.z)) || b.pos.y < 0) { if (b.onEnd) b.onEnd(b.pos); else burst(b.pos.x, b.pos.y, b.pos.z, b.color, 6, 8, 1.2, true, 0.3); gone = true; break; }
         for (const m of this.monsters.list) {
           const cy = m.pos.y + m.k.h * 0.5;
           if (Math.hypot(b.pos.x - m.pos.x, (b.pos.y - cy) * 0.8, b.pos.z - m.pos.z) < m.k.r + b.r) {
@@ -257,7 +274,8 @@ export function aimPoint(world, monsters, from) {
   // the block the view hits
   for (let d = 4; d < 120; d += 0.5) {
     tmp.copy(camera.position).addScaledVector(ray, d);
-    if (world.solid(tmp.x, tmp.y, tmp.z)) return tmp.clone();
+    if (world.poly) { const g = world.ground(tmp.x, tmp.z); if (g !== null && tmp.y < g) return tmp.clone(); }
+    else if (world.solid(tmp.x, tmp.y, tmp.z)) return tmp.clone();
   }
   return camera.position.clone().addScaledVector(ray, 120);
 }

@@ -6,6 +6,8 @@
 import { THREE, scene, camera, TEX, V3 } from './engine.js';
 import { buildHero, equipHeroWeapon, animHero } from './dh/models.js';
 import { buildForged, statsOf, clsOf } from './weaponkit.js';
+import { SEA } from './gen.js';
+const SEA_TOP = SEA + 0.86; // (the sea's surface)
 
 // (a block is half a stride: the hero stands 5.2 blocks tall, steps up 2 and jumps 6)
 const HW = 0.96, HH = 5.2;          // the hero's box: half its width, its height (blocks)
@@ -105,7 +107,13 @@ export class Player {
     return true;
   }
   // ---------------------------------------------------------------- a frame
+  // ---------------------------------------------------------------- the land, either way
+  // (the low-poly land is a height under each point; the block land is blocks)
+  surfaceAt(x, z) { const w = this.world; if (w.poly) { const g = w.ground(x, z); return g === null ? null : g; } const g = w.groundY(x, z); return g < 0 ? null : g + 1; }
+  waterAt(x, y, z) { const w = this.world; return w.poly ? (y < SEA_TOP && w.seaAt(x, z)) : w.water(x, y, z); }
+  lavaAt(x, y, z) { const w = this.world; return w.poly ? (y < SEA_TOP && w.lavaAt(x, z)) : w.lava(x, y, z); }
   update(dt, inp, look, frozen) {
+    if (this.world.poly) return this.updatePoly(dt, inp, look, frozen);
     const w = this.world, p = this.pos;
     // the camera: swipes and the mouse turn it; the right stick and turn keys at a steady rate
     const [lx, ly] = look;
@@ -196,8 +204,93 @@ export class Player {
     this.animate(dt, hs);
     this.placeCamera(dt);
   }
+  // the hero on the low-poly land: the ground is a height, slopes are walked, steep ones climbed only by
+  // jumping, trunks are bumped around, the sea is swum
+  updatePoly(dt, inp, look, frozen) {
+    const w = this.world, p = this.pos;
+    const [lx, ly] = look;
+    if (lx || ly || inp.lookRX || inp.lookRY) this.lastLook = performance.now() / 1000;
+    this.yaw -= lx + inp.lookRX * 2.6 * dt;
+    this.pitch = Math.max(-0.35, Math.min(1.25, this.pitch + ly + inp.lookRY * 1.8 * dt));
+    if (frozen) { this.placeCamera(dt); return; }
+    const sinY = Math.sin(this.yaw), cosY = Math.cos(this.yaw);
+    const fwdX = -sinY, fwdZ = -cosY, rtX = cosY, rtZ = -sinY;
+    const mx = inp.mx, my = inp.my, mag = Math.min(1, Math.hypot(mx, my));
+    let wx = fwdX * -my + rtX * mx, wz = fwdZ * -my + rtZ * mx;
+    const wl = Math.hypot(wx, wz); if (wl > 0) { wx /= wl; wz /= wl; }
+    const g0 = w.ground(p.x, p.z);
+    if (g0 === null) { this.placeCamera(dt); return; } // (the land under you isn't here yet)
+    const sea = w.seaAt(p.x, p.z);
+    this.inWater = sea && p.y + 0.8 < SEA_TOP; const chestW = sea && p.y + 2.8 < SEA_TOP; this.headUnder = sea && p.y + 3.8 < SEA_TOP;
+    const speed = (this.inWater && chestW ? SWIM : inp.sprint || mag > 0.95 ? RUN : WALK) * mag;
+    const accel = this.onGround || this.inWater ? 14 : 5;
+    const k = 1 - Math.exp(-accel * dt);
+    this.vel.x += (wx * speed - this.vel.x) * k;
+    this.vel.z += (wz * speed - this.vel.z) * k;
+    if (this.dash) { const D = this.dash; D.t -= dt; this.vel.x = D.dx * D.spd; this.vel.z = D.dz * D.spd; if (D.t <= 0) { this.dash = null; this.vel.x *= 0.3; this.vel.z *= 0.3; } }
+    // jumping
+    if (inp.jumpEdge) this.jumpBuf = 0.14;
+    inp.jumpEdge = false;
+    this.jumpBuf -= dt; this.coyote -= dt;
+    if (this.onGround) this.coyote = 0.1;
+    if (chestW) {
+      this.vel.y += (inp.jump ? 18 : this.headUnder ? 10 : -4) * dt * 3;
+      this.vel.y *= Math.exp(-3 * dt);
+      this.vel.y = Math.max(-10, Math.min(12, this.vel.y));
+    } else {
+      if (this.jumpBuf > 0 && this.coyote > 0) { this.vel.y = JUMP_V; this.jumpBuf = 0; this.coyote = 0; this.onGround = false; this.jumped = true; }
+      if (!inp.jump && this.vel.y > 8 && this.jumped) this.vel.y -= GRAV * 1.2 * dt;
+      this.vel.y -= GRAV * dt;
+      if (this.vel.y < -80) this.vel.y = -80;
+    }
+    if (this.lavaAt(p.x, p.y + 0.6, p.z)) { this.vel.y = 30; this.hurtT = 0.6; this.onHurt && this.onHurt(); }
+    this.hurtT = Math.max(0, this.hurtT - dt); this.invT = Math.max(0, this.invT - dt);
+    if (this.castT >= 0) { this.castT += dt / 0.38; if (this.castT >= 1) this.castT = -1; }
+    if (this.swingT >= 0) { this.swingT += dt / (this.whirl ? this.swingLen : 0.3); if (this.swingT >= 1) { this.swingT = -1; this.whirl = false; } }
+    // move: a step that would climb more than STEP blocks is a wall (jump it); trunks push you off
+    const wasGround = this.onGround;
+    let nx = p.x + this.vel.x * dt, nz = p.z + this.vel.z * dt;
+    [nx, nz] = w.clearOfTrunks(nx, nz, HW);
+    const gn = w.ground(nx, nz);
+    if (gn !== null) {
+      const rise = gn - p.y;
+      if (rise > STEP + 0.3 && this.onGround) { this.vel.x *= -0.1; this.vel.z *= -0.1; }
+      else if (rise > 0.3 && !this.onGround && this.vel.y < 0 && gn - p.y > STEP) { /* (a cliff face in the air: slide down it) */ }
+      else { p.x = nx; p.z = nz; }
+    } else { p.x = nx; p.z = nz; }
+    p.y += this.vel.y * dt;
+    const g = w.ground(p.x, p.z);
+    this.onGround = false;
+    if (g !== null && p.y <= g) { p.y = g; if (this.vel.y < 0) this.vel.y = 0; this.onGround = true; this.stepped = wasGround && g - (g0) > 0.4; }
+    if (this.onGround) this.jumped = false;
+    if (this.onGround && !wasGround && this.onLand) { const f = this.onLand; this.onLand = null; f(); }
+    this.aboveGround = g !== null ? p.y - g : 0;
+    // face where you walk (or where you aim)
+    const hs = Math.hypot(this.vel.x, this.vel.z);
+    if (this.aimFace !== null) { let d = this.aimFace - this.face; d = Math.atan2(Math.sin(d), Math.cos(d)); this.face += d * (1 - Math.exp(-20 * dt)); if (this.castT < 0) this.aimFace = null; }
+    else if (hs > 0.4 && mag > 0.05) { const target = Math.atan2(this.vel.x, this.vel.z); let d = target - this.face; d = Math.atan2(Math.sin(d), Math.cos(d)); this.face += d * (1 - Math.exp(-14 * dt)); }
+    const now = performance.now() / 1000;
+    if (mag > 0.3 && now - this.lastLook > 1.2 && -my > 0.2) { const want = this.face + Math.PI; let d = want - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * (1 - Math.exp(-0.9 * dt)) * Math.min(1, -my); }
+    this.animate(dt, hs);
+    this.placeCamera(dt);
+  }
   // the mage's blink: a leap ahead through the air, as far as the way is clear (up to 9 blocks)
   blink(dx, dz) {
+    if (this.world.poly) {
+      // along the ground, over any dip, stopping at a wall of land taller than a jump
+      const p = this.pos, from = p.clone();
+      let x = p.x, y = p.y, z = p.z, n = 0;
+      for (let d = 1; d <= 18; d += 1) {
+        const nx = from.x + dx * d, nz = from.z + dz * d, g = this.world.ground(nx, nz);
+        if (g === null) break;
+        if (g > y + 6) break;
+        x = nx; z = nz; y = Math.max(y, g); n = d;
+      }
+      if (n < 3) return false;
+      [x, z] = this.world.clearOfTrunks(x, z, HW);
+      p.set(x, y, z); this.visY = y; this.vel.set(dx * 8, 2, dz * 8); this.invT = Math.max(this.invT, 0.35); this.snapCam = false;
+      return true;
+    }
     const p = this.pos, from = p.clone();
     let x = p.x, y = p.y, z = p.z, n = 0;
     for (let d = 1; d <= 18; d += 1) {
@@ -210,14 +303,14 @@ export class Player {
     p.set(x, y, z); this.visY = y; this.vel.set(dx * 8, 2, dz * 8); this.invT = Math.max(this.invT, 0.35); this.snapCam = false;
     return true;
   }
-  wallAhead(wx, wz) { const p = this.pos; return this.world.solid(p.x + wx * 1.6, p.y + 1, p.z + wz * 1.6) || this.world.solid(p.x + wx * 1.6, p.y + 2.4, p.z + wz * 1.6); }
+  wallAhead(wx, wz) { const p = this.pos; if (this.world.poly) { const g = this.world.ground(p.x + wx * 1.6, p.z + wz * 1.6); return g !== null && g > p.y + 1; } return this.world.solid(p.x + wx * 1.6, p.y + 1, p.z + wz * 1.6) || this.world.solid(p.x + wx * 1.6, p.y + 2.4, p.z + wz * 1.6); }
   animate(dt, hs) {
     const m = this.model, p = this.pos;
     if (!m) return;
     // (the model eases up a step instead of popping)
     this.visY += (p.y - this.visY) * (this.stepped || Math.abs(p.y - this.visY) < 2.4 ? 1 - Math.exp(-18 * dt) : 1);
     if (Math.abs(p.y - this.visY) > 3) this.visY = p.y;
-    const swimming = this.inWater && this.world.water(p.x, p.y + 2.8, p.z);
+    const swimming = this.inWater && this.waterAt(p.x, p.y + 2.8, p.z);
     m.position.set(p.x, this.visY - (swimming ? 2.2 : 0), p.z);
     m.rotation.y = this.face;
     this.move += (Math.min(1, hs / WALK) - this.move) * (1 - Math.exp(-10 * dt));
@@ -237,9 +330,9 @@ export class Player {
     // the hurt flash
     if (u.flash) u.flash(this.hurtT > 0 ? (Math.sin(t * 40) > 0 ? 0.8 : 0) : 0, '#ff5a2a');
     // the shadow on the ground below
-    const gy = this.world.groundY(p.x, p.z, p.y + 1);
+    const gs = this.surfaceAt(p.x, p.z), gy = gs === null ? p.y - 1 : gs - 1;
     const h = p.y - (gy + 1);
-    this.blob.position.set(p.x, gy + 1.02, p.z);
+    this.blob.position.set(p.x, gy + 1.03, p.z);
     this.blob.material.opacity = Math.max(0, 0.75 - h * 0.04);
     this.blob.scale.setScalar(1 + Math.min(1, h * 0.025));
   }
@@ -255,7 +348,8 @@ export class Player {
     let dist = this.camDist;
     for (let d = 1.2; d <= this.camDist; d += 0.5) {
       const x = this.camFocus.x + dir.x * d, y = this.camFocus.y + dir.y * d, z = this.camFocus.z + dir.z * d;
-      if (this.world.camBlock(x, y, z) || this.world.camBlock(x, y - 0.6, z)) { dist = Math.max(2, d - 0.9); break; }
+      if (this.world.poly) { const g = this.world.ground(x, z); if (g !== null && y < g + 1.2) { dist = Math.max(2, d - 0.9); break; } }
+      else if (this.world.camBlock(x, y, z) || this.world.camBlock(x, y - 0.6, z)) { dist = Math.max(2, d - 0.9); break; }
     }
     // (the camera eases back out, but snaps in)
     this.curDist = this.snapCam || dist < (this.curDist || dist) ? dist : this.curDist + (dist - this.curDist) * (1 - Math.exp(-4 * dt));

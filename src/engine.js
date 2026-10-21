@@ -44,9 +44,9 @@ composer.addPass(new OutputPass());
 
 // quality: 0 fast, 1 good, 2 best (pixel ratio, shadows, bloom, how far you see)
 export const QUALITY = [
-  { name: 'FAST', pr: 1, shadow: 0, bloom: false, view: 128 },
-  { name: 'GOOD', pr: 1.5, shadow: 1024, bloom: false, view: 176 },
-  { name: 'BEST', pr: 2, shadow: 2048, bloom: true, view: IS_TOUCH ? 208 : 256 },
+  { name: 'FAST', pr: 1, shadow: 0, bloom: false, view: 128, grass: 0.25, grassRange: 1 },
+  { name: 'GOOD', pr: 1.5, shadow: 1024, bloom: false, view: 176, grass: 0.55, grassRange: 2 },
+  { name: 'BEST', pr: 2, shadow: 2048, bloom: true, view: IS_TOUCH ? 208 : 256, grass: 0.9, grassRange: 3 },
 ];
 export const view = { w: 1, h: 1, quality: 1, viewDist: 176, shadowR: 68 };
 export function resize() {

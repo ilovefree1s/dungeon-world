@@ -123,10 +123,11 @@ export function createGen(seed = 1, flat = false) {
   function heightOf(b, x, z) {
     switch (b) {
       case FOREST: {
-        let h = 31 + 8 * fbm(nA, x / 120, z / 120, 3) + 3.5 * fbm(nB, x / 30, z / 30, 2);
+        // rolling meadows, a few bluffs
+        let h = 31 + 7 * fbm(nA, x / 150, z / 150, 3) + 1.6 * fbm(nB, x / 40, z / 40, 2);
         const c = nC(x / 170, z / 170);
-        if (c > 0.2) h += 9 * clamp01((c - 0.2) * 3);
-        if (c > 0.15) h = h + (terrace(h, 4) - h) * clamp01((c - 0.15) * 4);
+        if (c > 0.3) h += 8 * clamp01((c - 0.3) * 3);
+        if (c > 0.42) h = h + (terrace(h, 4) - h) * clamp01((c - 0.42) * 5);
         const lake = nD(x / 140, z / 140); if (lake < -0.45) h -= 14 * clamp01((-0.45 - lake) * 4);
         return h;
       }
@@ -162,10 +163,11 @@ export function createGen(seed = 1, flat = false) {
   // one column: its height (the top solid block's y), the biome, the biome its surface shows
   // (dithered between neighbors at a border), the liquid over it
   function column(x, z) {
-    if (flat) { out.h = 60; out.biome = 0; out.pick = 0; return out; } // (a flat meadow, for tests)
+    if (flat) { out.h = 60; out.hf = 60; out.biome = 0; out.pick = 0; return out; } // (a flat meadow, for tests)
     const best = weights(x, z);
     let h = 0;
     for (let b = 0; b < 6; b++) if (wts[b] > 0.002) h += wts[b] * heightOf(b, x, z);
+    out.hf = Math.max(6, Math.min(WH - 20, h * 2)); // (the land's true height, for the low-poly skin)
     h = Math.max(6, Math.min(WH - 20, Math.floor(h * 2)));
     let pick = best;
     if (wts[best] < 0.98) { let r = hash3(x, 0, z, seed + 5) * 0.999, acc = 0; for (let b = 0; b < 6; b++) { acc += wts[b]; if (r < acc) { pick = b; break; } } }
@@ -443,5 +445,96 @@ export function createGen(seed = 1, flat = false) {
     for (let y = 0; y < WH; y++) for (let z = 0; z < CH; z++) { const s = at(0, y, z); vox.set(V.subarray(s, s + CH), (y * CH + z) * CH); }
     return { cx, cz, vox, top: top + 2, solid: take(B.solid), glow: take(B.glow), water: take(B.water) };
   }
-  return { column, chunk, weights: (x, z) => { const b = weights(x, z); return { best: b, w: Array.from(wts) }; }, site: (i, j) => [siteX(i, j), siteZ(i, j)], biomeOfCell };
+  // ---------------------------------------------------------------- the low-poly land
+  // A chunk as a faceted skin: a 16 x 16 grid of cells (one per hero stride, two blocks), each two flat
+  // triangles colored by the land they're on and how steep they are; water where the land dips under
+  // the sea; the trees, rocks and grass as placements for the main thread to build from its kits.
+  const PN = CH / 2, PV = PN + 1;
+  const SURF = [ // per biome: flat ground, steep ground (rock), underwater ground
+    [[96, 176, 62], [118, 118, 124], [224, 200, 140]], [[238, 244, 252], [132, 140, 150], [160, 170, 180]], [[228, 204, 142], [214, 146, 92], [210, 190, 140]],
+    [[96, 118, 52], [86, 70, 50], [70, 60, 44]], [[106, 96, 98], [58, 52, 60], [48, 40, 46]], [[96, 200, 196], [98, 74, 146], [90, 70, 130]]];
+  const POLY_TREES = [
+    [0.95, ['oak', 'oak', 'oak', 'birch', 'bush', 'bush', 'boulder']], [0.6, ['pine', 'pine', 'pine', 'snowrock']], [0.22, ['cactus', 'cactus', 'mesa_rock', 'deadbush', 'deadbush']],
+    [0.6, ['willow', 'willow', 'oak', 'reeds', 'reeds']], [0.28, ['char', 'spire', 'char', 'boulder']], [0.4, ['crystal', 'crystal', 'pale', 'boulder']]];
+  const TREE_ID = { oak: 0, birch: 1, pine: 2, cactus: 3, willow: 4, char: 5, spire: 6, crystal: 7, pale: 8, boulder: 9, snowrock: 10, mesa_rock: 11, bush: 12, deadbush: 13, reeds: 14 };
+  const hfs = new Float32Array(PV * PV), pks = new Uint8Array(PV * PV), bms = new Uint8Array(PV * PV);
+  function polyChunk(cx, cz) {
+    for (const k in B) { B[k].nv = 0; B[k].ni = 0; }
+    const ox = cx * CH, oz = cz * CH;
+    for (let j = 0; j < PV; j++) for (let i = 0; i < PV; i++) { const c = column(ox + i * 2, oz + j * 2), k = j * PV + i; hfs[k] = c.hf + 1; pks[k] = c.pick; bms[k] = c.biome; }
+    const col = [0, 0, 0];
+    const face = (ax, ay, az, bx, by, bz, qx, qy, qz, k0, k1, k2) => {
+      // the face's slope from its normal, its color from the land under it
+      const ux = bx - ax, uy = by - ay, uz = bz - az, vx = qx - ax, vy = qy - ay, vz = qz - az;
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, nl = Math.hypot(nx, ny, nz) || 1;
+      const up = ny / nl, pick = pks[k0], ymin = Math.min(ay, by, qy), ymid = (ay + by + qy) / 3;
+      const S = SURF[pick];
+      let c = up < 0.62 ? S[1] : ymin < SEA + 1.6 ? S[2] : S[0];
+      // dirt paths and worn ground wind through the woods and the bog
+      const wx = ox + (ax + bx + qx) / 3, wz = oz + (az + bz + qz) / 3;
+      if (c === S[0] && (pick === FOREST || pick === SWAMP) && Math.abs(nD(wx / 90 + 3, wz / 90)) < 0.045) c = pick === FOREST ? [156, 118, 76] : [86, 70, 50];
+      const v = 0.93 + 0.14 * hash3(Math.round(wx * 2), Math.round(ymid), Math.round(wz * 2), 17), t = nT(wx / 40, wz / 40) * 0.08;
+      col[0] = Math.min(255, c[0] * v * (1 - t)); col[1] = Math.min(255, c[1] * v * (1 + t * 0.5)); col[2] = Math.min(255, c[2] * v);
+      // (magma veins through the ash lands glow)
+      const glow = pick === LAVA && up < 0.62 && hash3(Math.round(wx), 0, Math.round(wz), 19) < 0.18;
+      const out = glow ? B.glow : B.solid;
+      if (glow) { col[0] = 255; col[1] = 104; col[2] = 24; }
+      if ((out.nv + 3) * 3 > out.p.length) grow(out);
+      const o = out.nv * 3, P = out.p, N = out.n, Cc = out.c;
+      P[o] = ax; P[o + 1] = ay; P[o + 2] = az; P[o + 3] = bx; P[o + 4] = by; P[o + 5] = bz; P[o + 6] = qx; P[o + 7] = qy; P[o + 8] = qz;
+      for (let k = 0; k < 3; k++) { N[o + k * 3] = nx / nl * 127; N[o + k * 3 + 1] = ny / nl * 127; N[o + k * 3 + 2] = nz / nl * 127; Cc[o + k * 3] = col[0]; Cc[o + k * 3 + 1] = col[1]; Cc[o + k * 3 + 2] = col[2]; }
+      const I = out.i, io = out.ni; I[io] = out.nv; I[io + 1] = out.nv + 1; I[io + 2] = out.nv + 2;
+      out.nv += 3; out.ni += 3;
+    };
+    let top = 0;
+    for (let j = 0; j < PN; j++) for (let i = 0; i < PN; i++) {
+      const k = j * PV + i, x0 = i * 2, x1 = x0 + 2, z0 = j * 2, z1 = z0 + 2;
+      const h00 = hfs[k], h10 = hfs[k + 1], h01 = hfs[k + PV], h11 = hfs[k + PV + 1];
+      top = Math.max(top, h00, h10, h01, h11);
+      // (the diagonal alternates, so slopes don't stripe)
+      if ((i + j) & 1) { face(x0, h00, z0, x0, h01, z1, x1, h11, z1, k, k + PV, k + PV + 1); face(x0, h00, z0, x1, h11, z1, x1, h10, z0, k, k + PV + 1, k + 1); }
+      else { face(x0, h00, z0, x0, h01, z1, x1, h10, z0, k, k + PV, k + 1); face(x1, h10, z0, x0, h01, z1, x1, h11, z1, k + 1, k + PV, k + PV + 1); }
+      // water over the dips
+      if (Math.min(h00, h10, h01, h11) < SEA + 0.86) {
+        const wy = SEA + 0.86, pick = pks[k], wc = WATER_COL[pick];
+        ps[0] = x0; ps[1] = wy; ps[2] = z0; ps[3] = x0; ps[4] = wy; ps[5] = z1; ps[6] = x1; ps[7] = wy; ps[8] = z1; ps[9] = x1; ps[10] = wy; ps[11] = z0;
+        if (pick === LAVA) quad(B.glow, ps, 0, 1, 0, 255, 100, 24, null); else quad(B.water, ps, 0, 1, 0, wc[0], wc[1], wc[2], null);
+      }
+    }
+    // trees and rocks: one candidate per 10 x 10 cell, on dry, flattish ground
+    const trees = [];
+    const C5 = 7, i0 = Math.floor(ox / C5), i1 = Math.floor((ox + CH - 1) / C5), j0 = Math.floor(oz / C5), j1 = Math.floor((oz + CH - 1) / C5);
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const tx = i * C5 + Math.floor(hash3(i, j, seed, 41) * C5), tz = j * C5 + Math.floor(hash3(i, j, seed, 42) * C5);
+      if (tx < ox || tz < oz || tx >= ox + CH || tz >= oz + CH) continue;
+      const c = column(tx, tz), h = c.hf + 1, b = c.pick;
+      if (h <= SEA + 1.5) continue;
+      const [p, kinds] = POLY_TREES[b];
+      const r0 = hash3(i, j, seed, 43);
+      const dens = b === FOREST ? p * clamp01(0.45 + nC(tx / 70 + 9, tz / 70) * 1.3) : p;
+      if (r0 > dens) continue;
+      const hx = column(tx + 3, tz).hf + 1, hz = column(tx, tz + 3).hf + 1;
+      if (Math.abs(hx - h) > 3.2 || Math.abs(hz - h) > 3.2) continue;
+      const kind = kinds[Math.floor(hash3(i, j, seed, 44) * kinds.length)];
+      trees.push(TREE_ID[kind], tx - ox + 0.5, Math.min(h, hx, hz) - 0.3, tz - oz + 0.5, 0.7 + hash3(i, j, seed, 45) * 0.5, hash3(i, j, seed, 46) * 6.283);
+    }
+    // grass: where the ground is grassy and gentle, a spot every other block, each with a number to thin by
+    const grass = [];
+    for (let z = 0; z < CH; z += 2) for (let x = 0; x < CH; x += 2) {
+      const i = x >> 1, j = z >> 1, k = j * PV + i, pick = pks[k];
+      if (pick !== FOREST && pick !== SWAMP && pick !== CRYSTAL) continue;
+      const h = hfs[k];
+      if (h < SEA + 2 || Math.abs(hfs[k + 1] - h) > 1.4 || Math.abs(hfs[k + PV] - h) > 1.4) continue;
+      const r = hash3(ox + x, 3, oz + z, 51);
+      if (r > 0.96) continue;
+      for (let n = 0; n < 4; n++) {
+        const gx = x + hash3(ox + x, n, oz + z, 52) * 2, gz = z + hash3(ox + x, n + 9, oz + z, 53) * 2;
+        const fx = gx / 2 - i, fz = gz / 2 - j;
+        const gy = h + (hfs[k + 1] - h) * fx + (hfs[k + PV] - h) * fz;
+        grass.push(gx, gy, gz, hash3(ox + x, n + 20, oz + z, 54), pick);
+      }
+    }
+    return { cx, cz, poly: true, hf: hfs.slice(), top: top + 2, solid: take(B.solid), glow: take(B.glow), water: take(B.water), trees: Float32Array.from(trees), grass: Float32Array.from(grass) };
+  }
+  return { column, chunk, polyChunk, weights: (x, z) => { const b = weights(x, z); return { best: b, w: Array.from(wts) }; }, site: (i, j) => [siteX(i, j), siteZ(i, j)], biomeOfCell };
 }
