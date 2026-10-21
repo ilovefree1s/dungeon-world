@@ -76,7 +76,7 @@ const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
 function terrace(h, step) { const f = h / step, i = Math.floor(f), t = f - i; return (i + clamp01((t - 0.72) / 0.28)) * step; }
 
 // ---------------------------------------------------------------- the world
-export const REGION = 300; // (the size of a biome region)
+export const REGION = 1000; // (the size of a biome region: a few minutes' walk across)
 export function createGen(seed = 1, flat = false) {
   const nA = simplex(seed * 7 + 1), nB = simplex(seed * 7 + 2), nC = simplex(seed * 7 + 3), nD = simplex(seed * 7 + 4), nW = simplex(seed * 7 + 5), nT = simplex(seed * 7 + 6);
   // biome regions: a jittered grid of sites; the one at 0,0 is the woods where you start, and its eight
@@ -96,11 +96,11 @@ export function createGen(seed = 1, flat = false) {
   }
   function siteX(i, j) { return (i + 0.2 + 0.6 * hash3(i, j, seed, 21)) * REGION; }
   function siteZ(i, j) { return (j + 0.2 + 0.6 * hash3(i, j, seed, 22)) * REGION; }
-  const BLEND = 46;
+  const BLEND = 110;
   const wts = new Float32Array(6);
   // the biome weights at a column (into wts); returns the strongest
   function weights(x, z) {
-    const wx = x + 55 * nW(x / 260, z / 260), wz = z + 55 * nW(x / 260 + 41.3, z / 260 + 17.7);
+    const wx = x + 140 * nW(x / 640, z / 640), wz = z + 140 * nW(x / 640 + 41.3, z / 640 + 17.7);
     const ci = Math.floor(wx / REGION), cj = Math.floor(wz / REGION);
     let d1 = 1e9;
     const ds = [], bs = [];
