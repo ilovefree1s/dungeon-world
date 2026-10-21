@@ -10,7 +10,7 @@ import { fullOutline } from './weaponkit.js';
 export class ShapePad {
   constructor(canvas, onChange) {
     this.c = canvas; this.x = canvas.getContext('2d'); this.onChange = onChange;
-    this.shape = null; this.mode = 'points'; this.drag = -1; this.stroke = null; this.brush = 26; this.erasing = false; this.hover = null;
+    this.shape = null; this.mode = 'points'; this.drag = -1; this.stroke = null; this.brush = 26; this.erasing = false; this.hover = null; this.bmp = null;
     canvas.addEventListener('pointerdown', e => this.down(e));
     canvas.addEventListener('pointermove', e => this.move(e));
     canvas.addEventListener('pointerup', e => this.up(e)); canvas.addEventListener('pointercancel', e => this.up(e));
@@ -58,28 +58,77 @@ export class ShapePad {
     this.changed(true);
   }
   up(e) {
-    if (this.mode === 'erase') { if (this.erasing) { this.erasing = false; this.tidy(); this.changed(); } return; }
+    if (this.mode === 'erase') { if (this.erasing) { this.erasing = false; this.bmp = null; this.changed(); } return; }
     if (this.mode === 'draw' && this.stroke) { this.finishStroke(); this.stroke = null; return; }
     if (this.drag >= 0) { this.drag = -1; this.changed(); }
   }
-  // the eraser: a round brush that carves the outline. Edges crossing the brush get corners where
-  // they cross, and every corner inside the brush is pushed out to its rim: drag it along and it cuts a curve
+  // the eraser: exactly what it sounds like. The shape is painted onto a small bitmap, the brush rubs
+  // pixels off it, and the outline is traced back off the bitmap (the biggest piece left, if it splits)
   eraseAt(px, py, w, h) {
-    const sh = this.shape, R = this.brush, P = sh.pts.map(p => this.toPx(p, w, h)), closed = !sh.mirror;
-    const out = [], n = P.length;
-    const inside = q => Math.hypot(q[0] - px, q[1] - py) < R;
-    for (let i = 0; i < n; i++) {
-      const a = P[i], b = P[(i + 1) % n];
-      out.push(a);
-      if (i === n - 1 && !closed) break;
-      // where this edge crosses the rim
-      const dx = b[0] - a[0], dy = b[1] - a[1], fx = a[0] - px, fy = a[1] - py;
-      const A = dx * dx + dy * dy, B = 2 * (fx * dx + fy * dy), C = fx * fx + fy * fy - R * R, D = B * B - 4 * A * C;
-      if (A > 0 && D > 0) { const sq = Math.sqrt(D); for (const t of [(-B - sq) / (2 * A), (-B + sq) / (2 * A)]) if (t > 0.02 && t < 0.98) out.push([a[0] + dx * t, a[1] + dy * t]); }
+    const sh = this.shape;
+    if (!this.bmp) {
+      // the bitmap: the pad at a quarter of its size, the whole outline filled in (mirrored shapes become full outlines here)
+      const G = 4, bw = Math.ceil(w / G), bh = Math.ceil(h / G);
+      const c = document.createElement('canvas'); c.width = bw; c.height = bh; const x = c.getContext('2d');
+      x.fillStyle = '#fff'; x.beginPath();
+      fullOutline(sh).forEach((p, i) => { const [qx, qy] = this.toPx(p, w, h); i ? x.lineTo(qx / G, qy / G) : x.moveTo(qx / G, qy / G); });
+      x.closePath(); x.fill();
+      this.bmp = { c, x, G, bw, bh };
     }
-    const pushed = out.map(q => { if (!inside(q)) return q; let vx = q[0] - px, vy = q[1] - py; const l = Math.hypot(vx, vy) || 1; if (l < 0.01) { vx = 0; vy = -1; } return [px + vx / l * (R + 0.5), py + vy / l * (R + 0.5)]; });
-    sh.pts = pushed.map(q => { const p = this.toPt(q[0], q[1], w, h); if (sh.mirror && p[0] < 0) p[0] = 0; return [+p[0].toFixed(3), +p[1].toFixed(3)]; });
+    const { x, G } = this.bmp;
+    x.globalCompositeOperation = 'destination-out';
+    x.beginPath(); x.arc(px / G, py / G, this.brush / G, 0, 7); x.fill();
+    x.globalCompositeOperation = 'source-over';
+    const outline = this.traceBitmap();
+    if (outline && outline.length >= 3) {
+      sh.mirror = false;
+      sh.pts = outline.map(([gx, gy]) => { const p = this.toPt(gx * G, gy * G, w, h); return [+p[0].toFixed(3), +p[1].toFixed(3)]; });
+    }
     this.draw(); this.onChange && this.onChange(sh, true);
+  }
+  // the outline of the biggest solid piece on the bitmap, as grid coordinates, shaved of the pixel stairs
+  traceBitmap() {
+    const { x, bw, bh } = this.bmp, img = x.getImageData(0, 0, bw, bh).data;
+    const solid = new Uint8Array(bw * bh);
+    for (let i = 0; i < bw * bh; i++) solid[i] = img[i * 4 + 3] > 127 ? 1 : 0;
+    // label the pieces, keep the biggest
+    const label = new Int32Array(bw * bh), sizes = [0]; let L = 0;
+    const stack = [];
+    for (let i = 0; i < bw * bh; i++) {
+      if (!solid[i] || label[i]) continue;
+      L++; sizes[L] = 0; stack.push(i); label[i] = L;
+      while (stack.length) {
+        const k = stack.pop(); sizes[L]++;
+        const kx = k % bw, ky = (k / bw) | 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = kx + dx, ny = ky + dy; if (nx < 0 || ny < 0 || nx >= bw || ny >= bh) continue; const n = ny * bw + nx; if (solid[n] && !label[n]) { label[n] = L; stack.push(n); } }
+      }
+    }
+    if (!L) return null;
+    let best = 1; for (let l = 2; l <= L; l++) if (sizes[l] > sizes[best]) best = l;
+    if (sizes[best] < 6) return null;
+    const on = (gx, gy) => gx >= 0 && gy >= 0 && gx < bw && gy < bh && label[gy * bw + gx] === best;
+    // walk the boundary (the square-tracing walk along pixel edges, keeping solid on the right)
+    let sx = -1, sy = -1;
+    for (let gy = 0; gy < bh && sx < 0; gy++) for (let gx = 0; gx < bw; gx++) if (on(gx, gy)) { sx = gx; sy = gy; break; }
+    // corners of the pixel lattice; direction: 0 right, 1 down, 2 left, 3 up
+    const pts = []; let cx = sx, cy = sy, dir = 0, guard = bw * bh * 4;
+    const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
+    // the cell to the right of travelling from (cx,cy) in dir, and to the left
+    const rightOf = d => [[0, 0], [-1, 0], [-1, -1], [0, -1]][d], leftOf = d => [[0, -1], [0, 0], [-1, 0], [-1, -1]][d];
+    do {
+      pts.push([cx, cy]);
+      const nx = cx + DX[dir], ny = cy + DY[dir];
+      const r = rightOf(dir), l = leftOf(dir);
+      const fr = on(nx + r[0], ny + r[1]), fl = on(nx + l[0], ny + l[1]);
+      cx = nx; cy = ny;
+      if (fl) dir = (dir + 3) % 4; else if (!fr) dir = (dir + 1) % 4;
+      // (straight on otherwise)
+    } while ((cx !== sx || cy !== sy || dir !== 0) && --guard > 0);
+    // every lattice step is a corner; shave the stairs and cap the count
+    let out = simplify(pts, 0.9);
+    if (out.length > 64) out = simplify(pts, 1.6);
+    if (out.length > 64) out = simplify(pts, 2.6);
+    return out;
   }
   // after an erase: drop corners that sit on a straight line, keep the count sane
   tidy() {
@@ -174,7 +223,7 @@ export class ShapePad {
       x.fillStyle = 'rgba(200,208,218,.55)'; x.fill(); x.strokeStyle = '#ffffff'; x.lineWidth = 1.5; x.stroke();
     }
     if (this.mode === 'erase' && this.hover) { x.beginPath(); x.arc(this.hover[0], this.hover[1], this.brush, 0, 7); x.strokeStyle = '#ff6a55'; x.lineWidth = 2; x.setLineDash([4, 4]); x.stroke(); x.setLineDash([]); }
-    if (this.mode === 'points' || this.mode === 'erase') {
+    if (this.mode === 'points') {
       this.handles().forEach(p => { const [px, py] = this.toPx(p, w, h); x.beginPath(); x.arc(px, py, 5, 0, 7); x.fillStyle = '#ffc93c'; x.fill(); x.strokeStyle = '#3a1c00'; x.lineWidth = 1.5; x.stroke(); });
     } else if (this.stroke) {
       x.beginPath(); this.stroke.forEach(([px, py], i) => i ? x.lineTo(px, py) : x.moveTo(px, py));

@@ -106,7 +106,7 @@ function render() {
     else { if (!s.shape) s.shape = presetShape(s); shapeMode = v; }
   });
   $('fHeadRow').hidden = drawable && !!s.shape;
-  if (s.shape) { pad.set(s.shape, shapeMode); $('fMirror').classList.toggle('on', !!s.shape.mirror); $('fPadHint').textContent = shapeMode === 'draw' ? 'TRACE THE SILHOUETTE IN ONE STROKE' : shapeMode === 'erase' ? 'RUB THE BRUSH ALONG THE EDGE TO CARVE A CURVE INTO IT' : 'DRAG THE CORNERS · CLICK AN EDGE TO ADD ONE · DOUBLE-CLICK ONE TO REMOVE IT'; }
+  if (s.shape) { pad.set(s.shape, shapeMode); $('fMirror').classList.toggle('on', !!s.shape.mirror); $('fPadHint').textContent = shapeMode === 'draw' ? 'TRACE THE SILHOUETTE IN ONE STROKE' : shapeMode === 'erase' ? 'RUB OUT WHATEVER YOU DRAG OVER' : 'DRAG THE CORNERS · CLICK AN EDGE TO ADD ONE · DOUBLE-CLICK ONE TO REMOVE IT'; }
   $('fLen').value = s.length; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1;
   $('fPowRow').hidden = !s.aura || s.aura === 'none';
   $('fName').value = s.name || '';
@@ -133,6 +133,13 @@ let wired = false, pad = null, shapeMode = 'points';
 function wire() {
   if (wired) return; wired = true;
   pad = new ShapePad($('fPad'), (shape, live) => { rebuild(); if (!live) persist(); });
+  // upside down: the tip becomes the grip end. A mirrored profile is kept mirrored, just read from the other end
+  $('fFlip').addEventListener('click', () => {
+    const sh = forge.spec.shape; if (!sh) return;
+    sh.pts = sh.pts.map(([x, y]) => [x, +(1 - y).toFixed(3)]);
+    if (sh.mirror) sh.pts.reverse();
+    sfx("pickup"); render();
+  });
   $('fMirror').addEventListener('click', () => {
     const sh = forge.spec.shape; if (!sh) return;
     if (sh.mirror) { // open it up: the whole outline becomes editable
