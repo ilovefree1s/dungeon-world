@@ -20,8 +20,9 @@ export class ShapePad {
   set(shape, mode) { this.shape = shape; if (mode) this.mode = mode; this.draw(); }
   // the pad: x across the middle (-1 .. 1), y up from a base line near the bottom (0 .. 1)
   size() { const r = this.c.getBoundingClientRect(); const dpr = Math.min(2, devicePixelRatio || 1); if (this.c.width !== Math.round(r.width * dpr)) { this.c.width = Math.round(r.width * dpr); this.c.height = Math.round(r.height * dpr); } return [r.width, r.height, dpr]; }
-  toPx(p, w, h) { return [w / 2 + p[0] * w * 0.42, h - 16 - p[1] * (h - 32)]; }
-  toPt(px, py, w, h) { return [Math.max(-1, Math.min(1, (px - w / 2) / (w * 0.42))), Math.max(0, Math.min(1, (h - 16 - py) / (h - 32)))]; }
+  // (margins all round: the widest corner and the base line stay well inside the box)
+  toPx(p, w, h) { return [w / 2 + p[0] * w * 0.36, h - 28 - p[1] * (h - 56)]; }
+  toPt(px, py, w, h) { return [Math.max(-1, Math.min(1, (px - w / 2) / (w * 0.36))), Math.max(0, Math.min(1, (h - 28 - py) / (h - 56)))]; }
   local(e) { const r = this.c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top, r.width, r.height]; }
   handles() { return this.shape ? this.shape.pts : []; }
   // ---------------------------------------------------------------- input
@@ -106,11 +107,13 @@ export class ShapePad {
     x.fillStyle = 'rgba(0,0,0,.35)'; x.beginPath(); x.roundRect(0, 0, w, h, 14); x.fill();
     // the spine and the base line
     x.strokeStyle = 'rgba(255,240,220,.18)'; x.lineWidth = 1; x.setLineDash([4, 5]);
-    x.beginPath(); x.moveTo(w / 2, 10); x.lineTo(w / 2, h - 10); x.stroke();
-    x.beginPath(); x.moveTo(w * 0.08, h - 16); x.lineTo(w * 0.92, h - 16); x.stroke();
+    x.beginPath(); x.moveTo(w / 2, 20); x.lineTo(w / 2, h - 20); x.stroke();
+    x.beginPath(); x.moveTo(w * 0.1, h - 28); x.lineTo(w * 0.9, h - 28); x.stroke();
+    // the widest the blade can go
+    x.beginPath(); x.moveTo(w * 0.14, 28); x.lineTo(w * 0.14, h - 28); x.moveTo(w * 0.86, 28); x.lineTo(w * 0.86, h - 28); x.stroke();
     x.setLineDash([]);
     x.font = '900 10px Nunito, sans-serif'; x.fillStyle = 'rgba(255,240,220,.4)'; x.textAlign = 'center';
-    x.fillText('GRIP', w / 2, h - 4); x.fillText('TIP', w / 2, 9);
+    x.fillText('GRIP', w / 2, h - 12); x.fillText('TIP', w / 2, 16);
     if (!this.shape) return;
     const full = fullOutline(this.shape);
     if (full.length >= 3) {

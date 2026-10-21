@@ -98,6 +98,8 @@ function render() {
   // the shape: the preset head, or your own (dragged corners or a freehand trace)
   const drawable = canDraw(s);
   $('fShapeRow').hidden = !drawable; $('fPadWrap').hidden = !drawable || !s.shape;
+  $('forge').querySelector('.panel').classList.toggle('drawing', drawable && !!s.shape);
+  if (renderer) sizePreview();
   if (!drawable) s.shape = null;
   seg('fShape', [['preset', 'OFF'], ['points', 'DRAG CORNERS'], ['draw', 'FREEHAND']], s.shape ? shapeMode : 'preset', v => {
     if (v === 'preset') { s.shape = null; }
