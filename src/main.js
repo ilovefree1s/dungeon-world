@@ -162,10 +162,13 @@ function openMenu() {
 }
 function closeMenu() { UI.state = 'play'; $('menu').hidden = true; writeSave(); }
 // the forge: opened from the menu; what it makes goes into the warrior's hand
-$('forgeBtn').addEventListener('click', () => { UI.state = 'forge'; $('menu').hidden = true; openForge(); });
-forge.onClose = () => { UI.state = 'menu'; $('menu').hidden = false; syncMenu(); };
+// (from the title screen too, so you can forge before you pick a hero; closing returns where you came from)
+let forgeFrom = 'menu';
+$('forgeBtn').addEventListener('click', () => { forgeFrom = 'menu'; UI.state = 'forge'; $('menu').hidden = true; openForge(); });
+$('forgeBtnTitle').addEventListener('click', () => { startAudio(); forgeFrom = 'title'; UI.state = 'forge'; $('title').hidden = true; openForge(); });
+forge.onClose = () => { if (forgeFrom === 'title') { UI.state = 'title'; $('title').hidden = false; } else { UI.state = 'menu'; $('menu').hidden = false; syncMenu(); } };
 // (wielding something made for another hero switches to that hero, so you see it in hand)
-forge.onEquip = (spec, cls) => { player.equipForged(spec, cls); if (spec && player.cls !== cls) { player.setClass(cls); UI.cls = cls; abilities.reset(); } };
+forge.onEquip = (spec, cls) => { player.equipForged(spec, cls); if (spec && player.cls !== cls) { player.setClass(cls); UI.cls = cls; abilities.reset(); focusHero(cls); } };
 for (let c = 0; c < 3; c++) player.equipForged(equippedSpec(c), c);
 $('menuBtn').addEventListener('click', openMenu);
 $('resume').addEventListener('click', () => { closeMenu(); if (!IS_TOUCH) lockMouse(); });

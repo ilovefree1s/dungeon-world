@@ -17,7 +17,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   | Hunter | an arrow, fast and straight | **Roll**: a dodge, untouchable while it lasts | **Multishot**: a fan of five arrows | **Arrow Rain**: a volley falls on where you aim |
   Attacks and abilities aim where the camera looks; a monster near the crosshair draws them in.
   The ability bar at the bottom shows each one's cooldown.
-- **The Forge** (in the menu): build a weapon from parts, and the hero it's for wields it.
+- **The Forge** (on the title screen and in the menu): build a weapon from parts, and the hero it's for wields it.
   Ten types: sword, greatsword, dagger, axe, hammer and mace for the warrior; staff and wand
   for the mage; bow and crossbow for the hunter. Four heads each, ten materials (three of them
   glow), guards, grips, pommels, gem and grip colors, length and width. Each build has its

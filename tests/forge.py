@@ -31,9 +31,16 @@ with sync_playwright() as pw:
     page.goto(base + 'index.html?q=0&t=0.42&fresh&flat')
     page.wait_for_function('window.__dw')
     page.wait_for_function('__dw.world.readyAround(__dw.player.pos.x, __dw.player.pos.z, 40) >= 1')
+    page.evaluate('window.__fc = 0; (function f(){ __fc++; requestAnimationFrame(f); })()')
+    def frames(n):
+        page.evaluate('window.__f0 = __fc'); page.wait_for_function(f'__fc - __f0 >= {n}')
+    # from the title screen, before any hero is picked
+    page.evaluate("document.getElementById('forgeBtnTitle').click()"); frames(3)
+    check(page.evaluate("__dw.UI.state") == 'forge' and page.evaluate("document.getElementById('title').hidden"), 'the forge opens from the title screen')
+    page.evaluate("document.getElementById('fClose').click()"); frames(2)
+    check(page.evaluate("__dw.UI.state") == 'title' and not page.evaluate("document.getElementById('title').hidden"), 'and BACK returns to the title screen')
     page.evaluate('__dw.start(0)')
     page.wait_for_function("__dw.UI.state === 'play'")
-    page.evaluate('window.__fc = 0; (function f(){ __fc++; requestAnimationFrame(f); })()')
     def frames(n):
         page.evaluate('window.__f0 = __fc'); page.wait_for_function(f'__fc - __f0 >= {n}')
     page.evaluate("document.getElementById('menuBtn').click()"); frames(2)
