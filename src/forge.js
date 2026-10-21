@@ -177,6 +177,20 @@ function wire() {
   $('fUnequip').addEventListener('click', () => { const c = clsOf(forge.spec); forge.equipped[c] = -1; persist(); forge.onEquip && forge.onEquip(null, c); sfx('pickup'); render(); });
   $('fClose').addEventListener('click', closeForge);
   addEventListener('resize', () => { if (forge.open) sizePreview(); });
+  // the grip between the preview and the pad: drag it to trade pad room for a bigger preview
+  {
+    const panel = $('fSplit').closest('.panel'), split = $('fSplit');
+    const saved = +localStorage.getItem('dw-forge-split'); if (saved) panel.style.setProperty('--fgl', saved + 'px');
+    let y0 = 0, h0 = 0;
+    split.addEventListener('pointerdown', e => { y0 = e.clientY; h0 = $('forgeGl').clientHeight; split.setPointerCapture(e.pointerId); e.preventDefault(); });
+    split.addEventListener('pointermove', e => {
+      if (!split.hasPointerCapture(e.pointerId)) return;
+      const total = Math.min(830, innerHeight * 0.94 - 140);
+      const hh = Math.round(Math.max(120, Math.min(total - 220, h0 + (e.clientY - y0))));
+      panel.style.setProperty('--fgl', hh + 'px'); sizePreview(); render(); pad && pad.draw();
+    });
+    split.addEventListener('pointerup', () => { localStorage.setItem('dw-forge-split', String($('forgeGl').clientHeight)); });
+  }
 }
 export function openForge() {
   wire(); initPreview();

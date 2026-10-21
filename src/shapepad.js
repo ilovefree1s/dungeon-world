@@ -19,7 +19,7 @@ export class ShapePad {
   }
   set(shape, mode) { this.shape = shape; if (mode) this.mode = mode; this.draw(); }
   // the pad: x across the middle (-1 .. 1), y up from a base line near the bottom (0 .. 1)
-  size() { const r = this.c.getBoundingClientRect(); const dpr = Math.min(2, devicePixelRatio || 1); if (this.c.width !== Math.round(r.width * dpr)) { this.c.width = Math.round(r.width * dpr); this.c.height = Math.round(r.height * dpr); } return [r.width, r.height, dpr]; }
+  size() { const r = this.c.getBoundingClientRect(); const dpr = Math.min(2, devicePixelRatio || 1); if (this.c.width !== Math.round(r.width * dpr) || this.c.height !== Math.round(r.height * dpr)) { this.c.width = Math.round(r.width * dpr); this.c.height = Math.round(r.height * dpr); } return [r.width, r.height, dpr]; }
   // (margins all round: the widest corner and the base line stay well inside the box)
   toPx(p, w, h) { return [w / 2 + p[0] * w * 0.36, h - 28 - p[1] * (h - 56)]; }
   toPt(px, py, w, h) { return [Math.max(-1, Math.min(1, (px - w / 2) / (w * 0.36))), Math.max(0, Math.min(1, (h - 28 - py) / (h - 56)))]; }
