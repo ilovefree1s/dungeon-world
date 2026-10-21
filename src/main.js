@@ -236,6 +236,7 @@ function frame(now) {
   if (dt > 0.1) dt = 0.1;
   const t0 = performance.now();
   menuStep();
+  input.lookOff = UI.state !== 'play';
   const inp = readInput();
   const look = takeLook();
   // the scroll wheel: nearer or farther
@@ -308,7 +309,7 @@ document.getElementById('boot')?.remove();
 
 // a hook for testing
 window.__dw = {
-  world, player, sky, UI, input, view, renderer, scene, THREE, monsters, bolts, hero: stats, abilities,
+  world, player, sky, UI, input, view, renderer, scene, THREE, monsters, bolts, hero: stats, abilities, forge,
   start(cls = 0) { pickHero(cls); },
   teleport(x, z) { player.place(x + 0.5, 90, z + 0.5); placed = false; },
   setQuality(q) { UI.autoQ = false; UI.quality = q; setQuality(q); },

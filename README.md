@@ -25,6 +25,12 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   other way round, longer reaches farther; a wand casts fast and light, a crossbow shoots hard
   and slow; a staff's gem colors the mage's bolts. Name it (or roll one), save up to sixteen,
   wield one per hero; they stay in hand across reloads.
+  **Draw the shape yourself** (SHAPE: POINTS or DRAW, on blades and on axe, hammer and mace
+  heads): drag the corners of the outline (click an edge to add one, double-click to remove), or
+  trace the silhouette freehand and it's cleaned into an outline; MIRROR shapes one half and
+  reflects it, or off, the whole outline. The drawing's area and length count: a fat blade hits
+  harder and swings slower, a short one reaches less. Hafts and shafts (axes, hammers, maces,
+  staffs, wands) have their own material, wood or any metal.
   An **aura** rides the blade, the staff's head or the bow's limbs: flame, lightning, water,
   wind, frost, shadow or holy (one cloud of particles per weapon, a single draw call), only on
   the part that does the work (a hammer's head, a mace's ball, a staff's crown), with a power

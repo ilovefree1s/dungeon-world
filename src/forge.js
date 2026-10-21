@@ -6,7 +6,8 @@
 // ============================================================================
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { TYPES, MATERIALS, GUARDS, GRIPS, POMMELS, ACCENTS, GRIP_COLORS, AURAS, HERO_NAME, clsOf, randomSpec, defaultSpec, nameOf, statsOf, buildForged } from './weaponkit.js';
+import { TYPES, MATERIALS, GUARDS, GRIPS, POMMELS, ACCENTS, GRIP_COLORS, AURAS, HAFTS, HERO_NAME, clsOf, hasHaft, canDraw, presetShape, randomSpec, defaultSpec, nameOf, statsOf, buildForged } from './weaponkit.js';
+import { ShapePad } from './shapepad.js';
 import { sfx } from './audio.js';
 
 const $ = id => document.getElementById(id);
@@ -87,11 +88,23 @@ function render() {
   const bladed = s.type === 'sword' || s.type === 'greatsword' || s.type === 'dagger', ranged = s.type === 'bow' || s.type === 'crossbow';
   $('fGuardRow').hidden = !bladed; $('fPommelRow').hidden = ranged;
   seg('fGuard', GUARDS.map(x => [x, x.toUpperCase()]), s.guard, v => { s.guard = v; });
+  $('fHaftRow').hidden = !hasHaft(s);
+  seg('fHaft', HAFTS.map(([id, n, c]) => [id, n, c]), s.haft || 'oak', v => { s.haft = v; });
   seg('fGrip', GRIPS.map(x => [x, x.toUpperCase()]), s.grip, v => { s.grip = v; });
   seg('fPommel', POMMELS.map(x => [x, x.toUpperCase()]), s.pommel, v => { s.pommel = v; });
   seg('fAccent', ACCENTS.map(([c, n]) => [n, n, c]), s.accent, (v, i) => { s.accent = i; });
   seg('fAura', AURAS.map(a => [a.id, a.name, a.color || null]), s.aura || 'none', v => { s.aura = v; });
   seg('fGripCol', GRIP_COLORS.map(([c, n]) => [n, n, c]), s.gripColor, (v, i) => { s.gripColor = i; });
+  // the shape: the preset head, or your own (dragged corners or a freehand trace)
+  const drawable = canDraw(s);
+  $('fShapeRow').hidden = !drawable; $('fPadWrap').hidden = !drawable || !s.shape;
+  if (!drawable) s.shape = null;
+  seg('fShape', [['preset', 'PRESET'], ['points', 'POINTS'], ['draw', 'DRAW']], s.shape ? shapeMode : 'preset', v => {
+    if (v === 'preset') { s.shape = null; }
+    else { if (!s.shape) s.shape = presetShape(s); shapeMode = v; }
+  });
+  $('fHeadRow').hidden = drawable && !!s.shape;
+  if (s.shape) { pad.set(s.shape, shapeMode); $('fMirror').classList.toggle('on', !!s.shape.mirror); $('fPadHint').textContent = shapeMode === 'draw' ? 'TRACE THE SILHOUETTE IN ONE STROKE' : 'DRAG THE CORNERS · CLICK AN EDGE TO ADD ONE · DOUBLE-CLICK ONE TO REMOVE IT'; }
   $('fLen').value = s.length; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1;
   $('fPowRow').hidden = !s.aura || s.aura === 'none';
   $('fName').value = s.name || '';
@@ -114,9 +127,20 @@ function render() {
   persist();
   rebuild();
 }
-let wired = false;
+let wired = false, pad = null, shapeMode = 'points';
 function wire() {
   if (wired) return; wired = true;
+  pad = new ShapePad($('fPad'), (shape, live) => { rebuild(); if (!live) persist(); });
+  $('fMirror').addEventListener('click', () => {
+    const sh = forge.spec.shape; if (!sh) return;
+    if (sh.mirror) { // open it up: the whole outline becomes editable
+      sh.pts = [...sh.pts, ...sh.pts.slice().reverse().map(([x, y]) => [-x, y])]; sh.mirror = false;
+    } else { // fold it: keep the right half
+      sh.pts = sh.pts.filter(p => p[0] >= 0).sort((a, b) => a[1] - b[1]); if (sh.pts.length < 3) sh.pts = presetShape(forge.spec).pts; sh.mirror = true;
+    }
+    sfx('pickup'); render();
+  });
+  $('fShapeReset').addEventListener('click', () => { forge.spec.shape = presetShape(forge.spec); sfx('pickup'); render(); });
   $('fLen').addEventListener('input', e => { forge.spec.length = +e.target.value; rebuild(); });
   $('fWid').addEventListener('input', e => { forge.spec.width = +e.target.value; rebuild(); });
   $('fPow').addEventListener('input', e => { forge.spec.auraPower = +e.target.value; rebuild(); });

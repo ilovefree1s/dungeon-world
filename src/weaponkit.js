@@ -18,6 +18,50 @@ function extrude(pts, depth, bevel = 0.012) {
 }
 const mirror = half => [...half, ...half.slice().reverse().map(([x, y]) => [-x, y])];
 
+// ---------------------------------------------------------------- drawn shapes
+// spec.shape = { pts: [[x, y], ...], mirror }: an outline of your own for the blade or the head, in units
+// of the type's half-width (x, -1 .. 1) and length (y, 0 at the base, 1 at the tip). With mirror, pts is
+// the right half from base to tip and the left is its reflection.
+export const SHAPE_W = { sword: 0.25, greatsword: 0.3, dagger: 0.2, axe: 0.45, hammer: 0.5, mace: 0.3 };
+export const SHAPE_L = { sword: 1.2, greatsword: 1.7, dagger: 0.6, axe: 0.6, hammer: 0.5, mace: 0.5 };
+export const canDraw = spec => spec.type in SHAPE_W;
+export const fullOutline = shape => shape.mirror ? mirror(shape.pts) : shape.pts;
+// the preset head as a shape to start editing from
+export function presetShape(spec) {
+  const t = spec.type, L = 1, W = 1;
+  if (t === 'sword' || t === 'greatsword' || t === 'dagger') {
+    const len = SHAPE_L[t], hw = (t === 'greatsword' ? 0.085 : t === 'dagger' ? 0.045 : 0.06), sw = SHAPE_W[t];
+    const h = bladeHalf(spec.head, hw, len), full = spec.head === 'curved';
+    const norm = pts => pts.map(([x, y]) => [+(x / sw).toFixed(3), +(y / len).toFixed(3)]);
+    return full ? { pts: norm(h), mirror: false } : { pts: norm(h), mirror: true };
+  }
+  if (t === 'axe') return { pts: [[0, 0.25], [0.5, 0.42], [1, 0.35], [1.0, 0.75], [0.5, 0.95], [0, 0.8]], mirror: spec.head === 'double' };
+  if (t === 'hammer') return { pts: [[0.9, 0.2], [0.9, 0.8], [0, 0.85], [0, 0.15]].map(([x, y]) => [x, y]), mirror: true };
+  if (t === 'mace') return { pts: [[0.3, 0], [0.9, 0.3], [0.9, 0.6], [0.4, 0.85], [0, 1]], mirror: true };
+  return { pts: [[0.6, 0], [0.6, 0.8], [0, 1]], mirror: true };
+}
+// the preset blade's outline (the right half, base to tip; 'curved' is a whole outline)
+function bladeHalf(head, hw, len) {
+  switch (head) {
+    case 'leaf': return [[hw * 0.7, 0], [hw * 1.4, len * 0.55], [hw * 0.9, len * 0.85], [0, len]];
+    case 'curved': return [[-hw, 0], [hw, 0], [hw * 1.2, len * 0.5], [hw * 2.2, len * 0.8], [hw * 1.4, len], [hw * 0.2, len * 0.9], [-hw * 0.8, len * 0.5]];
+    case 'serrated': { const h = [[hw, 0]]; for (let i = 1; i <= 7; i++) h.push([hw * (i % 2 ? 1.5 : 0.9), len * (i / 8)]); h.push([0, len]); return h; }
+    case 'flamberge': { const h = []; for (let i = 0; i <= 10; i++) h.push([hw * (1 + 0.5 * Math.sin(i * 1.3)), len * (i / 11)]); h.push([0, len]); return h; }
+    case 'cleaver': return [[hw * 0.8, 0], [hw * 1.6, len * 0.15], [hw * 1.6, len * 0.9], [hw * 0.6, len], [0, len]];
+    case 'kris': { const h = []; for (let i = 0; i <= 8; i++) h.push([hw * (1.1 + 0.6 * Math.sin(i * 1.6)), len * (i / 9)]); h.push([0, len]); return h; }
+    case 'needle': return [[hw * 0.9, 0], [hw * 0.4, len * 0.5], [0, len]];
+    default: return [[hw, 0], [hw, len * 0.86], [0, len]];
+  }
+}
+// a drawn shape's weight (its area against a plain sword's) and length (its tip against the full length)
+export function shapeMass(shape) {
+  if (!shape) return { mass: 1, len: 1 };
+  const o = fullOutline(shape); let a = 0, top = 0;
+  for (let i = 0; i < o.length; i++) { const [x1, y1] = o[i], [x2, y2] = o[(i + 1) % o.length]; a += x1 * y2 - x2 * y1; top = Math.max(top, y1); }
+  const area = Math.abs(a) / 2, ref = 0.42; // (a straight sword: 0.24 half-width over 0.86 of its length, and the point)
+  return { mass: Math.max(0.3, Math.min(3, area / ref)), len: Math.max(0.3, Math.min(1, top)) };
+}
+
 // ---------------------------------------------------------------- the parts on offer
 // cls: who wields it (0 warrior, 1 mage, 2 hunter)
 export const TYPES = [
@@ -48,6 +92,9 @@ export const MATERIALS = [
   { id: 'ember', name: 'EMBER', color: '#ff8a3a', glow: '#ff4a10', metalness: 0.6, roughness: 0.3, dmg: 1.25 },
   { id: 'frost', name: 'FROST', color: '#bfe8ff', glow: '#4ab0ff', metalness: 0.5, roughness: 0.15, dmg: 1.2 },
 ];
+// the haft (an axe's, a hammer's, a mace's) or shaft (a staff's, a wand's): woods, then any metal
+export const HAFTS = [['oak', 'OAK', '#6a4426'], ['dark', 'DARK WOOD', '#3a2616'], ['pale', 'ASH WOOD', '#b89a6a'], ['bonewood', 'BONE', '#e6dccb'], ['steel', 'STEEL', '#c8d0da'], ['iron', 'IRON', '#7d838a'], ['bronze', 'BRONZE', '#c48a4a'], ['gold', 'GOLD', '#f0b73c'], ['obsidian', 'OBSIDIAN', '#2a2238'], ['crystal', 'CRYSTAL', '#b48cff'], ['ember', 'EMBER', '#ff8a3a'], ['frost', 'FROST', '#bfe8ff']];
+export const hasHaft = spec => ['axe', 'hammer', 'mace', 'staff', 'wand'].includes(spec.type);
 export const GUARDS = ['none', 'bar', 'cross', 'wings', 'ring', 'upswept'];
 export const GRIPS = ['leather', 'wrapped', 'wood', 'bone', 'chain'];
 export const POMMELS = ['none', 'ball', 'disc', 'spike', 'gem', 'ring'];
@@ -69,9 +116,9 @@ export function randomSpec(rnd = Math.random) {
   const pick = a => a[Math.floor(rnd() * a.length)];
   const t = pick(TYPES);
   return { type: t.id, head: pick(t.heads), material: pick(MATERIALS).id, guard: pick(GUARDS), grip: pick(GRIPS), pommel: pick(POMMELS),
-    accent: Math.floor(rnd() * ACCENTS.length), gripColor: Math.floor(rnd() * GRIP_COLORS.length), length: 0.8 + rnd() * 0.5, width: 0.8 + rnd() * 0.5, aura: rnd() < 0.5 ? 'none' : pick(AURAS).id, auraPower: 0.6 + rnd() * 0.9, name: '' };
+    accent: Math.floor(rnd() * ACCENTS.length), gripColor: Math.floor(rnd() * GRIP_COLORS.length), haft: pick(HAFTS)[0], length: 0.8 + rnd() * 0.5, width: 0.8 + rnd() * 0.5, aura: rnd() < 0.5 ? 'none' : pick(AURAS).id, auraPower: 0.6 + rnd() * 0.9, name: '' };
 }
-export const defaultSpec = () => ({ type: 'sword', head: 'straight', material: 'steel', guard: 'cross', grip: 'leather', pommel: 'ball', accent: 0, gripColor: 0, length: 1, width: 1, aura: 'none', auraPower: 1, name: '' });
+export const defaultSpec = () => ({ type: 'sword', head: 'straight', material: 'steel', guard: 'cross', grip: 'leather', pommel: 'ball', accent: 0, gripColor: 0, haft: 'oak', length: 1, width: 1, aura: 'none', auraPower: 1, name: '' });
 
 // ---------------------------------------------------------------- names
 const ADJ = { steel: 'STEEL', iron: 'IRON', bronze: 'BRONZE', gold: 'GILDED', obsidian: 'BLACK', bone: 'BONE', jade: 'JADE', crystal: 'PRISM', ember: 'EMBER', frost: 'FROST' };
@@ -87,9 +134,10 @@ export function nameOf(spec, rnd = Math.random) {
 // damage and speed as multipliers of the warrior's plain swing, reach in blocks
 export function statsOf(spec) {
   const t = TYPES.find(x => x.id === spec.type) || TYPES[0], m = MATERIALS.find(x => x.id === spec.material) || MATERIALS[0];
-  const dmg = t.dmg * m.dmg * (0.8 + spec.length * 0.2) * (0.85 + spec.width * 0.15);
-  const spd = t.spd / (0.75 + spec.length * 0.15 + spec.width * 0.1);
-  const reach = 4.6 * t.reach * (0.7 + spec.length * 0.3);
+  const sm = canDraw(spec) && spec.shape ? shapeMass(spec.shape) : { mass: 1, len: 1 };
+  const dmg = t.dmg * m.dmg * (0.8 + spec.length * 0.2) * (0.85 + spec.width * 0.15) * (0.7 + 0.3 * sm.mass);
+  const spd = t.spd / (0.75 + spec.length * 0.15 + spec.width * 0.1) / (0.8 + 0.2 * sm.mass);
+  const reach = 4.6 * t.reach * (0.7 + spec.length * 0.3) * (0.6 + 0.4 * sm.len);
   // (for staffs and bows the reach is how fast the shot flies)
   const shot = t.reach * (0.8 + spec.length * 0.2);
   const aura = AURAS.find(a => a.id === spec.aura);
@@ -107,6 +155,9 @@ export function buildForged(spec) {
   const gem = std({ color: accent, emissive: accent, emissiveIntensity: 0.7, roughness: 0.15, metalness: 0.1 });
   const gripCol = GRIP_COLORS[spec.gripColor % GRIP_COLORS.length][0];
   const gripMat = std({ color: gripCol, roughness: spec.grip === 'bone' ? 0.6 : 0.8, metalness: spec.grip === 'chain' ? 0.7 : 0 });
+  // the haft's own material: a wood, or any metal (glowing ones glow)
+  const hm = MATERIALS.find(x => x.id === spec.haft), hw0 = HAFTS.find(x => x[0] === (spec.haft || 'oak')) || HAFTS[0];
+  const haftMat = hm ? std({ color: hm.color, metalness: hm.metalness, roughness: hm.roughness, envMapIntensity: 1, emissive: hm.glow || '#000000', emissiveIntensity: hm.glow ? 0.7 : 0 }) : std({ color: hw0[2], roughness: 0.8 });
   const ranged = spec.type === 'bow' || spec.type === 'crossbow';
   // the grip: longer for two-handed things
   const two = spec.type === 'greatsword' || spec.type === 'hammer' || (spec.type === 'axe' && spec.head === 'double');
@@ -144,24 +195,30 @@ export function buildForged(spec) {
   let blade = null;
   if (spec.type === 'sword' || spec.type === 'greatsword' || spec.type === 'dagger') {
     const len = (spec.type === 'sword' ? 1.2 : spec.type === 'greatsword' ? 1.7 : 0.6) * L, hw = (spec.type === 'greatsword' ? 0.085 : spec.type === 'dagger' ? 0.045 : 0.06) * W;
-    let pts;
-    switch (spec.head) {
-      case 'leaf': pts = mirror([[hw * 0.7, 0], [hw * 1.4, len * 0.55], [hw * 0.9, len * 0.85], [0, len]]); break;
-      case 'curved': pts = [[-hw, 0], [hw, 0], [hw * 1.2, len * 0.5], [hw * 2.2, len * 0.8], [hw * 1.4, len], [hw * 0.2, len * 0.9], [-hw * 0.8, len * 0.5]]; break;
-      case 'serrated': { const h = [[hw, 0]]; for (let i = 1; i <= 7; i++) { h.push([hw * (i % 2 ? 1.5 : 0.9), len * (i / 8)]); } h.push([0, len]); pts = mirror(h); break; }
-      case 'flamberge': { const h = []; for (let i = 0; i <= 10; i++) h.push([hw * (1 + 0.5 * Math.sin(i * 1.3)), len * (i / 11)]); h.push([0, len]); pts = mirror(h); break; }
-      case 'cleaver': pts = mirror([[hw * 0.8, 0], [hw * 1.6, len * 0.15], [hw * 1.6, len * 0.9], [hw * 0.6, len], [0, len]]); break;
-      case 'kris': { const h = []; for (let i = 0; i <= 8; i++) h.push([hw * (1.1 + 0.6 * Math.sin(i * 1.6)), len * (i / 9)]); h.push([0, len]); pts = mirror(h); break; }
-      case 'needle': pts = mirror([[hw * 0.9, 0], [hw * 0.4, len * 0.5], [0, len]]); break;
-      default: pts = mirror([[hw, 0], [hw, len * 0.86], [0, len]]);
-    }
+    let pts, bx = [-hw * 1.2, hw * 1.2, 0, len];
+    if (spec.shape) {
+      // your own outline, scaled to the type's half-width and length
+      const sw = SHAPE_W[spec.type] * W;
+      pts = fullOutline(spec.shape).map(([x, y]) => [x * sw, y * len]);
+      bx = outlineBox(pts);
+    } else pts = spec.head === 'curved' ? bladeHalf('curved', hw, len) : mirror(bladeHalf(spec.head, hw, len));
     blade = mesh(extrude(pts, spec.type === 'greatsword' ? 0.04 : 0.025), metal); blade.position.y = y0; g.add(blade);
-    g.userData.auraBox = [-hw * 1.2, hw * 1.2, y0, y0 + len, -0.05, 0.05];
+    g.userData.auraBox = [bx[0], bx[1], y0 + bx[2], y0 + bx[3], -0.05, 0.05];
     // a fuller down the middle, in the accent's color on the fancier blades
-    if (spec.head === 'straight' || spec.head === 'leaf') for (const z of [-0.02, 0.02]) { const f = mesh(box(hw * 0.4, len * 0.6, 0.006), gem, false); f.position.set(0, y0 + len * 0.42, z); g.add(f); }
-    g.userData.tipY = y0 + len;
+    if (!spec.shape && (spec.head === 'straight' || spec.head === 'leaf')) for (const z of [-0.02, 0.02]) { const f = mesh(box(hw * 0.4, len * 0.6, 0.006), gem, false); f.position.set(0, y0 + len * 0.42, z); g.add(f); }
+    g.userData.tipY = y0 + bx[3];
+  } else if (spec.shape && (spec.type === 'axe' || spec.type === 'hammer' || spec.type === 'mace')) {
+    // a drawn head on a haft: the drawing spans the haft's upper half and a little past its top
+    const hl = (spec.type === 'axe' ? 0.8 : spec.type === 'hammer' ? 0.85 : 0.7) * L;
+    const haft = mesh(cyl(0.04, 0.045, hl, 10), haftMat); haft.position.y = y0 + hl / 2; g.add(haft);
+    const sw = SHAPE_W[spec.type] * W, hh = SHAPE_L[spec.type] * L, base = y0 + hl * 0.55;
+    const pts = fullOutline(spec.shape).map(([x, y]) => [x * sw, y * hh]), bx = outlineBox(pts);
+    const head = mesh(extrude(pts, spec.type === 'hammer' ? 0.22 * W : 0.06), metal); head.position.y = base; g.add(head);
+    const cap = mesh(cyl(0.055, 0.055, Math.max(0.1, (bx[3] - bx[2]) * 0.9), 10), iron); cap.position.y = base + (bx[2] + bx[3]) / 2; g.add(cap);
+    g.userData.auraBox = [bx[0], bx[1], base + bx[2], base + bx[3], spec.type === 'hammer' ? -0.12 * W : -0.06, spec.type === 'hammer' ? 0.12 * W : 0.06];
+    g.userData.tipY = Math.max(y0 + hl, base + bx[3]);
   } else if (spec.type === 'axe') {
-    const haft = mesh(cyl(0.04, 0.045, 0.8 * L, 10), gripMat); haft.position.y = y0 + 0.4 * L; g.add(haft);
+    const haft = mesh(cyl(0.04, 0.045, 0.8 * L, 10), haftMat); haft.position.y = y0 + 0.4 * L; g.add(haft);
     const hy = y0 + 0.62 * L, hw = 0.32 * W, hh = 0.42 * W;
     const head = (s) => { const pts = spec.head === 'bearded' ? [[0, hh * 0.3], [hw * 0.35, hh * 0.5], [hw, hh * 0.6], [hw * 1.05, -hh * 0.5], [hw * 0.5, -hh * 0.75], [hw * 0.2, -hh * 0.2], [0, -hh * 0.3]]
       : spec.head === 'crescent' ? [[0, hh * 0.35], [hw * 0.6, hh * 0.7], [hw * 1.1, 0], [hw * 0.6, -hh * 0.7], [0, -hh * 0.35], [hw * 0.45, 0]]
@@ -173,7 +230,7 @@ export function buildForged(spec) {
     const tip = mesh(new THREE.ConeGeometry(0.035, 0.16, 8), iron); tip.position.y = y0 + 0.8 * L + 0.08; g.add(tip);
     g.userData.tipY = y0 + 0.8 * L;
   } else if (spec.type === 'hammer') {
-    const haft = mesh(cyl(0.045, 0.05, 0.85 * L, 10), gripMat); haft.position.y = y0 + 0.42 * L; g.add(haft);
+    const haft = mesh(cyl(0.045, 0.05, 0.85 * L, 10), haftMat); haft.position.y = y0 + 0.42 * L; g.add(haft);
     const hy = y0 + 0.72 * L, hw = 0.5 * W, hh = 0.22 * W;
     let head;
     if (spec.head === 'maul') head = mesh(cyl(hh * 1.1, hh * 1.1, hw * 1.1, 14), metal), head.rotation.z = Math.PI / 2;
@@ -186,7 +243,7 @@ export function buildForged(spec) {
     const j = mesh(sph(0.045, 10, 8), gem); j.position.set(0, hy, hh * 0.65); j.scale.z = 0.5; g.add(j);
     g.userData.tipY = hy + hh;
   } else if (spec.type === 'mace') {
-    const haft = mesh(cyl(0.04, 0.045, 0.7 * L, 10), gripMat); haft.position.y = y0 + 0.35 * L; g.add(haft);
+    const haft = mesh(cyl(0.04, 0.045, 0.7 * L, 10), haftMat); haft.position.y = y0 + 0.35 * L; g.add(haft);
     const hy = y0 + 0.72 * L, r = 0.16 * W;
     if (spec.head === 'ball') { const c = mesh(sph(r * 1.1, 14, 10), metal); c.position.y = hy; g.add(c); }
     else if (spec.head === 'star') { const c = mesh(sph(r * 0.8, 12, 8), metal); c.position.y = hy; g.add(c); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, b = (i % 2) * 0.9 - 0.45; const sp = mesh(new THREE.ConeGeometry(r * 0.25, r * 0.9, 6), iron); sp.position.set(Math.cos(a) * Math.cos(b) * r * 1.0, hy + Math.sin(b) * r, Math.sin(a) * Math.cos(b) * r * 1.0); sp.lookAt(0, hy, 0); sp.rotateX(-Math.PI / 2); g.add(sp); } }
@@ -200,7 +257,7 @@ export function buildForged(spec) {
     // the mage's: the shaft is the grip's wood, the head holds the gem that lights the bolts
     const wand = spec.type === 'wand';
     const shaft = (wand ? 0.7 : 1.6) * L;
-    const pole = mesh(cyl(0.04, 0.055, shaft, 8), gripMat); pole.position.y = y0 + shaft / 2; g.add(pole);
+    const pole = mesh(cyl(0.04, 0.055, shaft, 8), haftMat); pole.position.y = y0 + shaft / 2; g.add(pole);
     const hy = y0 + shaft, r = (wand ? 0.1 : 0.15) * W;
     const orbMat = std({ color: accent, emissive: accent, emissiveIntensity: 1.4, roughness: 0.1, metalness: 0.1 });
     g.userData.orbMat = orbMat;
@@ -272,7 +329,7 @@ function attachAura(g, kind, bx, power = 1) {
   power = Math.max(0.2, Math.min(2, power));
   const [x0, x1, y0, y1, z0, z1] = bx, span = Math.max(0.1, y1 - y0);
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, orbitR = Math.max(x1 - x0, z1 - z0) / 2 + 0.08;
-  const N = Math.round((kind === 'lightning' ? 48 : 110) * power);
+  const N = Math.round((kind === 'lightning' ? 26 : 110) * power);
   const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), ph = new Float32Array(N);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -285,21 +342,18 @@ function attachAura(g, kind, bx, power = 1) {
   const bright = Math.min(1.5, 0.6 + 0.4 * power);
   const mat = new THREE.PointsMaterial({ size, map: TEX.soft, vertexColors: true, transparent: true, depthWrite: false, blending: kind === 'shadow' ? THREE.NormalBlending : THREE.AdditiveBlending, opacity: kind === 'shadow' ? 0.75 : 1, sizeAttenuation: true });
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
-  // a few jagged lines for lightning
-  let line = null, lpos = null;
-  if (kind === 'lightning') {
-    const L = 3, S = 7; lpos = new Float32Array(L * S * 2 * 3);
-    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(lpos, 3));
-    line = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#cfeeff', transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
-    line.frustumCulled = false; g.add(line);
-  }
+  // lightning: jagged bolts as thin crossed ribbons (a bright core and a soft glow, one draw call each),
+  // running along the blade and arcing off it, redrawn every few frames
+  let bolts = null;
+  if (kind === 'lightning') bolts = makeBolts(g, Math.max(2, Math.round(2 + power * 2)));
   const rnd = () => Math.random();
   const spawn = i => {
     pos[i * 3] = x0 + rnd() * (x1 - x0); pos[i * 3 + 1] = y0 + rnd() * span; pos[i * 3 + 2] = z0 + rnd() * (z1 - z0);
-    max[i] = { flame: 0.45, lightning: 0.14, water: 0.55, wind: 0.7, frost: 1.1, shadow: 1.0, holy: 1.0 }[kind] * (0.6 + rnd() * 0.8);
+    max[i] = { flame: 0.45, lightning: 0.22, water: 0.55, wind: 0.7, frost: 1.1, shadow: 1.0, holy: 1.0 }[kind] * (0.6 + rnd() * 0.8);
     life[i] = max[i] * (kind === 'lightning' ? rnd() : 0);
     ph[i] = rnd() * Math.PI * 2;
-    vel[i * 3] = (rnd() - 0.5) * 0.3; vel[i * 3 + 1] = (rnd() - 0.5) * 0.3; vel[i * 3 + 2] = (rnd() - 0.5) * 0.3;
+    const sp = kind === 'lightning' ? 2.2 : 0.3;
+    vel[i * 3] = (rnd() - 0.5) * sp; vel[i * 3 + 1] = (rnd() - 0.5) * sp; vel[i * 3 + 2] = (rnd() - 0.5) * sp;
   };
   for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
   let last = -1, flick = 0;
@@ -318,30 +372,68 @@ function attachAura(g, kind, bx, power = 1) {
         case 'wind': { const a = ph[i] + t * 7, r = orbitR + 0.06 * Math.sin(t * 2 + ph[i]); pos[o] = cx + Math.cos(a) * r; pos[o + 2] = cz + Math.sin(a) * r; pos[o + 1] += 0.5 * dt; if (pos[o + 1] > y1 + 0.1) pos[o + 1] = y0; fade = Math.sin(k * Math.PI); break; }
         case 'holy': { const a = ph[i] + t * 1.8, r = orbitR * 0.7 + orbitR * 0.5 * Math.sin(k * Math.PI); pos[o] = cx + Math.cos(a) * r; pos[o + 2] = cz + Math.sin(a) * r; pos[o + 1] += upL.y * 0.15 * dt; fade = Math.sin(k * Math.PI); break; }
         case 'shadow': pos[o] += (vel[o] * 0.4 - upL.x * 0.3) * dt; pos[o + 1] += (vel[o + 1] * 0.4 - upL.y * 0.3) * dt; pos[o + 2] += (vel[o + 2] * 0.4 - upL.z * 0.3) * dt; fade = Math.sin(k * Math.PI); break;
-        default: fade = 1 - k; // lightning sparks
+        default: pos[o] += vel[o] * dt; pos[o + 1] += vel[o + 1] * dt; pos[o + 2] += vel[o + 2] * dt; fade = (1 - k) * (1 - k); // sparks flying off
       }
       cc.copy(c0).lerp(c1, k).multiplyScalar(Math.max(0, fade) * bright);
       col[o] = cc.r; col[o + 1] = cc.g; col[o + 2] = cc.b;
     }
     geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
-    if (line) {
-      // new jagged paths every few frames, flickering
+    if (bolts) {
       if ((flick -= dt) <= 0) {
-        flick = 0.05 + rnd() * 0.06;
-        let q = 0;
-        const wx = (x1 - x0), wz = (z1 - z0);
-        for (let l = 0; l < 3; l++) {
-          const ya = y0 + rnd() * span * 0.5, yb = Math.min(y1, ya + span * (0.3 + rnd() * 0.5));
-          let px = x0 + rnd() * wx, pz = z0 + rnd() * wz;
-          for (let sIdx = 0; sIdx < 7; sIdx++) {
-            const nx = x0 + rnd() * wx, nz = z0 + rnd() * wz, y1s = ya + (yb - ya) * sIdx / 7, y2s = ya + (yb - ya) * (sIdx + 1) / 7;
-            lpos[q++] = px; lpos[q++] = y1s; lpos[q++] = pz; lpos[q++] = nx; lpos[q++] = y2s; lpos[q++] = nz;
-            px = nx; pz = nz;
-          }
-        }
-        line.geometry.attributes.position.needsUpdate = true;
-        line.material.opacity = (0.4 + rnd() * 0.6) * Math.min(1, 0.5 + power * 0.5);
+        // a crackle: new bolts for a few frames, then a short gap
+        const gap = rnd() < 0.3;
+        flick = gap ? 0.03 + rnd() * 0.05 : 0.04 + rnd() * 0.07;
+        bolts.draw(gap ? 0 : bolts.n, bx, power);
       }
     }
   };
 }
+// bolts: n jagged paths of up to 9 segments, each segment two crossed quads; a thin bright core and a wide dim glow
+function makeBolts(g, n) {
+  const SEG = 9, Q = n * SEG * 2;
+  const make = (w, color, opacity) => {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(Q * 4 * 3), idx = new Uint16Array(Q * 6);
+    for (let q = 0; q < Q; q++) { const v = q * 4, o = q * 6; idx[o] = v; idx[o + 1] = v + 1; idx[o + 2] = v + 2; idx[o + 3] = v; idx[o + 4] = v + 2; idx[o + 5] = v + 3; }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    m.frustumCulled = false; g.add(m);
+    return { m, pos, w };
+  };
+  const core = make(0.014, '#ffffff', 1), glow = make(0.042, '#4aa8ff', 0.35);
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), D = new THREE.Vector3(), U = new THREE.Vector3(), V = new THREE.Vector3(), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
+  const rnd = Math.random;
+  function seg(layer, q, a, b) {
+    A.copy(a); B.copy(b); D.subVectors(B, A).normalize();
+    U.crossVectors(D, Math.abs(D.z) < 0.9 ? Z : X).normalize().multiplyScalar(layer.w); V.crossVectors(D, U).normalize().multiplyScalar(layer.w);
+    const P = layer.pos; let o = q * 24;
+    const put = (p, off, sgn) => { P[o++] = p.x + off.x * sgn; P[o++] = p.y + off.y * sgn; P[o++] = p.z + off.z * sgn; };
+    put(A, U, 1); put(B, U, 1); put(B, U, -1); put(A, U, -1);
+    put(A, V, 1); put(B, V, 1); put(B, V, -1); put(A, V, -1);
+  }
+  const pts = [];
+  return { n, draw(count, bx, power) {
+    const [x0, x1, y0, y1, z0, z1] = bx, wx = x1 - x0, wz = z1 - z0, span = y1 - y0;
+    core.pos.fill(0); glow.pos.fill(0);
+    let q = 0;
+    for (let b = 0; b < count; b++) {
+      // along the blade: from somewhere low to somewhere high, jittering across it; now and then it arcs
+      // out to the side and comes back (or ends in the air)
+      pts.length = 0;
+      const ya = y0 + rnd() * span * 0.4, yb = Math.min(y1 + 0.05, ya + span * (0.35 + rnd() * 0.6));
+      const arcAt = rnd() < 0.6 ? 2 + Math.floor(rnd() * 5) : -1, arcDir = rnd() < 0.5 ? -1 : 1, arcR = 0.12 + rnd() * 0.22 * (0.5 + power * 0.5);
+      for (let i = 0; i <= SEG; i++) {
+        const t = i / SEG;
+        let x = x0 + rnd() * wx, z = z0 + rnd() * wz;
+        if (arcAt >= 0 && Math.abs(i - arcAt) <= 1) { const k = 1 - Math.abs(i - arcAt) * 0.5; x += arcDir * arcR * k; z += (rnd() - 0.5) * 0.1 * k; }
+        pts.push(new THREE.Vector3(x, ya + (yb - ya) * t, z));
+      }
+      for (let i = 0; i < SEG; i++) { seg(core, q, pts[i], pts[i + 1]); seg(glow, q, pts[i], pts[i + 1]); q += 2; }
+    }
+    core.m.geometry.attributes.position.needsUpdate = true; glow.m.geometry.attributes.position.needsUpdate = true;
+    const k = Math.min(1, 0.5 + power * 0.5);
+    core.m.material.opacity = (0.6 + rnd() * 0.4) * k; glow.m.material.opacity = (0.3 + rnd() * 0.3) * k;
+  } };
+}
+
+function outlineBox(pts) { let x0 = 9, x1 = -9, y0 = 9, y1 = -9; for (const [x, y] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return [x0, x1, y0, y1]; }

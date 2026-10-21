@@ -80,7 +80,7 @@ export function initTouch(canvas) {
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   // the captured mouse: every movement turns the camera
   document.addEventListener('mousemove', e => {
-    if (!mouseLocked()) return;
+    if (!mouseLocked() || input.lookOff) return; // (lookOff: a menu is open)
     input.lastDevice = 'kb';
     input.lookX += e.movementX * 0.0024 * input.mouseSpeed;
     input.lookY += e.movementY * 0.0024 * input.mouseSpeed;
