@@ -143,6 +143,8 @@ function wire() {
     sfx('pickup'); render();
   });
   $('fShapeReset').addEventListener('click', () => { forge.spec.shape = presetShape(forge.spec); sfx('pickup'); render(); });
+  $('fMorePts').addEventListener('click', () => { if (shapeMode !== 'points') { shapeMode = 'points'; render(); } pad.addPoints(); sfx('pickup'); });
+  $('fSpin').addEventListener('click', () => { spin = spin ? 0 : 1; $('fSpin').classList.toggle('on', !!spin); $('fSpin').textContent = spin ? 'SPINNING' : 'STILL'; });
   $('fLen').addEventListener('input', e => { forge.spec.length = +e.target.value; rebuild(); });
   $('fWid').addEventListener('input', e => { forge.spec.width = +e.target.value; rebuild(); });
   $('fPow').addEventListener('input', e => { forge.spec.auraPower = +e.target.value; rebuild(); });

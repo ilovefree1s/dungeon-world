@@ -58,6 +58,17 @@ export class ShapePad {
     if (this.mode === 'draw' && this.stroke) { this.finishStroke(); this.stroke = null; return; }
     if (this.drag >= 0) { this.drag = -1; this.changed(); }
   }
+  // a corner in the middle of every edge (the longest ones first, up to 24 corners)
+  addPoints() {
+    if (!this.shape) return;
+    const H = this.shape.pts, n = H.length, closed = !this.shape.mirror;
+    const edges = [];
+    for (let i = 0; i < (closed ? n : n - 1); i++) { const a = H[i], b = H[(i + 1) % n]; edges.push([Math.hypot(a[0] - b[0], (a[1] - b[1]) * 1.5), i]); }
+    edges.sort((x, y) => y[0] - x[0]);
+    const take = edges.slice(0, Math.min(edges.length, Math.max(1, 24 - n))).map(e => e[1]).sort((x, y) => y - x);
+    for (const i of take) { const a = H[i], b = H[(i + 1) % n]; H.splice(i + 1, 0, [+((a[0] + b[0]) / 2).toFixed(3), +((a[1] + b[1]) / 2).toFixed(3)]); }
+    this.changed();
+  }
   dbl(e) {
     if (!this.shape || this.mode !== 'points') return;
     const [px, py, w, h] = this.local(e), H = this.handles();
