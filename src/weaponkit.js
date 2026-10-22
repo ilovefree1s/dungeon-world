@@ -17,6 +17,48 @@ function extrude(pts, depth, bevel = 0.012) {
   g.translate(0, 0, -depth / 2);
   return g;
 }
+// a ground blade: the outline lofted with a diamond cross-section, thick along the spine and
+// sharp at both edges (an extrusion would leave the edges flat, like a bar of metal)
+function bladeGeo(pts, thick) {
+  const n = pts.length, eps = 1e-4;
+  // every height the outline has a corner at, plus enough in between to follow the curves
+  const ys = [...new Set(pts.map(p => +p[1].toFixed(5)))].sort((a, b) => a - b);
+  const y0 = ys[0], y1 = ys[ys.length - 1];
+  const want = Math.max(24, Math.round((y1 - y0) / 0.03));
+  for (let i = 0; i <= want; i++) ys.push(y0 + (y1 - y0) * i / want);
+  const Y = [...new Set(ys.map(y => +y.toFixed(5)))].sort((a, b) => a - b);
+  // the outline's span at a height: the leftmost and rightmost crossing
+  const span = y => {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      if ((a[1] <= y && b[1] > y) || (b[1] <= y && a[1] > y)) { const x = a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]); lo = Math.min(lo, x); hi = Math.max(hi, x); }
+    }
+    return lo <= hi ? [lo, hi] : null;
+  };
+  // rings: at each height, just below and just above it (so a horizontal step in the outline stays a step)
+  const rings = [];
+  for (let k = 0; k < Y.length; k++) {
+    const y = Y[k];
+    const below = k === 0 ? null : span(y - eps), above = k === Y.length - 1 ? null : span(y + eps);
+    const put = sp => { const c = (sp[0] + sp[1]) / 2, w = (sp[1] - sp[0]) / 2, t = Math.min(thick / 2, w * 0.9); rings.push([[sp[0], y, 0], [c, y, t], [sp[1], y, 0], [c, y, -t]]); };
+    if (k === 0) put(above || [0, 0]); else if (k === Y.length - 1) put(below || [0, 0]);
+    else { if (below) put(below); if (above && (!below || Math.abs(above[0] - below[0]) > 1e-3 || Math.abs(above[1] - below[1]) > 1e-3)) put(above); }
+  }
+  const pos = [];
+  const tri = (a, b, c) => pos.push(...a, ...b, ...c);
+  for (let r = 0; r + 1 < rings.length; r++) {
+    const A = rings[r], B = rings[r + 1];
+    for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; tri(A[i], A[j], B[j]); tri(A[i], B[j], B[i]); }
+  }
+  // the base and the tip capped (they are usually a point or a flat)
+  const cap = (R, flip) => { for (let i = 1; i + 1 < 4; i++) flip ? tri(R[0], R[i + 1], R[i]) : tri(R[0], R[i], R[i + 1]); };
+  cap(rings[0], true); cap(rings[rings.length - 1], false);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
 const mirror = half => [...half, ...half.slice().reverse().map(([x, y]) => [-x, y])];
 
 // ---------------------------------------------------------------- drawn shapes
@@ -203,7 +245,7 @@ export function buildForged(spec) {
       pts = fullOutline(spec.shape).map(([x, y]) => [x * sw, y * len]);
       bx = outlineBox(pts);
     } else pts = spec.head === 'curved' ? bladeHalf('curved', hw, len) : mirror(bladeHalf(spec.head, hw, len));
-    blade = mesh(extrude(pts, spec.type === 'greatsword' ? 0.04 : 0.025), metal); blade.position.y = y0; g.add(blade);
+    blade = mesh(bladeGeo(pts, spec.type === 'greatsword' ? 0.07 : spec.type === 'dagger' ? 0.04 : 0.05), metal); blade.position.y = y0; g.add(blade);
     g.userData.auraBox = [bx[0], bx[1], y0 + bx[2], y0 + bx[3], -0.05, 0.05];
     // a fuller down the middle, in the accent's color on the fancier blades
     if (!spec.shape && (spec.head === 'straight' || spec.head === 'leaf')) for (const z of [-0.02, 0.02]) { const f = mesh(box(hw * 0.4, len * 0.6, 0.006), gem, false); f.position.set(0, y0 + len * 0.42, z); g.add(f); }

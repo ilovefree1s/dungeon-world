@@ -49,7 +49,11 @@ function rebuild() {
   model = buildForged(forge.spec);
   // (centered on its length, so long and short weapons both fill the view)
   // (framed by its whole box, so a crossbow's stock and a greatsword's length both fit)
-  const bb = new THREE.Box3().setFromObject(model), size = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+  // (the aura doesn't count: flames rising off the tip shouldn't zoom the blade out)
+  const bb = new THREE.Box3(), tb = new THREE.Box3();
+  model.updateMatrixWorld(true);
+  model.traverse(o => { if (o.isMesh && !o.userData.aura && !o.isPoints && !o.isSprite && o.geometry) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); tb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); bb.union(tb); } });
+  const size = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
   model.position.set(-c.x, -c.y, -c.z);
   scene.add(model);
   const span = Math.max(size.y, size.z * 1.2, size.x * 1.2);

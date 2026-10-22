@@ -219,7 +219,9 @@ export function attachAura(g, kind, bx, power = 1) {
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   const build = BUILD[kind];
   if (!build) return () => {};
+  const before = new Set(g.children);
   const parts = build(g, bx, power, { span, wide, cx, cz });
+  for (const o of g.children) if (!before.has(o)) o.traverse(c => { c.userData.aura = true; });
   let last = -1;
   return t => {
     const dt = last < 0 ? 0.016 : Math.min(0.05, t - last); last = t;
