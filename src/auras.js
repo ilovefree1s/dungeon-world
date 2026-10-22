@@ -329,12 +329,12 @@ const BUILD = {
     const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
     const rise = 0.9 + power * 0.5, h = 0.25 + span * 0.35 * Math.min(1.5, power);
     const spawn = i => {
-      // born on the blade's skin, a few inside it
-      const o = i * 3, face = rnd();
-      pos[o] = x0 + rnd() * (x1 - x0); pos[o + 1] = y0 + rnd() * (y1 - y0); pos[o + 2] = face < 0.5 ? z0 - 0.01 : z1 + 0.01;
-      if (rnd() < 0.3) pos[o] = rnd() < 0.5 ? x0 - 0.01 : x1 + 0.01;
+      // born around the blade, in a cloud with some depth to it (a flat sheet of tongues looks thin from the side):
+      // out from both faces by up to a tenth, and a little past the edges
+      const o = i * 3, face = rnd() < 0.5 ? -1 : 1, depth = 0.01 + rnd() * rnd() * 0.1;
+      pos[o] = x0 - 0.03 + rnd() * (x1 - x0 + 0.06); pos[o + 1] = y0 + rnd() * (y1 - y0); pos[o + 2] = face < 0 ? z0 - depth : z1 + depth;
       max[i] = (0.35 + rnd() * 0.4) * (h / 0.6); life[i] = 0;
-      vel[o] = (rnd() - 0.5) * 0.25; vel[o + 1] = 0; vel[o + 2] = (rnd() - 0.5) * 0.25;
+      vel[o] = (rnd() - 0.5) * 0.25; vel[o + 1] = 0; vel[o + 2] = (rnd() - 0.5) * 0.25 + face * 0.08;
       base[i] = (0.14 + rnd() * 0.12 + 0.03 * Math.min(1, power)) * tongue; ph[i] = rnd() * 6.28; rot[i] = (rnd() - 0.5) * 0.7;
     };
     for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
