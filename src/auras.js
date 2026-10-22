@@ -319,11 +319,11 @@ const BUILD = {
     const center = new THREE.Vector3(cx, (y0 + y1) / 2, cz), upL0 = new THREE.Vector3(0, 1, 0);
     // three sheets of fire that rise toward the world's up: two a little apart (so there's some thickness), an inner hotter one
     const mk = (off, h, pw, speed, across = 0, at = 0) => {
-      const u = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: pw }, uAsp: { value: across ? 0.3 : 1 }, uUpL: { value: upL0.clone() }, uCenter: { value: center }, uSpan: { value: span * 1.08 }, uWide: { value: wide * 2 + 0.25 }, uH: { value: h }, uOff: { value: off }, uAcross: { value: across }, uAt: { value: at } };
+      const u = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: pw }, uAsp: { value: across ? 1.2 : 1 }, uUpL: { value: upL0.clone() }, uCenter: { value: center }, uSpan: { value: span * 1.08 }, uWide: { value: wide * 3 + 0.4 }, uH: { value: h }, uOff: { value: off }, uAcross: { value: across }, uAt: { value: at } };
       const m = new THREE.Mesh(riseGeo(across ? 8 : 24, 12), riseSheet(u)); m.frustumCulled = false; g.add(m); return { m, u, speed };
     };
     // along the blade (two a hair apart, a hotter core), and one facing the camera that shows when the blade points at you
-    const sheets = [mk(side, up * 0.8, power, 1), mk(-side, up * 0.8, power, 1.1), mk(0, up * 0.45, power * 1.2, 1.5), mk(0, up * 0.8, power, 1.2, 1)];
+    const sheets = [mk(side, up * 0.5, power, 1), mk(-side, up * 0.5, power, 1.1), mk(0, up * 0.3, power * 1.2, 1.5), mk(0, up * 0.3, power * 0.8, 1.2, 1)];
     // and the fire for a blade held upright: sheets along the blade, rising past its tip (the old way); the two
     // fires crossfade by how far over the blade is held
     const uni = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: (wide + side * 2) / (span + up) } };
