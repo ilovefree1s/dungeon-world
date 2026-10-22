@@ -55,7 +55,8 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 
 ## Stage 1: the world
 - A low-poly toy-diorama land: a faceted heightfield with vertex colors (grass, dirt paths, sand
-  by the water, rock on the steep faces, snow, ash, prism moss), low-poly trees, rocks and bushes
+  by the water, rock on the steep faces, snow, ash, prism moss), giant low-poly trees (eight times
+  a hero's scale, trunks like towers, crowns far overhead, spaced out), rocks and bushes
   (icosahedron crowns, chunky trunks, angular rocks, a different kit per biome), and thousands of
   instanced grass blades that sway in the wind and bend away from whoever walks through. Broad
   plains with the hills and cliffs between them. Built in chunks of 32 x 32 in a background
@@ -74,7 +75,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 - Your Dungeon Heart hero (warrior, mage or hunter, made by Dungeon Heart's own `models.js`)
   walks, runs, jumps about three blocks, steps up single blocks, swims, and gets thrown out
   of lava. A third-person camera follows, slips through leaves and pulls in before hills.
-- Day and night: a ten-minute day, a square sun and moon, stars, drifting block clouds;
+- Day and night: a ten-minute day, a square sun and moon, stars, drifting puffy clouds;
   glowing crystal, magma and mushrooms light up the dark.
 - A compass with a marker for the tower at the world's middle (a later stage), the biome's
   name as you enter it, a menu for hero, graphics, music and sounds. Your place is saved.

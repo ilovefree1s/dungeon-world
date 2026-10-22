@@ -522,10 +522,10 @@ const TREE_ID = { oak: 0, birch: 1, pine: 2, cactus: 3, willow: 4, char: 5, spir
       const hx = column(tx + 3, tz).hf + 1, hz = column(tx, tz + 3).hf + 1;
       if (Math.abs(hx - h) > 3.2 || Math.abs(hz - h) > 3.2) continue;
       const kind = kinds[Math.floor(hash3(i, j, seed, 44) * kinds.length)];
-      // (trees: half as many as the ground would take, and twice the size; rocks and bushes as they are)
+      // (trees: giants, eight times the size, and only three in eight of the spots the ground would take; rocks and bushes as they are)
       const tree = !NOT_TREE.has(kind);
-      if (tree && hash3(i, j, seed, 47) < 0.5) continue;
-      trees.push(TREE_ID[kind], tx - ox + 0.5, Math.min(h, hx, hz) - 0.3, tz - oz + 0.5, (0.7 + hash3(i, j, seed, 45) * 0.5) * (tree ? 2 : 1), hash3(i, j, seed, 46) * 6.283);
+      if (tree && hash3(i, j, seed, 47) < 0.625) continue;
+      trees.push(TREE_ID[kind], tx - ox + 0.5, Math.min(h, hx, hz) - 0.3, tz - oz + 0.5, (0.7 + hash3(i, j, seed, 45) * 0.5) * (tree ? 8 : 1), hash3(i, j, seed, 46) * 6.283);
     }
     // grass: where the ground is grassy and gentle, a spot every other block, each with a number to thin by
     const grass = [];
