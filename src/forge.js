@@ -6,7 +6,7 @@
 // ============================================================================
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { TYPES, MATERIALS, GUARDS, GRIPS, POMMELS, ACCENTS, GRIP_COLORS, AURAS, HAFTS, HERO_NAME, clsOf, hasHaft, canDraw, presetShape, randomSpec, defaultSpec, nameOf, statsOf, buildForged } from './weaponkit.js';
+import { TYPES, MATERIALS, GUARDS, GRIPS, POMMELS, ACCENTS, GRIP_COLORS, AURAS, HAFTS, HERO_NAME, rarityOf, clsOf, hasHaft, canDraw, presetShape, randomSpec, defaultSpec, nameOf, statsOf, buildForged } from './weaponkit.js';
 import { ShapePad } from './shapepad.js';
 import { sfx } from './audio.js';
 
@@ -66,7 +66,8 @@ function rebuild() {
   const span = Math.max(size.y, size.z * 1.2, size.x * 1.2);
   camera.position.set(0, 0.1, span * 1.75 + 0.6); camera.lookAt(0, 0, 0);
   const st = statsOf(forge.spec);
-  $('forgeStats').innerHTML = (st.aura !== 'none' ? `<b>AURA</b> ${st.aura.toUpperCase()} ` : '') + `<b>FOR THE</b> ${HERO_NAME[st.cls]} <b>DAMAGE</b> ${Math.round(st.dmg * 100)}% <b>SPEED</b> ${Math.round(st.spd * 100)}% ` + (st.cls === 0 ? `<b>REACH</b> ${st.reach} blocks` : `<b>SHOT</b> ${Math.round(st.shot * 100)}%`) + (st.glow ? ' <b>GLOWS</b>' : '');
+  const rr = rarityOf(forge.spec);
+  $('forgeStats').innerHTML = (rr.id !== 'common' ? `<b style="color:${rr.color}">${rr.name}</b> ` : '') + (st.aura !== 'none' ? `<b>AURA</b> ${st.aura.toUpperCase()} ` : '') + `<b>FOR THE</b> ${HERO_NAME[st.cls]} <b>DAMAGE</b> ${Math.round(st.dmg * 100)}% <b>SPEED</b> ${Math.round(st.spd * 100)}% ` + (st.cls === 0 ? `<b>REACH</b> ${st.reach} blocks` : `<b>SHOT</b> ${Math.round(st.shot * 100)}%`) + (st.glow ? ' <b>GLOWS</b>' : '');
 }
 function frame(now) {
   if (!forge.open) return;
@@ -132,7 +133,8 @@ function render() {
   forge.saved.forEach((w, i) => {
     const c = clsOf(w), eq = forge.equipped[c] === i;
     const chip = document.createElement('div'); chip.className = 'fchip' + (eq ? ' eq' : '');
-    chip.innerHTML = `<button type="button" class="load"><i>${HERO_NAME[c][0]}</i>${w.name || 'UNNAMED'}</button><button type="button" class="eqb">${eq ? 'WIELDED' : 'WIELD'}</button><button type="button" class="del" aria-label="Delete">×</button>`;
+    const wr = rarityOf(w);
+    chip.innerHTML = `<button type="button" class="load"${wr.id !== 'common' ? ` style="color:${wr.color}"` : ''}><i>${HERO_NAME[c][0]}</i>${w.name || 'UNNAMED'}</button><button type="button" class="eqb">${eq ? 'WIELDED' : 'WIELD'}</button><button type="button" class="del" aria-label="Delete">×</button>`;
     chip.querySelector('.load').addEventListener('click', () => { forge.spec = JSON.parse(JSON.stringify(w)); sfx('pickup'); render(); });
     chip.querySelector('.eqb').addEventListener('click', () => { forge.equipped[c] = i; persist(); sfx('rare'); forge.onEquip && forge.onEquip(w, c); render(); });
     chip.querySelector('.del').addEventListener('click', () => {

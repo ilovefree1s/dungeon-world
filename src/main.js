@@ -14,6 +14,7 @@ import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollDrop } from './loot.js';
 import { statsOf } from './weaponkit.js';
+import { Turntable } from './turntable.js';
 import { burst, ring, stepFx } from './fx.js';
 import { grassUniforms } from './flora.js';
 import { updateAmbience } from './ambience.js';
@@ -64,9 +65,15 @@ const abilities = new Abilities(ctx);
 const bodies = new Bodies(player);
 monsters.hooks.fallen = m => bodies.fall(m, rollDrop(m, player.cls));
 let lootBody = null;
+const lootView = new Turntable($('lootGl'));
 function openLoot(b) {
   lootBody = b; const d = bodies.describe(b.spec);
-  $('lootName').textContent = d.name; $('lootName').style.color = d.rare ? '#9fe0ff' : '';
+  // the rarity colors the name and the frame; the picture turns on its stand
+  $('lootT').textContent = d.rarity.id === 'common' ? 'IT DROPPED' : `A ${d.rarity.name} DROP`;
+  $('lootRarity').textContent = d.rarity.name; $('lootRarity').style.color = d.rarity.color;
+  $('lootName').textContent = d.name; $('lootName').style.color = d.rarity.color; $('lootName').style.textShadow = `0 5px 0 rgba(0,0,0,.55), 0 0 24px ${d.rarity.color}66`;
+  $('loot').querySelector('.panel').style.boxShadow = `inset 0 0 0 2px ${d.rarity.color}, 0 24px 60px rgba(0,0,0,.55), 0 0 40px ${d.rarity.color}44`;
+  $('loot').hidden = false; lootView.show(b.spec);
   $('lootLine').textContent = d.line;
   // each number beside what the hero of that class wields now (the plain weapon if nothing's forged): up in green, down in red
   const have = equippedSpec(d.cls), cur = have ? statsOf(have) : { dmg: 1, spd: 1, reach: 4.6, shot: 1 };
@@ -74,9 +81,9 @@ function openLoot(b) {
   $('lootStats').innerHTML = row('DAMAGE', d.stats.dmg, cur.dmg) + row('SPEED', d.stats.spd, cur.spd) + row('REACH', d.stats.reach, cur.reach, '') + (d.stats.cls !== 0 ? row('SHOT', d.stats.shot, cur.shot) : '')
     + `<div class="small" style="margin-top:6px">${have ? 'AGAINST ' + (have.name || 'YOUR FORGED WEAPON') : 'AGAINST THE PLAIN ONE'}</div>`;
   $('lootWield').textContent = d.cls === player.cls ? 'TAKE & WIELD' : `TAKE & WIELD (AS THE ${['WARRIOR', 'MAGE', 'HUNTER'][d.cls]})`;
-  unlockMouse(); UI.state = 'loot'; $('loot').hidden = false; sfx('rare');
+  unlockMouse(); UI.state = 'loot'; sfx(d.rarity.id === 'legendary' ? 'legend' : d.rarity.id === 'common' ? 'pickup' : 'rare');
 }
-function closeLoot() { UI.state = 'play'; $('loot').hidden = true; lootBody = null; }
+function closeLoot() { UI.state = 'play'; $('loot').hidden = true; lootBody = null; lootView.stop(); }
 $('lootWield').addEventListener('click', () => { if (!lootBody) return; takeLoot(lootBody.spec, true); bodies.took(lootBody); sfx('legend'); closeLoot(); });
 $('lootTake').addEventListener('click', () => { if (!lootBody) return; takeLoot(lootBody.spec, false); bodies.took(lootBody); sfx('pickup'); closeLoot(); });
 $('lootLeave').addEventListener('click', () => { sfx('nope'); closeLoot(); });
@@ -361,7 +368,7 @@ document.getElementById('boot')?.remove();
 
 // a hook for testing
 window.__dw = {
-  world, player, sky, UI, input, view, renderer, scene, THREE, monsters, bolts, hero: stats, abilities, forge,
+  world, player, sky, UI, input, view, renderer, scene, THREE, monsters, bolts, hero: stats, abilities, forge, bodies, openLoot, closeLoot,
   start(cls = 0) { pickHero(cls); },
   teleport(x, z) { player.place(x + 0.5, 90, z + 0.5); placed = false; },
   setQuality(q) { UI.autoQ = false; UI.quality = q; setQuality(q); },

@@ -187,16 +187,26 @@ export function nameOf(spec, rnd = Math.random) {
   const n = pick(NOUN[spec.type]);
   return rnd() < 0.5 ? `${ADJ[spec.material]} ${n}` : `${n} ${pick(EPITHET)}`;
 }
+// ---------------------------------------------------------------- rarity (of a dropped weapon; a forged one is common)
+export const RARITIES = [
+  { id: 'common', name: 'COMMON', color: '#d8d0c0', mult: 1 },
+  { id: 'uncommon', name: 'UNCOMMON', color: '#5ce65c', mult: 1.08 },
+  { id: 'rare', name: 'RARE', color: '#4aa8ff', mult: 1.18 },
+  { id: 'epic', name: 'EPIC', color: '#c070ff', mult: 1.32 },
+  { id: 'legendary', name: 'LEGENDARY', color: '#ffb020', mult: 1.5 },
+];
+export const rarityOf = spec => RARITIES.find(r => r.id === spec.rarity) || RARITIES[0];
 // ---------------------------------------------------------------- numbers
 // damage and speed as multipliers of the warrior's plain swing, reach in blocks
 export function statsOf(spec) {
   const t = TYPES.find(x => x.id === spec.type) || TYPES[0], m = MATERIALS.find(x => x.id === spec.material) || MATERIALS[0];
   const sm = canDraw(spec) && spec.shape ? shapeMass(spec.shape) : { mass: 1, len: 1 };
-  const dmg = t.dmg * m.dmg * (0.8 + spec.length * 0.2) * (0.85 + spec.width * 0.15) * (0.7 + 0.3 * sm.mass);
-  const spd = t.spd / (0.75 + spec.length * 0.15 + spec.width * 0.1) / (0.8 + 0.2 * sm.mass);
-  const reach = 4.6 * t.reach * (0.7 + spec.length * 0.3) * (0.6 + 0.4 * sm.len);
+  const rr = rarityOf(spec).mult;   // (a rarer drop hits harder, swings a little quicker, reaches a little farther)
+  const dmg = t.dmg * m.dmg * (0.8 + spec.length * 0.2) * (0.85 + spec.width * 0.15) * (0.7 + 0.3 * sm.mass) * rr;
+  const spd = t.spd / (0.75 + spec.length * 0.15 + spec.width * 0.1) / (0.8 + 0.2 * sm.mass) * (1 + (rr - 1) * 0.3);
+  const reach = 4.6 * t.reach * (0.7 + spec.length * 0.3) * (0.6 + 0.4 * sm.len) * (1 + (rr - 1) * 0.2);
   // (for staffs and bows the reach is how fast the shot flies)
-  const shot = t.reach * (0.8 + spec.length * 0.2);
+  const shot = t.reach * (0.8 + spec.length * 0.2) * (1 + (rr - 1) * 0.3);
   const aura = AURAS.find(a => a.id === spec.aura);
   return { dmg: +dmg.toFixed(2), spd: +spd.toFixed(2), reach: +reach.toFixed(1), shot: +shot.toFixed(2), glow: !!m.glow, cls: t.cls, color: aura && aura.color ? aura.color : ACCENTS[spec.accent % ACCENTS.length][0], aura: spec.aura || 'none' };
 }
