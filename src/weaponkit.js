@@ -19,7 +19,9 @@ function extrude(pts, depth, bevel = 0.012) {
 }
 // a ground blade: the outline lofted with a diamond cross-section, thick along the spine and
 // sharp at both edges (an extrusion would leave the edges flat, like a bar of metal)
-function bladeGeo(pts, thick) {
+// spine: thick down the middle (a sword). haft: thick along x = 0, where it meets the handle, and sharp at the
+// outer edge (an axe)
+function bladeGeo(pts, thick, mode = 'spine') {
   const n = pts.length, eps = 1e-4;
   // every height the outline has a corner at, plus enough in between to follow the curves
   const ys = [...new Set(pts.map(p => +p[1].toFixed(5)))].sort((a, b) => a - b);
@@ -41,7 +43,7 @@ function bladeGeo(pts, thick) {
   for (let k = 0; k < Y.length; k++) {
     const y = Y[k];
     const below = k === 0 ? null : span(y - eps), above = k === Y.length - 1 ? null : span(y + eps);
-    const put = sp => { const c = (sp[0] + sp[1]) / 2, w = (sp[1] - sp[0]) / 2, t = Math.min(thick / 2, w * 0.9); rings.push([[sp[0], y, 0], [c, y, t], [sp[1], y, 0], [c, y, -t]]); };
+    const put = sp => { const c = mode === 'haft' ? Math.max(sp[0], Math.min(sp[1], 0)) : (sp[0] + sp[1]) / 2, w = mode === 'haft' ? Math.max(sp[1] - c, c - sp[0]) : (sp[1] - sp[0]) / 2, t = Math.min(thick / 2, w * 0.9); rings.push([[sp[0], y, 0], [c, y, t], [sp[1], y, 0], [c, y, -t]]); };
     if (k === 0) put(above || [0, 0]); else if (k === Y.length - 1) put(below || [0, 0]);
     else { if (below) put(below); if (above && (!below || Math.abs(above[0] - below[0]) > 1e-3 || Math.abs(above[1] - below[1]) > 1e-3)) put(above); }
   }
@@ -256,7 +258,7 @@ export function buildForged(spec) {
     const haft = mesh(cyl(0.04, 0.045, hl, 10), haftMat); haft.position.y = y0 + hl / 2; g.add(haft);
     const sw = SHAPE_W[spec.type] * W, hh = SHAPE_L[spec.type] * L, base = y0 + hl * 0.55;
     const pts = fullOutline(spec.shape).map(([x, y]) => [x * sw, y * hh]), bx = outlineBox(pts);
-    const head = mesh(extrude(pts, spec.type === 'hammer' ? 0.22 * W : 0.06), metal); head.position.y = base; g.add(head);
+    const head = mesh(spec.type === 'axe' ? bladeGeo(pts, 0.1, 'haft') : extrude(pts, spec.type === 'hammer' ? 0.22 * W : 0.06), metal); head.position.y = base; g.add(head);
     const cap = mesh(cyl(0.055, 0.055, Math.max(0.1, (bx[3] - bx[2]) * 0.9), 10), iron); cap.position.y = base + (bx[2] + bx[3]) / 2; g.add(cap);
     g.userData.auraBox = [bx[0], bx[1], base + bx[2], base + bx[3], spec.type === 'hammer' ? -0.12 * W : -0.06, spec.type === 'hammer' ? 0.12 * W : 0.06];
     g.userData.tipY = Math.max(y0 + hl, base + bx[3]);
@@ -266,7 +268,7 @@ export function buildForged(spec) {
     const head = (s) => { const pts = spec.head === 'bearded' ? [[0, hh * 0.3], [hw * 0.35, hh * 0.5], [hw, hh * 0.6], [hw * 1.05, -hh * 0.5], [hw * 0.5, -hh * 0.75], [hw * 0.2, -hh * 0.2], [0, -hh * 0.3]]
       : spec.head === 'crescent' ? [[0, hh * 0.35], [hw * 0.6, hh * 0.7], [hw * 1.1, 0], [hw * 0.6, -hh * 0.7], [0, -hh * 0.35], [hw * 0.45, 0]]
       : [[0, hh * 0.4], [hw * 0.5, hh * 0.55], [hw, hh * 0.3], [hw * 1.05, -hh * 0.4], [hw * 0.5, -hh * 0.55], [0, -hh * 0.4]];
-      const m = mesh(extrude(pts, 0.05), metal); m.position.y = hy; m.scale.x = s; return m; };
+      const m = mesh(bladeGeo(pts, 0.1, 'haft'), metal); m.position.y = hy; m.scale.x = s; return m; };
     g.add(head(1)); if (spec.head === 'double') g.add(head(-1));
     g.userData.auraBox = [spec.head === 'double' ? -hw * 1.05 : 0.08, hw * 1.05, hy - hh * 0.7, hy + hh * 0.7, -0.06, 0.06];
     const cap = mesh(cyl(0.055, 0.055, hh * 0.9, 10), iron); cap.position.y = hy; g.add(cap);
