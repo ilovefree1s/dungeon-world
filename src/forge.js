@@ -173,7 +173,7 @@ function wire() {
   $('fWid').addEventListener('input', e => { forge.spec.width = +e.target.value; rebuild(); });
   // (each slider shows its number, so a setting can be read off and told to someone)
   for (const id of ['fPow', 'fSize', 'fLen', 'fWid', 'fHilt', 'fGuardSize', 'fPommelSize']) {
-    const el = $(id), out = document.createElement('b'); out.className = 'sval'; el.after(out);
+    const el = $(id), out = document.createElement('b'); out.className = 'sval'; el.parentElement.querySelector('span').appendChild(out);
     const show = () => { out.textContent = (+el.value).toFixed(2); };
     el.addEventListener('input', show); el.addEventListener('change', show); el.__show = show; show();
   }
