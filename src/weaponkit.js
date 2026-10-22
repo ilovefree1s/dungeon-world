@@ -151,6 +151,9 @@ export const AURAS = [
   { id: 'water', name: 'WATER', color: '#4aa8ff' },
   { id: 'wind', name: 'WIND', color: '#d8f0e8' },
   { id: 'frost', name: 'FROST', color: '#bfe8ff' },
+  { id: 'rime', name: 'RIME', color: '#dff4ff' },
+  { id: 'blizzard', name: 'BLIZZARD', color: '#eaf6ff' },
+  { id: 'shards', name: 'SHARDS', color: '#cfe8ff' },
   { id: 'shadow', name: 'SHADOW', color: '#7a3cff' },
   { id: 'holy', name: 'HOLY', color: '#ffe08a' },
 ];

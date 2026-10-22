@@ -523,6 +523,97 @@ const BUILD = {
       G.flush();
     };
   },
+  // ---------------------------------------------------------------- FROST, three more ways
+  // RIME: the blade ices over: icicles growing out from its edges (now and then one snaps off and falls), cold vapor sinking off it
+  rime(g, bx, power, { span, wide, cx, cz }) {
+    const [x0, x1, y0, y1, z0, z1] = bx, N = Math.round(10 + span * 24 * Math.min(1.5, power));
+    const geo = new THREE.ConeGeometry(0.035, 1, 5); geo.translate(0, 0.5, 0); geo.rotateZ(-Math.PI / 2);   // a spike along +x from its base
+    const ice = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: '#dff4ff', emissive: '#6ab8ff', emissiveIntensity: 0.25, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.9 }), N);
+    ice.frustumCulled = false; g.add(ice);
+    const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), E = new THREE.Euler();
+    const sp = [];
+    const seed = c => { c.side = rnd() < 0.5 ? -1 : 1; c.y = y0 + rnd() * span; c.z = z0 + rnd() * (z1 - z0); c.len = (0.08 + rnd() * 0.16) * (0.7 + 0.3 * power); c.tilt = (rnd() - 0.5) * 0.9; c.roll = rnd() * 6.28; c.max = 2 + rnd() * 3; c.life = 0; c.fall = 0; c.vy = 0; };
+    for (let i = 0; i < N; i++) { const c = {}; seed(c); c.life = rnd() * c.max; sp.push(c); }
+    const vapor = cloud(g, Math.round(26 * power), { size: 0.09, tex: softTex(), colors: ['#dff4ff', '#8ac4ff'] });
+    const spawnV = i => { inBox(vapor, i, bx); vapor.max[i] = 0.8 + rnd() * 1; vapor.life[i] = 0; vapor.ph[i] = rnd() * 6.28; };
+    for (let i = 0; i < vapor.N; i++) { spawnV(i); vapor.life[i] = rnd() * vapor.max[i]; }
+    const bm = g.userData.bladeMat, e0 = bm && bm.emissive ? bm.emissive.clone() : null, i0 = bm ? bm.emissiveIntensity || 0 : 0;
+    return (t, dt, up) => {
+      if (e0) { bm.emissive.copy(e0).lerp(new THREE.Color('#9fd4ff'), 0.35 * Math.min(1, power)); bm.emissiveIntensity = Math.max(i0, 0.18 * Math.min(1, power)); }
+      for (let i = 0; i < N; i++) {
+        const c = sp[i]; c.life += dt;
+        if (c.fall) { c.vy -= 4 * dt; c.y += c.vy * dt * up.y; c.z -= c.vy * dt * up.z * 0; if (c.life > c.max + 0.8) seed(c); }
+        else if (c.life >= c.max) { if (rnd() < 0.5) { c.fall = 1; c.life = c.max; } else seed(c); }
+        const k = Math.min(1, c.life / c.max);
+        const grow = c.fall ? 1 : k < 0.3 ? k / 0.3 : 1;
+        const x = c.side < 0 ? x0 : x1;
+        E.set(c.roll, c.side < 0 ? Math.PI : 0, c.tilt); Q.setFromEuler(E); P.set(x + (c.fall ? c.side * 0.03 : 0), c.y, c.z); S.set(c.len * grow, 1, 1);
+        M.compose(P, Q, S); ice.setMatrixAt(i, M);
+      }
+      ice.instanceMatrix.needsUpdate = true;
+      const V = vapor;
+      for (let i = 0; i < V.N; i++) {
+        V.life[i] += dt; if (V.life[i] >= V.max[i]) spawnV(i);
+        const k = V.life[i] / V.max[i], o = i * 3;
+        V.pos[o] += (Math.sin(t * 1.5 + V.ph[i]) * 0.08 - up.x * 0.18 * k) * dt; V.pos[o + 1] += (-up.y * 0.18 * k) * dt; V.pos[o + 2] += (Math.cos(t * 1.5 + V.ph[i]) * 0.08 - up.z * 0.18 * k) * dt;
+        V.paint(i, k, Math.sin(k * Math.PI) * 0.45);
+      }
+      V.flush();
+    };
+  },
+  // BLIZZARD: snow whipping round the blade in a cold whirl, thick with flakes, glinting
+  blizzard(g, bx, power, { span, wide, cx, cz }) {
+    const [x0, x1, y0, y1, z0, z1] = bx, N = Math.round((80 + span * 120) * Math.min(2, power));
+    const P = pointCloud(g, N, softTex()), ang = new Float32Array(N), rad = new Float32Array(N), y = new Float32Array(N), w = new Float32Array(N), ph = new Float32Array(N), big = new Float32Array(N);
+    const r0 = wide / 2 + 0.05;
+    for (let i = 0; i < N; i++) { ang[i] = rnd() * 6.28; rad[i] = r0 + rnd() * rnd() * 0.5; y[i] = y0 - 0.1 + rnd() * (span + 0.2); w[i] = (2 + rnd() * 4) * (rnd() < 0.5 ? 1 : -1); ph[i] = rnd() * 6.28; big[i] = rnd() < 0.15 ? 1 : 0; }
+    const glints = cloud(g, Math.round(8 * power) + 2, { size: 0.12, tex: glintTex(), colors: ['#ffffff', '#ffffff'] });
+    for (let i = 0; i < glints.N; i++) { inBox(glints, i, bx); glints.ph[i] = rnd() * 6.28; glints.max[i] = 0.5 + rnd(); }
+    const c = new THREE.Color(), white = new THREE.Color('#ffffff'), blue = new THREE.Color('#9fd0ff');
+    return (t, dt, up) => {
+      for (let i = 0; i < N; i++) {
+        const o = i * 3;
+        ang[i] += w[i] * dt; y[i] += (Math.sin(t * 1.7 + ph[i]) * 0.3 - up.y * 0.15) * dt; if (y[i] < y0 - 0.15) y[i] = y1 + 0.15; if (y[i] > y1 + 0.2) y[i] = y0 - 0.1;
+        const r = rad[i] + 0.06 * Math.sin(t * 3 + ph[i]);
+        P.pos[o] = cx + Math.cos(ang[i]) * r; P.pos[o + 1] = y[i]; P.pos[o + 2] = cz + Math.sin(ang[i]) * r;
+        P.size[i] = big[i] ? 0.06 : 0.025 + 0.01 * Math.sin(t * 5 + ph[i]);
+        c.copy(white).lerp(blue, big[i] ? 0.1 : 0.5); P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b;
+        P.alpha[i] = (0.4 + 0.4 * Math.sin(ang[i] * 3 + ph[i])) * (0.5 + 0.5 * Math.min(1, power)); P.rot[i] = 0;
+      }
+      P.flush();
+      const G = glints;
+      for (let i = 0; i < G.N; i++) { const k = (t * G.max[i] + G.ph[i]) % 1; G.paint(i, 0, Math.max(0, Math.sin(k * Math.PI) ** 6)); }
+      G.flush();
+    };
+  },
+  // SHARDS: a ring of long ice shards floating round the blade, turning slowly and tumbling, in a cold mist
+  shards(g, bx, power, { span, wide, cx, cz }) {
+    const [x0, x1, y0, y1, z0, z1] = bx, N = Math.round(6 + power * 6);
+    const geo = new THREE.OctahedronGeometry(0.05, 0); geo.scale(0.6, 3.2, 0.6);
+    const ice = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: '#e6f6ff', emissive: '#5aaaff', emissiveIntensity: 0.4, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.85, flatShading: true }), N);
+    ice.frustumCulled = false; g.add(ice);
+    const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), E = new THREE.Euler();
+    const sh = [];
+    for (let i = 0; i < N; i++) sh.push({ a: i / N * 6.28, r: wide / 2 + 0.16 + rnd() * 0.12, y: y0 + rnd() * span, s: 0.6 + rnd() * 0.8, tx: rnd() * 6.28, tz: rnd() * 6.28, wx: (rnd() - 0.5) * 1.5, wz: (rnd() - 0.5) * 1.5, bob: rnd() * 6.28 });
+    const mistU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 0.3 }, uAsp: { value: 1 }, uFlash: { value: 0.08 } };
+    const mist = new THREE.Mesh(crossedPlanes(bx, 0.08, 0.16), sheet(HAZE_FS, mistU)); mist.frustumCulled = false; g.add(mist);
+    const snow = cloud(g, Math.round(20 * power), { size: 0.04, tex: softTex(), colors: ['#ffffff', '#bfe8ff'] });
+    const spawnS = i => { inBox(snow, i, [x0 - 0.2, x1 + 0.2, y0, y1 + 0.1, z0 - 0.2, z1 + 0.2]); snow.max[i] = 1 + rnd() * 1.2; snow.life[i] = 0; snow.ph[i] = rnd() * 6.28; };
+    for (let i = 0; i < snow.N; i++) { spawnS(i); snow.life[i] = rnd() * snow.max[i]; }
+    return (t, dt, up) => {
+      mistU.uT.value = t * 0.3;
+      const turn = t * 0.5 * (0.5 + 0.5 * Math.min(1, power));
+      for (let i = 0; i < N; i++) {
+        const c = sh[i], a = c.a + turn;
+        E.set(c.tx + t * c.wx, a, c.tz + t * c.wz); Q.setFromEuler(E); P.set(cx + Math.cos(a) * c.r, c.y + Math.sin(t * 1.3 + c.bob) * 0.04, cz + Math.sin(a) * c.r); S.setScalar(c.s);
+        M.compose(P, Q, S); ice.setMatrixAt(i, M);
+      }
+      ice.instanceMatrix.needsUpdate = true;
+      const SN = snow;
+      for (let i = 0; i < SN.N; i++) { SN.life[i] += dt; if (SN.life[i] >= SN.max[i]) spawnS(i); const k = SN.life[i] / SN.max[i], o = i * 3; SN.pos[o] += (Math.sin(t * 2 + SN.ph[i]) * 0.1 - up.x * 0.2) * dt; SN.pos[o + 1] += (-up.y * 0.2) * dt; SN.pos[o + 2] += (Math.cos(t * 2 + SN.ph[i]) * 0.1 - up.z * 0.2) * dt; SN.paint(i, k, Math.sin(k * Math.PI) * 0.8); }
+      SN.flush();
+    };
+  },
   // ---------------------------------------------------------------- SHADOW
   shadow(g, bx, power, { span, wide, cx, cz }) {
     const [x0, x1, y0, y1, z0, z1] = bx;
