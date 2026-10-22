@@ -288,7 +288,7 @@ const BUILD = {
   lightning(g, bx, power, { span, wide, cx, cz }) {
     // thin bolts that strike: each one races from its start to its end in a few hundredths of a second
     // (the forks lighting as the leader passes their joint), holds a beat flickering, then is gone; a pause, the next
-    const bolts = makeBolts(g, Math.max(1, Math.round(1 + power * 1.2)), 0.7 * Math.min(1, Math.max(0.3, span / 1.1)));
+    const bolts = makeBolts(g, 2, 0.7 * Math.min(1, Math.max(0.3, span / 1.1)));   // (room for one bolt and its mirror)
     const hazeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: 1 }, uFlash: { value: 0 } };
     const haze = new THREE.Mesh(crossedPlanes(bx, 0.1, 0.1 + 0.08 * power), sheet(HAZE_FS, hazeU)); haze.frustumCulled = false; g.add(haze);
     const sparks = cloud(g, Math.round(9 * power), { size: 0.035 + 0.02 * Math.min(1, span), tex: glintTex(), colors: ['#ffffff', '#8ab8ff'] });
@@ -315,15 +315,18 @@ const BUILD = {
           // the leader: which step are we on
           const si = Math.min(S.steps.length - 1, Math.floor(S.age / LEADER * S.steps.length));
           const upto = Math.max(1, Math.round(S.steps[si] * n));
-          lines.push({ pts: S.main.slice(0, upto + 1), ws: S.ws.map(w => w * 0.5) });
+          const wl = S.ws.map(w => w * 0.5);
+          lines.push({ pts: S.main.slice(0, upto + 1), ws: wl }, { pts: S.mainB.slice(0, upto + 1), ws: wl });
           for (const f of S.forks) if (f.at <= upto - 1) lines.push({ pts: f.pts, w: 0.3 });
+          for (const f of S.forksB) if (f.at <= upto - 1) lines.push({ pts: f.pts, w: 0.3 });
           bright = 0.35 + rnd() * 0.1;
         } else {
           const a = S.age - LEADER;
           if (a > STROKE + TAIL) { strike = null; wait = 0.6 + rnd() * 1.2; }
           else {
-            lines.push({ pts: S.main, ws: S.ws });
+            lines.push({ pts: S.main, ws: S.ws }, { pts: S.mainB, ws: S.ws });
             for (const f of S.forks) lines.push({ pts: f.pts, w: 0.6 });
+            for (const f of S.forksB) lines.push({ pts: f.pts, w: 0.6 });
             if (a < STROKE) { bright = 1.4; flash = 1; }
             else {
               let b = Math.exp(-(a - STROKE) * 9) * 0.9;
@@ -667,25 +670,27 @@ function makeBolts(g, n, sc = 1) {
 // and its forks, each noting which joint it leaves from
 function genBolt(bx, power) {
   const SEG = 9, [x0, x1, y0, y1, z0, z1] = bx, wx = x1 - x0, wz = z1 - z0, span = y1 - y0;
-  const main = [];
+  // (the bolt lies on one face of the blade, a hair off it, and is mirrored onto the other face so it reads the
+  // same from either side instead of passing through the steel)
+  const main = [], zc = (z0 + z1) / 2, zf = zc + wz / 2 + 0.025;
   const ya = y0 + rnd() * span * 0.4, yb = Math.min(y1 + 0.08, ya + span * (0.35 + rnd() * 0.6));
   const arcAt = rnd() < 0.6 ? 2 + Math.floor(rnd() * 5) : -1, arcDir = rnd() < 0.5 ? -1 : 1, arcR = 0.14 + rnd() * 0.24 * (0.5 + power * 0.5);
   for (let i = 0; i <= SEG; i++) {
     const t = i / SEG;
-    let x = x0 + rnd() * wx, z = z0 + rnd() * wz;
-    if (rnd() < 0.5) x = (rnd() < 0.5 ? x0 - 0.02 : x1 + 0.02); else z = (rnd() < 0.5 ? z0 - 0.02 : z1 + 0.02);
-    if (arcAt >= 0 && Math.abs(i - arcAt) <= 1) { const k = 1 - Math.abs(i - arcAt) * 0.5; x += arcDir * arcR * k; z += (rnd() - 0.5) * 0.12 * k; }
+    let x = x0 - 0.02 + rnd() * (wx + 0.04), z = zf + (rnd() - 0.5) * 0.02;
+    if (arcAt >= 0 && Math.abs(i - arcAt) <= 1) { const k = 1 - Math.abs(i - arcAt) * 0.5; x += arcDir * arcR * k; }
     main.push(new THREE.Vector3(x, ya + (yb - ya) * t, z));
   }
   const forks = [], nf = 1 + Math.floor(rnd() * 3);
   for (let f = 0; f < nf; f++) {
     const j = 1 + Math.floor(rnd() * (SEG - 1)); let a = main[j].clone(); const pts = [a];
-    const dx = (rnd() - 0.5) * 0.5, dz = (rnd() - 0.5) * 0.5, dy = (rnd() - 0.3) * 0.3, len = 2 + Math.floor(rnd() * 2);
-    for (let s = 0; s < len; s++) { a = new THREE.Vector3(a.x + dx * (0.4 + rnd() * 0.6) * 0.5, a.y + dy * 0.5 + (rnd() - 0.5) * 0.08, a.z + dz * (0.4 + rnd() * 0.6) * 0.5); pts.push(a); }
+    const dx = (rnd() - 0.5) * 0.5, dy = (rnd() - 0.3) * 0.3, len = 2 + Math.floor(rnd() * 2);
+    for (let s = 0; s < len; s++) { a = new THREE.Vector3(a.x + dx * (0.4 + rnd() * 0.6) * 0.5, a.y + dy * 0.5 + (rnd() - 0.5) * 0.08, a.z + (rnd() - 0.5) * 0.01); pts.push(a); }
     forks.push({ at: j, pts });
   }
   const ws = []; for (let i = 0; i < SEG; i++) ws.push(1.1 - 0.65 * (i / (SEG - 1)));
-  return { main, forks, ws };
+  const flip = pts => pts.map(p => new THREE.Vector3(p.x, p.y, 2 * zc - p.z));
+  return { main, forks, ws, mainB: flip(main), forksB: forks.map(f => ({ at: f.at, pts: flip(f.pts) })) };
 }
 // a point on the surface of the box (the head's skin, not its inside)
 function onSkin(bx, t) {
