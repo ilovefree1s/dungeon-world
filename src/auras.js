@@ -288,7 +288,7 @@ const BUILD = {
   lightning(g, bx, power, { span, wide, cx, cz }) {
     // thin bolts that strike: each one races from its start to its end in a few hundredths of a second
     // (the forks lighting as the leader passes their joint), holds a beat flickering, then is gone; a pause, the next
-    const bolts = makeBolts(g, 2, 0.7 * Math.min(1, Math.max(0.3, span / 1.1)));   // (room for one bolt and its mirror)
+    const bolts = makeBolts(g, 1, 0.7 * Math.min(1, Math.max(0.3, span / 1.1)), true);   // (one strike at a time, drawn over the steel)
     const hazeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: 1 }, uFlash: { value: 0 } };
     const haze = new THREE.Mesh(crossedPlanes(bx, 0.1, 0.1 + 0.08 * power), sheet(HAZE_FS, hazeU)); haze.frustumCulled = false; g.add(haze);
     const sparks = cloud(g, Math.round(9 * power), { size: 0.035 + 0.02 * Math.min(1, span), tex: glintTex(), colors: ['#ffffff', '#8ab8ff'] });
@@ -316,17 +316,15 @@ const BUILD = {
           const si = Math.min(S.steps.length - 1, Math.floor(S.age / LEADER * S.steps.length));
           const upto = Math.max(1, Math.round(S.steps[si] * n));
           const wl = S.ws.map(w => w * 0.5);
-          lines.push({ pts: S.main.slice(0, upto + 1), ws: wl }, { pts: S.mainB.slice(0, upto + 1), ws: wl });
+          lines.push({ pts: S.main.slice(0, upto + 1), ws: wl });
           for (const f of S.forks) if (f.at <= upto - 1) lines.push({ pts: f.pts, w: 0.3 });
-          for (const f of S.forksB) if (f.at <= upto - 1) lines.push({ pts: f.pts, w: 0.3 });
           bright = 0.35 + rnd() * 0.1;
         } else {
           const a = S.age - LEADER;
           if (a > STROKE + TAIL) { strike = null; wait = 0.6 + rnd() * 1.2; }
           else {
-            lines.push({ pts: S.main, ws: S.ws }, { pts: S.mainB, ws: S.ws });
+            lines.push({ pts: S.main, ws: S.ws });
             for (const f of S.forks) lines.push({ pts: f.pts, w: 0.6 });
-            for (const f of S.forksB) lines.push({ pts: f.pts, w: 0.6 });
             if (a < STROKE) { bright = 1.4; flash = 1; }
             else {
               let b = Math.exp(-(a - STROKE) * 9) * 0.9;
@@ -601,14 +599,15 @@ const BUILD = {
 // ---------------------------------------------------------------- bolts
 // n jagged paths of up to 9 segments plus forks branching off them; each segment two crossed quads;
 // a thin hot core, a violet glow around it
-function makeBolts(g, n, sc = 1) {
+function makeBolts(g, n, sc = 1, overSteel = false) {
   const SEG = 9, FORK = 4, Q = n * (SEG + FORK * 3) * 2;   // (quads: two per segment, one for each crossed strip)
   const make = (w, color, opacity) => {
     const geo = new THREE.BufferGeometry();
     const pos = new Float32Array(Q * 4 * 3), idx = new Uint16Array(Q * 6);
     for (let q = 0; q < Q; q++) { const v = q * 4, o = q * 6; idx[o] = v; idx[o + 1] = v + 1; idx[o + 2] = v + 2; idx[o + 3] = v; idx[o + 4] = v + 2; idx[o + 5] = v + 3; }
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(new THREE.BufferAttribute(idx, 1));
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: !overSteel, side: THREE.DoubleSide }));
+    if (overSteel) m.renderOrder = 5;
     m.frustumCulled = false; g.add(m);
     return { m, pos, w };
   };
@@ -670,9 +669,9 @@ function makeBolts(g, n, sc = 1) {
 // and its forks, each noting which joint it leaves from
 function genBolt(bx, power) {
   const SEG = 9, [x0, x1, y0, y1, z0, z1] = bx, wx = x1 - x0, wz = z1 - z0, span = y1 - y0;
-  // (the bolt lies on one face of the blade, a hair off it, and is mirrored onto the other face so it reads the
-  // same from either side instead of passing through the steel)
-  const main = [], zc = (z0 + z1) / 2, zf = zc + wz / 2 + 0.025;
+  // (the bolt runs in the blade's middle plane and is drawn over the steel, never hidden by it, so one channel
+  // reads the same from either side and edge-on)
+  const main = [], zc = (z0 + z1) / 2, zf = zc;
   const ya = y0 + rnd() * span * 0.4, yb = Math.min(y1 + 0.08, ya + span * (0.35 + rnd() * 0.6));
   const arcAt = rnd() < 0.6 ? 2 + Math.floor(rnd() * 5) : -1, arcDir = rnd() < 0.5 ? -1 : 1, arcR = 0.14 + rnd() * 0.24 * (0.5 + power * 0.5);
   for (let i = 0; i <= SEG; i++) {
@@ -689,8 +688,7 @@ function genBolt(bx, power) {
     forks.push({ at: j, pts });
   }
   const ws = []; for (let i = 0; i < SEG; i++) ws.push(1.1 - 0.65 * (i / (SEG - 1)));
-  const flip = pts => pts.map(p => new THREE.Vector3(p.x, p.y, 2 * zc - p.z));
-  return { main, forks, ws, mainB: flip(main), forksB: forks.map(f => ({ at: f.at, pts: flip(f.pts) })) };
+  return { main, forks, ws };
 }
 // a point on the surface of the box (the head's skin, not its inside)
 function onSkin(bx, t) {
