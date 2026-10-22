@@ -147,6 +147,7 @@ export const POMMELS = ['none', 'ball', 'disc', 'spike', 'gem', 'ring'];
 export const AURAS = [
   { id: 'none', name: 'NONE' },
   { id: 'flame', name: 'FLAME', color: '#ff8a2a' },
+  { id: 'flame2', name: 'FLAME 2', color: '#ff8a2a' },
   { id: 'lightning', name: 'BOLTS', color: '#9fe0ff' },
   { id: 'arcs', name: 'ARCS', color: '#b8d8ff' },
   { id: 'plasma', name: 'PLASMA', color: '#6ae0ff' },
