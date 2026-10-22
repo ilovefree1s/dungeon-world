@@ -288,54 +288,54 @@ const BUILD = {
   lightning(g, bx, power, { span, wide, cx, cz }) {
     // thin bolts that strike: each one races from its start to its end in a few hundredths of a second
     // (the forks lighting as the leader passes their joint), holds a beat flickering, then is gone; a pause, the next
-    const bolts = makeBolts(g, 2, 0.7 * Math.min(1, Math.max(0.3, span / 1.1)) * (power > 1 ? 1 + (power - 1) * 0.15 : 0.6 + 0.4 * power), true);   // (one strike at a time, drawn over the steel; thin as before at 1, only a touch fatter above)
-    const hazeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: Math.min(1, power) * 0.35 }, uAsp: { value: 1 }, uFlash: { value: 0 } };
+    // power doesn't change a bolt's look: it brings more of them, and sooner. above 1, extra strikes run at once
+    const slots = Math.max(1, Math.round(1 + Math.max(0, power - 1) * 1.5));
+    const bolts = makeBolts(g, slots + 1, 0.7 * Math.min(1, Math.max(0.3, span / 1.1)), true);   // (drawn over the steel)
+    const hazeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: 0.35 }, uAsp: { value: 1 }, uFlash: { value: 0 } };
     const haze = new THREE.Mesh(crossedPlanes(bx, 0.06, 0.05), sheet(HAZE_FS, hazeU)); haze.frustumCulled = false; g.add(haze);
     const sparks = cloud(g, Math.round(9 * power), { size: 0.035 + 0.02 * Math.min(1, span), tex: glintTex(), colors: ['#ffffff', '#8ab8ff'] });
     const spawn = i => { inBox(sparks, i, bx); sparks.max[i] = 0.15 + rnd() * 0.25; sparks.life[i] = 0; jitter(sparks, i, 2.6); };
     for (let i = 0; i < sparks.N; i++) { spawn(i); sparks.life[i] = rnd() * sparks.max[i]; }
     // a strike, like the real thing: a stepped leader creeps along in jerks, dim and thin; when it reaches the end the
     // return stroke lights the whole channel at once, brightest of all; then a couple of dimmer re-strikes flicker
-    // down the same channel before it goes dark; and a long dark gap before the next one
+    // down the same channel before it goes dark; and a dark gap before the next one (shorter the more power)
     const LEADER = 0.22, STROKE = 0.06, TAIL = 0.3;
-    let wait = 0.4, strike = null, flash = 0;
+    const gap = () => (0.6 + rnd() * 1.2) / (0.5 + 0.5 * Math.min(power, 1)) / (power > 1 ? 1 + (power - 1) * 0.5 : 1);
+    const lanes = []; for (let i = 0; i < slots; i++) lanes.push({ strike: null, wait: 0.3 + i * 0.5 + rnd() * 0.5 });
+    let flash = 0;
     const lines = [];
     return (t, dt) => {
       hazeU.uT.value = t;
-      if (!strike && (wait -= dt) <= 0) {
-        strike = { ...genBolt(bx, power, Math.round(power * 1.5)), age: 0, steps: [], restrikes: [0.08 + rnd() * 0.08, 0.17 + rnd() * 0.1], stepHold: 0, stepAt: 0 };
-        // the leader's jerks: a random schedule of how far along it is at each moment
-        let k = 0; while (k < 1) { k = Math.min(1, k + 0.08 + rnd() * 0.22); strike.steps.push(k); }
-      }
       lines.length = 0; let bright = 0;
-      if (strike) {
-        const S = strike; S.age += dt;
+      for (const lane of lanes) {
+        if (!lane.strike && (lane.wait -= dt) <= 0) {
+          lane.strike = { ...genBolt(bx, power), age: 0, steps: [], restrikes: [0.08 + rnd() * 0.08, 0.17 + rnd() * 0.1] };
+          let k = 0; while (k < 1) { k = Math.min(1, k + 0.08 + rnd() * 0.22); lane.strike.steps.push(k); }
+        }
+        const S = lane.strike; if (!S) continue;
+        S.age += dt;
         const n = S.main.length - 1;
         if (S.age < LEADER) {
-          // the leader: which step are we on
           const si = Math.min(S.steps.length - 1, Math.floor(S.age / LEADER * S.steps.length));
           const upto = Math.max(1, Math.round(S.steps[si] * n));
-          const wl = S.ws.map(w => w * 0.5);
-          lines.push({ pts: S.main.slice(0, upto + 1), ws: wl });
+          lines.push({ pts: S.main.slice(0, upto + 1), ws: S.ws.map(w => w * 0.5) });
           for (const f of S.forks) if (f.at <= upto - 1) lines.push({ pts: f.pts, w: 0.3 });
-          bright = 0.35 + rnd() * 0.1;
+          bright = Math.max(bright, 0.35 + rnd() * 0.1);
         } else {
           const a = S.age - LEADER;
-          if (a > STROKE + TAIL) { strike = null; wait = (0.6 + rnd() * 1.2) / (0.4 + 0.6 * power); }
+          if (a > STROKE + TAIL) { lane.strike = null; lane.wait = gap(); continue; }
+          lines.push({ pts: S.main, ws: S.ws });
+          for (const f of S.forks) lines.push({ pts: f.pts, w: 0.6 });
+          if (a < STROKE) { bright = Math.max(bright, 1.4); flash = 1; }
           else {
-            lines.push({ pts: S.main, ws: S.ws });
-            for (const f of S.forks) lines.push({ pts: f.pts, w: 0.6 });
-            if (a < STROKE) { bright = 1.4; flash = 1; }
-            else {
-              let b = Math.exp(-(a - STROKE) * 9) * 0.9;
-              for (const r of S.restrikes) { const d = a - STROKE - r; if (d >= 0 && d < 0.04) b = Math.max(b, 0.8); }
-              bright = b;
-            }
+            let b = Math.exp(-(a - STROKE) * 9) * 0.9;
+            for (const r of S.restrikes) { const d = a - STROKE - r; if (d >= 0 && d < 0.04) b = Math.max(b, 0.8); }
+            bright = Math.max(bright, b);
           }
         }
       }
       bolts.drawLines(lines, bright);
-      flash = Math.max(0, flash - dt * 5); hazeU.uFlash.value = Math.max(flash, bright * 0.5) * Math.min(1.5, power);
+      flash = Math.max(0, flash - dt * 5); hazeU.uFlash.value = Math.max(flash, bright * 0.5);
       const S = sparks;
       for (let i = 0; i < S.N; i++) {
         S.life[i] += dt; if (S.life[i] >= S.max[i]) spawn(i);
