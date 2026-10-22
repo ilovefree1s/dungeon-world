@@ -232,8 +232,8 @@ export function buildForged(spec) {
   else if (bladed) {
     const gw = 0.36 * W * GS * (spec.type === 'dagger' ? 0.7 : spec.type === 'greatsword' ? 1.3 : 1);
     if (gd === 'bar') { const b = mesh(box(gw, 0.06, 0.08), iron); b.position.y = top + 0.02; g.add(b); }
-    else if (gd === 'cross') { const b = mesh(box(gw * 1.15, 0.07, 0.07), iron); b.position.y = top + 0.02; g.add(b); for (const s of [-1, 1]) { const e = mesh(sph(0.05, 8, 6), iron); e.position.set(s * gw * 0.57, top + 0.02, 0); g.add(e); } const c = mesh(sph(0.05, 10, 8), gem); c.position.set(0, top + 0.02, 0.05); c.scale.z = 0.6; g.add(c); }
-    else if (gd === 'wings') { for (const s of [-1, 1]) { const w = mesh(extrude([[0, 0], [gw * 0.6, 0.12], [gw * 0.7, 0.3], [gw * 0.35, 0.08], [0.04, 0.1]], 0.05), iron); w.position.set(0, top - 0.02, 0); w.scale.x = s; g.add(w); } const c = mesh(sph(0.045, 10, 8), gem); c.position.set(0, top + 0.03, 0.04); g.add(c); }
+    else if (gd === 'cross') { const b = mesh(box(gw * 1.15, 0.07, 0.07), iron); b.position.y = top + 0.02; g.add(b); for (const s of [-1, 1]) { const e = mesh(sph(0.05, 8, 6), iron); e.position.set(s * gw * 0.57, top + 0.02, 0); g.add(e); } for (const z of [-1, 1]) { const c = mesh(sph(0.05, 10, 8), gem); c.position.set(0, top + 0.02, z * 0.05); c.scale.z = 0.6; g.add(c); } }
+    else if (gd === 'wings') { for (const s of [-1, 1]) { const w = mesh(extrude([[0, 0], [gw * 0.6, 0.12], [gw * 0.7, 0.3], [gw * 0.35, 0.08], [0.04, 0.1]], 0.05), iron); w.position.set(0, top - 0.02, 0); w.scale.x = s; g.add(w); } for (const z of [-1, 1]) { const c = mesh(sph(0.045, 10, 8), gem); c.position.set(0, top + 0.03, z * 0.04); g.add(c); } }
     else if (gd === 'ring') { const r = mesh(new THREE.TorusGeometry(gw * 0.4, 0.025, 8, 24), iron); r.position.y = top + 0.02; r.rotation.x = Math.PI / 2; g.add(r); const b = mesh(box(gw * 0.9, 0.05, 0.06), iron); b.position.y = top + 0.02; g.add(b); }
     else if (gd === 'upswept') { for (const s of [-1, 1]) { const a = mesh(cyl(0.025, 0.04, gw * 0.7, 8), iron); a.position.set(s * gw * 0.3, top + 0.12, 0); a.rotation.z = s * 1.1; g.add(a); const tip = mesh(sph(0.035, 8, 6), gem); tip.position.set(s * gw * 0.58, top + 0.25, 0); g.add(tip); } }
     const collar = mesh(cyl(0.06, 0.055, 0.05, 12), iron); collar.position.y = top; g.add(collar);
@@ -291,7 +291,7 @@ export function buildForged(spec) {
     g.userData.auraBox = [-hw * 0.6, hw * 0.6, hy - hh * 0.7, hy + hh * (spec.head === 'anvil' ? 1.4 : 0.7), -hh * 0.7, hh * 0.7];
     if (spec.head === 'spiked') for (const s of [-1, 1]) { const sp = mesh(new THREE.ConeGeometry(hh * 0.4, hh * 0.9, 8), iron); sp.position.set(s * (hw / 2 + hh * 0.4), hy, 0); sp.rotation.z = -s * Math.PI / 2; g.add(sp); }
     for (const s of [-1, 1]) { const band = mesh(box(0.03, hh * 1.3, hh * 1.3), iron); band.position.set(s * hw * 0.3, hy, 0); g.add(band); }
-    const j = mesh(sph(0.045, 10, 8), gem); j.position.set(0, hy, hh * 0.65); j.scale.z = 0.5; g.add(j);
+    for (const z of [-1, 1]) { const j = mesh(sph(0.045, 10, 8), gem); j.position.set(0, hy, z * hh * 0.65); j.scale.z = 0.5; g.add(j); }
     g.userData.tipY = hy + hh;
   } else if (spec.type === 'mace') {
     const haft = mesh(cyl(0.04, 0.045, 0.7 * L, 10), haftMat); haft.position.y = y0 + 0.35 * L; g.add(haft);
