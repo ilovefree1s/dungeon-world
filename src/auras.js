@@ -651,8 +651,10 @@ const BUILD = {
   // ---------------------------------------------------------------- SHADOW 2: tongues
   // like the fire's tongues, rising off the blade: half of them black (darkening what's behind), half violet, with
   // the wisps and motes of the first shadow
-  shadow2(g, bx, power, { span, wide, cx, cz, size: tongue }) {
+  shadow2(g, bx, power, { span, wide, cx, cz }) {
     const [x0, x1, y0, y1, z0, z1] = bx;
+    // one slider: power runs 0.05 .. 2.9, and the tongues' size runs with it up to 2.05
+    const tongue = 0.5 + Math.max(0, Math.min(1, (power - 0.05) / 2.85)) * 1.55;
     const mk = (N, black) => {
       const P = pointCloud(g, N, tongueTex()), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), base = new Float32Array(N), rot = new Float32Array(N);
       if (black) { P.mat.blending = THREE.NormalBlending; P.mat.fragmentShader = `uniform sampler2D tM; varying vec3 vCol; varying float vA, vR;
