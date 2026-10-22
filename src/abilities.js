@@ -45,12 +45,12 @@ const hitAll = (ctx, list, mult, from, stun = 0) => {
 // ---------------------------------------------------------------- the kits
 export const KITS = [
   // ---- warrior
-  { name: 'WARRIOR', attack: { name: 'SWING', cd: 0.45, cdOf: p => 0.45 / (p.forged ? p.forged.spd : 1), use(ctx) {
+  { name: 'WARRIOR', attack: { name: 'SWING', cd: 0.55, cdOf: p => 0.55 / (p.forged ? p.forged.spd : 1), use(ctx) {
       const p = ctx.player, dir = camFlat(p), f = p.forged;
       faceTo(p, dir); p.swingT = 0; p.whirl = false; p.swingN = (p.swingN | 0) + 1;
       sfx('swing');
       // (a weapon from the forge sets the swing's damage, speed and reach)
-      ctx.later(0.16, () => { const n = hitAll(ctx, around(ctx.monsters, p.pos.x + dir.x * 1.5, p.pos.y + 2, p.pos.z + dir.z * 1.5, f ? f.reach : 4.6, dir, 0.3), 1.5 * (f ? f.dmg : 1), p.pos); if (n) sfx('hit'); });
+      ctx.later(0.2, () => { const n = hitAll(ctx, around(ctx.monsters, p.pos.x + dir.x * 1.5, p.pos.y + 2, p.pos.z + dir.z * 1.5, f ? f.reach : 4.6, dir, 0.3), 1.5 * (f ? f.dmg : 1), p.pos); if (n) sfx('hit'); });
     } },
     abilities: [
       { name: 'CHARGE', glyph: '➤', cd: 5, use(ctx) {

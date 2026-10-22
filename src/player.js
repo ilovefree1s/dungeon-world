@@ -164,7 +164,7 @@ export class Player {
     if (w.lava(p.x, p.y + 0.6, p.z)) { this.vel.y = 30; this.hurtT = 0.6; this.onHurt && this.onHurt(); }
     this.hurtT = Math.max(0, this.hurtT - dt); this.invT = Math.max(0, this.invT - dt);
     if (this.castT >= 0) { this.castT += dt / (this.castKind === 'nova' || this.castKind === 'meteor' || this.castKind === 'rain' || this.castKind === 'multi' ? 0.6 : 0.38); if (this.castT >= 1) this.castT = -1; }
-    if (this.swingT >= 0) { this.swingT += dt / (this.whirl ? this.swingLen : 0.3); if (this.swingT >= 1) { this.swingT = -1; this.whirl = false; } }
+    if (this.swingT >= 0) { this.swingT += dt / (this.whirl ? this.swingLen : 0.4); if (this.swingT >= 1) { this.swingT = -1; this.whirl = false; } }
     if (this.landT >= 0) { this.landT += dt / 0.45; if (this.landT >= 1) this.landT = -1; }
     // move, one axis at a time
     const wasGround = this.onGround;
@@ -248,7 +248,7 @@ export class Player {
     if (this.lavaAt(p.x, p.y + 0.6, p.z)) { this.vel.y = 30; this.hurtT = 0.6; this.onHurt && this.onHurt(); }
     this.hurtT = Math.max(0, this.hurtT - dt); this.invT = Math.max(0, this.invT - dt);
     if (this.castT >= 0) { this.castT += dt / (this.castKind === 'nova' || this.castKind === 'meteor' || this.castKind === 'rain' || this.castKind === 'multi' ? 0.6 : 0.38); if (this.castT >= 1) this.castT = -1; }
-    if (this.swingT >= 0) { this.swingT += dt / (this.whirl ? this.swingLen : 0.3); if (this.swingT >= 1) { this.swingT = -1; this.whirl = false; } }
+    if (this.swingT >= 0) { this.swingT += dt / (this.whirl ? this.swingLen : 0.4); if (this.swingT >= 1) { this.swingT = -1; this.whirl = false; } }
     if (this.landT >= 0) { this.landT += dt / 0.45; if (this.landT >= 1) this.landT = -1; }
     // move: a step that would climb more than STEP blocks is a wall (jump it); trunks push you off
     const wasGround = this.onGround;
