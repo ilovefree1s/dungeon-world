@@ -20,7 +20,7 @@ function persist() { ls.set(KEY, JSON.stringify({ saved: forge.saved, equipped: 
 export const equippedSpec = cls => forge.equipped[cls] >= 0 && forge.saved[forge.equipped[cls]] ? forge.saved[forge.equipped[cls]] : null;
 
 // ---------------------------------------------------------------- the preview
-let renderer = null, scene = null, camera = null, model = null, raf = 0, last = 0, turn = 0, dragging = false, spin = 1;
+let renderer = null, scene = null, camera = null, model = null, raf = 0, last = 0, turn = 0, tilt = 0, dragging = false, spin = 1, dragMoved = 0;
 function initPreview() {
   if (renderer) return;
   const canvas = $('forgeGl');
@@ -35,8 +35,15 @@ function initPreview() {
   camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
   // a drag turns it; left alone it turns by itself
   let lx = 0;
-  canvas.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; canvas.setPointerCapture(e.pointerId); });
-  canvas.addEventListener('pointermove', e => { if (dragging) { turn += (e.clientX - lx) * 0.01; lx = e.clientX; } });
+  // drag to turn the weapon any way: sideways spins it, up and down tilts it over; a real drag stops the spinning
+  let ly = 0;
+  canvas.addEventListener('pointerdown', e => { dragging = true; dragMoved = 0; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY;
+    turn += dx * 0.01; tilt += dy * 0.01; dragMoved += Math.abs(dx) + Math.abs(dy);
+    if (dragMoved > 6 && spin) { spin = 0; $('fSpin').classList.remove('on'); $('fSpin').textContent = 'STILL'; }
+  });
   const up = () => { dragging = false; };
   canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
 }
@@ -66,7 +73,7 @@ function frame(now) {
   raf = requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (!dragging) turn += dt * 0.6 * spin;
-  if (model) { model.rotation.y = turn; model.rotation.z = Math.sin(now / 1000 * 0.5) * 0.1; if (model.userData.tick) model.userData.tick(now / 1000); }
+  if (model) { model.rotation.order = 'XYZ'; model.rotation.set(tilt, turn, spin ? Math.sin(now / 1000 * 0.5) * 0.1 : 0); if (model.userData.tick) model.userData.tick(now / 1000); }
   renderer.render(scene, camera);
 }
 
@@ -157,7 +164,7 @@ function wire() {
   $('fSmooth').addEventListener('click', () => { if (!forge.spec.shape) return; pad.smooth(); sfx('pickup'); });
   $('fBrush').addEventListener('input', e => { pad.brush = +e.target.value; pad.draw(); });
   $('fMorePts').addEventListener('click', () => { if (shapeMode !== 'points') { shapeMode = 'points'; render(); } pad.addPoints(); sfx('pickup'); });
-  $('fSpin').addEventListener('click', () => { spin = spin ? 0 : 1; $('fSpin').classList.toggle('on', !!spin); $('fSpin').textContent = spin ? 'SPINNING' : 'STILL'; });
+  $('fSpin').addEventListener('click', () => { spin = spin ? 0 : 1; if (spin) tilt = 0; $('fSpin').classList.toggle('on', !!spin); $('fSpin').textContent = spin ? 'SPINNING' : 'STILL'; });
   $('fLen').addEventListener('input', e => { forge.spec.length = +e.target.value; rebuild(); });
   $('fHilt').addEventListener('input', e => { forge.spec.gripSize = +e.target.value; rebuild(); });
   $('fGuardSize').addEventListener('input', e => { forge.spec.guardSize = +e.target.value; rebuild(); });
