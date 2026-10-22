@@ -120,8 +120,11 @@ function render() {
   $('fHeadRow').hidden = drawable && !!s.shape;
   if (s.shape) { pad.set(s.shape, shapeMode); $('fMirror').classList.toggle('on', !!s.shape.mirror); $('fPadHint').textContent = shapeMode === 'draw' ? 'TRACE THE SILHOUETTE IN ONE STROKE' : shapeMode === 'erase' ? 'RUB OUT WHATEVER YOU DRAG OVER' : 'DRAG THE CORNERS · CLICK AN EDGE TO ADD ONE · DOUBLE-CLICK ONE TO REMOVE IT'; }
   $('fLen').value = s.length; $('fHilt').value = s.gripSize ?? s.hilt ?? 1; $('fGuardSize').value = s.guardSize ?? s.hilt ?? 1; $('fPommelSize').value = s.pommelSize ?? s.hilt ?? 1; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1; $('fSize').value = s.auraSize ?? 1;
+  $('fPowRow').hidden = !s.aura || s.aura === 'none'; $('fSizeRow').hidden = true;
+  // (the fire's slider runs a narrower range, and its size follows along)
+  const pw = $('fPow'); if (s.aura === 'flame' || s.aura === 'flame2') { pw.min = 0.45; pw.max = 2.95; } else { pw.min = 0.05; pw.max = 3; }
+  if (s.auraPower != null) { s.auraPower = Math.max(+pw.min, Math.min(+pw.max, s.auraPower)); pw.value = s.auraPower; }
   for (const id of ['fPow', 'fSize', 'fLen', 'fWid', 'fHilt', 'fGuardSize', 'fPommelSize']) if ($(id).__show) $(id).__show();
-  $('fPowRow').hidden = !s.aura || s.aura === 'none'; $('fSizeRow').hidden = s.aura !== 'flame' && s.aura !== 'flame2';
   $('fName').value = s.name || '';
   // the saved ones
   const list = $('fSaved'); list.innerHTML = '';

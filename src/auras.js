@@ -263,7 +263,9 @@ const BUILD = {
   // ---------------------------------------------------------------- FLAME (particles)
   // tongues of flame born all over the blade, rising toward the world's up, swelling then shrinking as they cool from
   // white to yellow to orange to a red that fades out; the same from any side, and they rise off a tilted blade
-  flame(g, bx, power, { span, wide, cx, cz, size: tongue }) {
+  flame(g, bx, power, { span, wide, cx, cz }) {
+    // one slider for the fire: power runs 0.45 .. 2.95, and the tongues' size runs with it from 0.65 .. 1.55
+    const tongue = 0.65 + Math.max(0, Math.min(1, (power - 0.45) / 2.5)) * 0.9;
     const [x0, x1, y0, y1, z0, z1] = bx;
     const N = Math.round((30 + span * 70) * Math.min(2, power));
     const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), size = new Float32Array(N), alpha = new Float32Array(N), rot = new Float32Array(N);
