@@ -623,8 +623,9 @@ const BUILD = {
     const [x0, x1, y0, y1, z0, z1] = bx;
     // black smoke: dark puffs born on the steel that swell, drift off and sink as they thin (normal blending, so they
     // darken what's behind them); the same from any side
+    // (like the fire's tongues, but dark and upside down: each puff a tongue shape with its point trailing down as it sinks)
     const N = Math.round((30 + span * 50) * Math.min(2, power));
-    const P = pointCloud(g, N, softTex()), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), ph = new Float32Array(N);
+    const P = pointCloud(g, N, tongueTex()), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), ph = new Float32Array(N);
     P.mat.blending = THREE.NormalBlending; P.mat.fragmentShader = `uniform sampler2D tM; varying vec3 vCol; varying float vA, vR;
 void main(){ float m = texture2D(tM, gl_PointCoord).a; gl_FragColor = vec4(vCol, m * vA); }`; P.mat.needsUpdate = true;
     const spawn = i => { const o = i * 3; P.pos[o] = x0 + rnd() * (x1 - x0); P.pos[o + 1] = y0 + rnd() * (y1 - y0); P.pos[o + 2] = rnd() < 0.5 ? z0 - 0.01 : z1 + 0.01; max[i] = 1 + rnd() * 1.2; life[i] = 0; vel[o] = (rnd() - 0.5) * 0.3; vel[o + 1] = (rnd() - 0.5) * 0.1; vel[o + 2] = (rnd() - 0.5) * 0.3; ph[i] = rnd() * 6.28; };
@@ -641,13 +642,14 @@ void main(){ float m = texture2D(tM, gl_PointCoord).a; gl_FragColor = vec4(vCol,
     for (let i = 0; i < motes.N; i++) { spawnM(i); motes.life[i] = rnd() * motes.max[i]; }
     return (t, dt, up) => {
       for (const m of wisps) m.material.uniforms.uT.value = -t * 0.6;
+      P.mat.uniforms.uUpL.value.copy(up).negate();   // (the tongues' points trail downward)
       for (let i = 0; i < N; i++) {
         life[i] += dt; if (life[i] >= max[i]) spawn(i);
         const k = life[i] / max[i], o = i * 3, sw = Math.sin(t * 2 + ph[i]) * 0.15;
-        P.pos[o] += (vel[o] + sw - up.x * 0.25 * k) * dt; P.pos[o + 1] += (vel[o + 1] - up.y * 0.25 * k) * dt; P.pos[o + 2] += (vel[o + 2] + sw * 0.5 - up.z * 0.25 * k) * dt;
-        P.size[i] = (0.08 + 0.2 * k) * (0.7 + 0.3 * Math.min(1, power));
+        P.pos[o] += (vel[o] + sw - up.x * 0.3 * k) * dt; P.pos[o + 1] += (vel[o + 1] - up.y * 0.3 * k) * dt; P.pos[o + 2] += (vel[o + 2] + sw * 0.5 - up.z * 0.3 * k) * dt;
+        P.size[i] = (0.14 + 0.26 * Math.sin(Math.min(1, k * 1.1) * Math.PI)) * (0.7 + 0.3 * Math.min(1, power));
         c.copy(ink).lerp(violet, k * 0.6); P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b;
-        P.alpha[i] = Math.min(1, k * 4) * (1 - k) * (0.55 + 0.3 * Math.min(1, power)); P.rot[i] = 0;
+        P.alpha[i] = Math.min(1, k * 4) * (1 - k) * (0.6 + 0.3 * Math.min(1, power)); P.rot[i] = (ph[i] - 3.14) * 0.12;
       }
       P.flush();
       const Mo = motes;
