@@ -309,7 +309,7 @@ const BUILD = {
     return (t, dt) => {
       hazeU.uT.value = t;
       lines.length = 0; let bright = 0;
-      if (e0) { const k = Math.min(1, 0.1 + power * 0.1 + flash * 0.3); bm.emissive.copy(e0).lerp(charge, k); bm.emissiveIntensity = Math.max(i0, 0.05 + power * 0.1 + flash * 0.5); }
+      if (e0) { const k = Math.min(1, 0.3 + power * 0.25 + flash * 0.3); bm.emissive.copy(e0).lerp(charge, k); bm.emissiveIntensity = Math.max(i0, 0.25 + power * 0.45 + flash * 0.9); }
       for (const lane of lanes) {
         if (!lane.strike && (lane.wait -= dt) <= 0) {
           lane.strike = { ...genBolt(bx, power), age: 0, steps: [], restrikes: [0.08 + rnd() * 0.08, 0.17 + rnd() * 0.1] };
