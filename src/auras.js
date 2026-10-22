@@ -127,14 +127,9 @@ void main(){
   vec3 Av = M * vec3(0.0, 1.0, 0.0); float sc = length(Av); Av /= sc;
   vec3 Uv = normalize(M * uUpL);
   vec3 n = cross(Av, Uv); float dg = length(n);
-  // the blade across the up direction: the sheet lies along the blade. the blade along it: the sheet faces the camera
-  vec3 alongB = normalize(cross(Uv, vec3(0.0, 0.0, 1.0)));
-  float k = smoothstep(0.15, 0.45, dg);
-  vec3 along = normalize(mix(alongB, Av, k));
-  vec3 nn = normalize(mix(normalize(cross(along, Uv)), n / max(dg, 1e-4), k));
-  float len = mix(uWide, uSpan, k) * sc;
+  vec3 nn = n / max(dg, 1e-4);
   vec3 c = (modelViewMatrix * vec4(uCenter, 1.0)).xyz;
-  vec3 p = c + along * position.x * len + Uv * position.y * uH * sc + nn * uOff * sc;
+  vec3 p = c + Av * position.x * uSpan * sc + Uv * position.y * uH * sc + nn * uOff * sc;
   vUv = vec2(position.x + 0.5, position.y); vFace = abs(nn.z);
   gl_Position = projectionMatrix * vec4(p, 1.0);
 }`;
@@ -320,7 +315,13 @@ const BUILD = {
       const u = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: pw }, uAsp: { value: 1 }, uUpL: { value: upL0.clone() }, uCenter: { value: center }, uSpan: { value: span * 1.08 }, uWide: { value: wide + side * 2 + 0.1 }, uH: { value: h }, uOff: { value: off } };
       const m = new THREE.Mesh(riseGeo(), riseSheet(u)); m.frustumCulled = false; g.add(m); return { m, u, speed };
     };
-    const sheets = [mk(side, up, power, 1), mk(-side, up, power, 1.1), mk(0, up * 0.55, power * 1.2, 1.5)];
+    const sheets = [mk(side, up * 0.7, power, 1), mk(-side, up * 0.7, power, 1.1), mk(0, up * 0.4, power * 1.2, 1.5)];
+    // and the fire for a blade held upright: sheets along the blade, rising past its tip (the old way); the two
+    // fires crossfade by how far over the blade is held
+    const uni = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: (wide + side * 2) / (span + up) } };
+    const fire = new THREE.Mesh(crossedPlanes(bx, up, side + 0.04), sheetFaced(FLAME_FS, uni)); fire.frustumCulled = false; g.add(fire);
+    const uni2 = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 1.2 }, uAsp: { value: uni.uAsp.value } };
+    const core = new THREE.Mesh(crossedPlanes([x0 + wide * 0.2, x1 - wide * 0.2, y0, y1, z0 + (z1 - z0) * 0.2, z1 - (z1 - z0) * 0.2], up * 0.5, 0.02), sheetFaced(FLAME_FS, uni2)); core.frustumCulled = false; g.add(core);
     // a body for the fire: soft orange blobs along the blade, facing the camera, so from the tip or edge-on it's a glow and not a cross
     const NB = Math.max(3, Math.round(span / 0.12)), bodyMat = new THREE.SpriteMaterial({ map: softTex(), color: '#ff7a20', transparent: true, opacity: 0.22 * Math.min(1, power), blending: THREE.AdditiveBlending, depthWrite: false });
     for (let i = 0; i < NB; i++) { const sp = new THREE.Sprite(bodyMat); sp.position.set(cx, y0 + span * (i + 0.5) / NB, cz); sp.scale.set(wide + 0.25 + 0.1 * power, span / NB * 2.4, 1); sp.frustumCulled = false; g.add(sp); }
@@ -331,7 +332,11 @@ const BUILD = {
     return (t, dt, up) => {
       // the sheets flicker a touch, and stand toward the world's up
       const flick = 0.9 + 0.1 * Math.sin(t * 23) + 0.08 * Math.sin(t * 37);
-      for (const sh of sheets) { sh.u.uT.value = t * sh.speed + sh.speed * 2; sh.u.uUpL.value.copy(up); sh.u.uPow.value = power * flick * (sh.speed > 1.2 ? 1.2 : 1); }
+      // how far over the blade is held: 0 upright (or upside down), 1 flat
+      const over = Math.min(1, Math.max(0, (Math.hypot(up.x, up.z) - 0.25) / 0.4));
+      for (const sh of sheets) { sh.u.uT.value = t * sh.speed + sh.speed * 2; sh.u.uUpL.value.copy(up); sh.u.uPow.value = power * flick * (sh.speed > 1.2 ? 1.2 : 1) * over; }
+      uni.uT.value = t; uni2.uT.value = t * 1.5 + 3;
+      uni.uPow.value = power * flick * (1 - over); uni2.uPow.value = power * 1.2 * (1 - over);
       bodyMat.opacity = 0.22 * Math.min(1, power) * (0.85 + 0.15 * Math.sin(t * 19));
       const E = embers;
       for (let i = 0; i < E.N; i++) {
