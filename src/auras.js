@@ -302,14 +302,27 @@ const BUILD = {
     const LEADER = 0.22, STROKE = 0.06, TAIL = 0.3;
     const gap = () => (0.6 + rnd() * 1.2) / (0.5 + 0.5 * Math.min(power, 1)) / (power > 1 ? 1 + (power - 1) * 0.5 : 1);
     const lanes = []; for (let i = 0; i < slots; i++) lanes.push({ strike: null, wait: 0.3 + i * 0.5 + rnd() * 0.5 });
-    // the steel itself takes on a faint blue charge that grows with power and jumps with each stroke
+    // a glow around the blade: three soft additive shells of the blade's own shape, each a little bigger (much fatter
+    // through the thin side), like the halo round a bolt; it brightens with power and flares with each stroke.
+    // the steel itself only takes a faint blue tint
     const bm = g.userData.bladeMat, e0 = bm && bm.emissive ? bm.emissive.clone() : null, i0 = bm ? bm.emissiveIntensity || 0 : 0, charge = new THREE.Color('#8ec8ff');
+    const shells = [];
+    if (bm) g.traverse(o => {
+      if (!o.isMesh || o.material !== bm) return;
+      [[1.1, 1.01, 2.2, 0.3], [1.22, 1.02, 4, 0.16], [1.38, 1.03, 6.5, 0.08]].forEach(([sx, sy, sz, op]) => {
+        const sh = new THREE.Mesh(o.geometry, new THREE.MeshBasicMaterial({ color: '#7fc4ff', transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+        sh.position.copy(o.position); sh.rotation.copy(o.rotation); sh.scale.set(o.scale.x * sx, o.scale.y * sy, o.scale.z * sz);
+        sh.userData.aura = true; sh.userData.op = op; sh.frustumCulled = false; o.parent.add(sh); shells.push(sh);
+      });
+    });
     let flash = 0;
     const lines = [];
     return (t, dt) => {
       hazeU.uT.value = t;
       lines.length = 0; let bright = 0;
-      if (e0) { const k = Math.min(1, 0.3 + power * 0.25 + flash * 0.3); bm.emissive.copy(e0).lerp(charge, k); bm.emissiveIntensity = Math.max(i0, 0.25 + power * 0.45 + flash * 0.9); }
+      if (e0) { const k = Math.min(1, 0.1 + power * 0.1 + flash * 0.3); bm.emissive.copy(e0).lerp(charge, k); bm.emissiveIntensity = Math.max(i0, 0.05 + power * 0.08 + flash * 0.3); }
+      const glowK = (0.4 + 0.6 * Math.min(power, 1)) * (power > 1 ? 1 + (power - 1) * 0.5 : 1) * (1 + flash * 1.6);
+      for (const sh of shells) sh.material.opacity = Math.min(1, sh.userData.op * glowK);
       for (const lane of lanes) {
         if (!lane.strike && (lane.wait -= dt) <= 0) {
           lane.strike = { ...genBolt(bx, power), age: 0, steps: [], restrikes: [0.08 + rnd() * 0.08, 0.17 + rnd() * 0.1] };
