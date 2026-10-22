@@ -375,15 +375,31 @@ export class Monsters {
 
 // ---------------------------------------------------------------- bolts
 const boltGeo = new THREE.SphereGeometry(0.56, 12, 8);
+// an arrow: a wooden shaft, a steel head, feathers at the tail (built once, cloned per shot; +z is the way it flies)
+const arrowMats = {
+  wood: new THREE.MeshLambertMaterial({ color: '#8a6238' }), steel: new THREE.MeshLambertMaterial({ color: '#cfd6de' }),
+  feather: new THREE.MeshLambertMaterial({ color: '#e8e4d8', side: THREE.DoubleSide }), feather2: new THREE.MeshLambertMaterial({ color: '#c8402e', side: THREE.DoubleSide }),
+};
+let arrowProto = null;
+function buildArrow() {
+  if (arrowProto) return arrowProto.clone();
+  const g = new THREE.Group(), L = 2.6;
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, L, 6), arrowMats.wood); shaft.rotation.x = Math.PI / 2; g.add(shaft);
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 4), arrowMats.steel); head.rotation.x = Math.PI / 2; head.position.z = L / 2 + 0.18; g.add(head);
+  const nock = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.1, 6), arrowMats.steel); nock.rotation.x = Math.PI / 2; nock.position.z = -L / 2; g.add(nock);
+  // three vanes, flat quarter-arcs sticking out of the shaft near the tail
+  const vane = new THREE.PlaneGeometry(0.42, 0.2); vane.rotateY(Math.PI / 2); vane.translate(0, 0.14, -L / 2 + 0.3);
+  for (let i = 0; i < 3; i++) { const v = new THREE.Mesh(vane, i ? arrowMats.feather : arrowMats.feather2); v.rotation.z = i * Math.PI * 2 / 3; g.add(v); }
+  arrowProto = g;
+  return g.clone();
+}
 export class Bolts {
   constructor(world, monsters) { this.world = world; this.monsters = monsters; this.list = []; }
   // opts: speed, arrow (a shaft, no glow), big (a meteor), mult (damage), onEnd(pos) when it lands
   fire(from, dir, color = '#9ad8ff', opts = {}) {
-    const g = new THREE.Group();
-    const sz = opts.big ? 2.6 : opts.arrow ? 0.55 : 1;
-    const core = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), opts.arrow ? 0 : 0.6) }));
-    core.scale.set(sz, sz, opts.arrow ? 5 : sz);
-    g.add(core);
+    const g = opts.arrow ? buildArrow() : new THREE.Group();
+    const sz = opts.big ? 2.6 : 1;
+    if (!opts.arrow) { const core = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.6) })); core.scale.setScalar(sz); g.add(core); }
     let glow = null;
     if (!opts.arrow) { glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.soft, color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); glow.scale.setScalar(4.4 * sz); g.add(glow); }
     g.position.copy(from);
@@ -409,7 +425,7 @@ export class Bolts {
           }
         }
       }
-      if (gone || b.t > b.life) { scene.remove(b.g); b.g.traverse(o => o.material && o.material.dispose()); this.list.splice(i, 1); continue; }
+      if (gone || b.t > b.life) { scene.remove(b.g); if (!b.arrow) b.g.traverse(o => o.material && o.material.dispose()); this.list.splice(i, 1); continue; }
       b.g.position.copy(b.pos);
       if (b.glow) b.glow.scale.setScalar(4.4 * (b.big ? 2.6 : 1) + Math.sin(b.t * 30) * 0.6);
       if (!b.arrow && Math.random() < (b.big ? 1 : 0.6)) burst(b.pos.x, b.pos.y, b.pos.z, b.color, b.big ? 3 : 1, b.big ? 3 : 1.2, b.big ? 2.4 : 1.1, true, 0.3, 0);
