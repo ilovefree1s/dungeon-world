@@ -311,7 +311,7 @@ const BUILD = {
         if (S.age < 0) continue;
         if (S.age > TRAVEL + HOLD) { strikes.splice(i, 1); continue; }
         const k = Math.min(1, S.age / TRAVEL), upto = Math.floor(k * (S.main.length - 1)) + 1;
-        lines.push({ pts: S.main.slice(0, upto + 1), w: 1 });
+        lines.push({ pts: S.main.slice(0, upto + 1), ws: S.ws });   // (thick where it starts, thinning toward the tip)
         for (const f of S.forks) if (f.at <= upto - 1) lines.push({ pts: f.pts, w: 0.6 });
       }
       bolts.drawLines(lines, lines.length ? 0.8 + rnd() * 0.2 : 0);
@@ -636,11 +636,11 @@ function makeBolts(g, n, sc = 1) {
     const k = Math.min(1, 0.5 + power * 0.5);
     core.m.material.opacity = (0.7 + rnd() * 0.3) * k; mid.m.material.opacity = (0.4 + rnd() * 0.3) * k; glow.m.material.opacity = (0.25 + rnd() * 0.2) * k;
   },
-  // any polylines at all: [{ pts: [Vector3...], w }] (w scales the width), drawn on the same three layers
+  // any polylines at all: [{ pts: [Vector3...], w }] (w scales the width; or ws, one width per segment), drawn on the same three layers
   drawLines(lines, bright = 1) {
     core.pos.fill(0); mid.pos.fill(0); glow.pos.fill(0);
     let q = 0;
-    for (const L of lines) for (let i = 0; i + 1 < L.pts.length && q + 2 <= Q; i++) { seg(core, q, L.pts[i], L.pts[i + 1], L.w || 1); seg(mid, q, L.pts[i], L.pts[i + 1], L.w || 1); seg(glow, q, L.pts[i], L.pts[i + 1], L.w || 1); q += 2; }
+    for (const L of lines) for (let i = 0; i + 1 < L.pts.length && q + 2 <= Q; i++) { const wk = L.ws ? L.ws[i] : (L.w || 1); seg(core, q, L.pts[i], L.pts[i + 1], wk); seg(mid, q, L.pts[i], L.pts[i + 1], wk); seg(glow, q, L.pts[i], L.pts[i + 1], wk); q += 2; }
     core.m.geometry.attributes.position.needsUpdate = true; mid.m.geometry.attributes.position.needsUpdate = true; glow.m.geometry.attributes.position.needsUpdate = true;
     core.m.material.opacity = 0.95 * bright; mid.m.material.opacity = 0.55 * bright; glow.m.material.opacity = 0.3 * bright;
   } };
@@ -666,7 +666,8 @@ function genBolt(bx, power) {
     for (let s = 0; s < len; s++) { a = new THREE.Vector3(a.x + dx * (0.4 + rnd() * 0.6) * 0.5, a.y + dy * 0.5 + (rnd() - 0.5) * 0.08, a.z + dz * (0.4 + rnd() * 0.6) * 0.5); pts.push(a); }
     forks.push({ at: j, pts });
   }
-  return { main, forks };
+  const ws = []; for (let i = 0; i < SEG; i++) ws.push(1.1 - 0.65 * (i / (SEG - 1)));
+  return { main, forks, ws };
 }
 // a point on the surface of the box (the head's skin, not its inside)
 function onSkin(bx, t) {
