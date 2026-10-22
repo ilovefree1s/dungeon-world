@@ -180,6 +180,15 @@ void main(){
   float a = (1.0 - cx * cx) * smoothstep(0.3, 0.8, n) * (0.15 + 0.55 * uFlash) * (0.4 + 0.6 * uPow) * min(1.0, uPow);
   gl_FragColor = vec4(vec3(0.5, 0.8, 1.0) * a, a);
 }`;
+const DASH_FS2 = `
+uniform float uT, uPow, uPhase; uniform vec3 uCol; varying vec2 vUv;
+void main(){
+  float p = fract(vUv.x * 1.5 + uT * 0.4 + uPhase);
+  float dash = smoothstep(0.0, 0.15, p) * smoothstep(0.7, 0.35, p);
+  float ey = 1.0 - abs(vUv.y * 2.0 - 1.0);
+  float a = (0.2 + 0.8 * dash) * ey * uPow;
+  gl_FragColor = vec4(uCol * a, a);
+}`;
 const HELIX_FS = `
 uniform float uT, uPow, uPhase; uniform vec3 uCol; varying vec2 vUv;
 void main(){
@@ -237,6 +246,8 @@ function pointCloud(g, N, tex, tipDir) {
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
   return { pos, col, size, alpha, rot, geo, mat, N, flush() { for (const k of ['position', 'aColor', 'aSize', 'aAlpha', 'aRot']) geo.attributes[k].needsUpdate = true; } };
 }
+// a crescent: a thin arc, for a flick of wind off the edge
+const crescentTex = () => TX.crescent || (TX.crescent = canvas(64, 64, (x, w, h) => { x.strokeStyle = '#fff'; x.lineCap = 'round'; x.shadowColor = '#fff'; x.shadowBlur = 4; x.lineWidth = 5; x.beginPath(); x.arc(32, 36, 24, Math.PI * 1.15, Math.PI * 1.85); x.stroke(); x.lineWidth = 2; x.globalAlpha = 0.6; x.beginPath(); x.arc(32, 36, 24, Math.PI * 1.15, Math.PI * 1.85); x.stroke(); }));
 // ---------------------------------------------------------------- particles (a cloud of points that knows which way is down)
 function cloud(g, N, { size, tex, colors, blending = THREE.AdditiveBlending, opacity = 1 }) {
   const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), ph = new Float32Array(N);
@@ -459,6 +470,77 @@ const BUILD = {
         L.paint(i, i % 2 ? 1 : 0, Math.sin(k * Math.PI) * 0.9);
       }
       L.flush();
+    };
+  },
+  // ---------------------------------------------------------------- WIND, three more ways
+  // GUST: streaks of air blowing along the blade in gusts, half each way, spiralling a little, with the odd leaf
+  gust(g, bx, power, { span, wide, cx, cz }) {
+    const [x0, x1, y0, y1, z0, z1] = bx, N = Math.round((40 + span * 70) * Math.min(2, power));
+    const P = pointCloud(g, N, streakTex(), new THREE.Vector3(0, 1, 0)), life = new Float32Array(N), max = new Float32Array(N), ang = new Float32Array(N), rad = new Float32Array(N), dir = new Float32Array(N), spd = new Float32Array(N);
+    const r0 = wide / 2 + 0.06;
+    const spawn = i => { dir[i] = i % 2 ? -1 : 1; ang[i] = rnd() * 6.28; rad[i] = r0 + rnd() * 0.14; spd[i] = 1.2 + rnd() * 1.4; max[i] = (span + 0.3) / spd[i] * (0.6 + rnd() * 0.5); life[i] = 0; P.pos[i * 3 + 1] = dir[i] > 0 ? y0 - 0.15 + rnd() * span * 0.3 : y1 + 0.15 - rnd() * span * 0.3; };
+    for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
+    const leaves = cloud(g, Math.round(6 * power), { size: 0.1, tex: leafTex(), colors: ['#8ad66a', '#c8b24a'], blending: THREE.NormalBlending, opacity: 0.95 });
+    for (let i = 0; i < leaves.N; i++) { leaves.ph[i] = rnd() * 6.28; leaves.max[i] = 1 + rnd(); leaves.life[i] = rnd(); leaves.pos[i * 3 + 1] = y0 + rnd() * span; }
+    const c = new THREE.Color('#e6fbff');
+    return (t, dt) => {
+      const gust = 0.55 + 0.45 * Math.max(0, Math.sin(t * 1.7) + 0.4 * Math.sin(t * 4.3));   // the wind comes in gusts
+      for (let i = 0; i < N; i++) {
+        life[i] += dt; if (life[i] >= max[i]) spawn(i);
+        const k = life[i] / max[i], o = i * 3;
+        ang[i] += dir[i] * (2.5 + spd[i]) * dt * gust;
+        P.pos[o] = cx + Math.cos(ang[i]) * rad[i]; P.pos[o + 2] = cz + Math.sin(ang[i]) * rad[i]; P.pos[o + 1] += dir[i] * spd[i] * (0.5 + gust) * dt;
+        P.size[i] = 0.045 + 0.03 * gust; P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b;
+        P.alpha[i] = Math.sin(k * Math.PI) * (0.35 + 0.45 * gust) * (0.5 + 0.5 * Math.min(1, power)); P.rot[i] = 0;
+      }
+      P.flush();
+      const L = leaves;
+      for (let i = 0; i < L.N; i++) { L.life[i] += dt; if (L.life[i] >= L.max[i]) { L.life[i] = 0; L.pos[i * 3 + 1] = y0; } const k = L.life[i] / L.max[i], o = i * 3, a = L.ph[i] + t * 6 * gust; L.pos[o] = cx + Math.cos(a) * (r0 + 0.1); L.pos[o + 2] = cz + Math.sin(a) * (r0 + 0.1); L.pos[o + 1] += 0.5 * gust * dt; L.paint(i, i % 2 ? 1 : 0, Math.sin(k * Math.PI) * 0.9); }
+      L.flush();
+    };
+  },
+  // VORTEX: a tight cyclone of dust and light whipping round the blade and climbing it, with rings of air
+  vortex(g, bx, power, { span, wide, cx, cz }) {
+    const [x0, x1, y0, y1, z0, z1] = bx, N = Math.round((60 + span * 90) * Math.min(2, power));
+    const P = pointCloud(g, N, softTex()), ang = new Float32Array(N), rad = new Float32Array(N), y = new Float32Array(N), w = new Float32Array(N);
+    const r0 = wide / 2 + 0.04;
+    for (let i = 0; i < N; i++) { ang[i] = rnd() * 6.28; rad[i] = r0 + rnd() * 0.12; y[i] = y0 + rnd() * span; w[i] = 7 + rnd() * 6; }
+    const rings = [];
+    for (let i = 0; i < 3; i++) { const u = { uT: { value: 0 }, uPow: { value: power * 0.6 }, uPhase: { value: i * 1.1 }, uCol: { value: new THREE.Color('#dff6ff') } }; const m = new THREE.Mesh(ringGeo(r0 + 0.1, 0.03, 40), sheet(DASH_FS2, u)); m.frustumCulled = false; m.position.set(cx, y0, cz); m.userData.k = i / 3; g.add(m); rings.push(m); }
+    const c = new THREE.Color(), pale = new THREE.Color('#f0fbff'), dust = new THREE.Color('#9ec9d8');
+    return (t, dt) => {
+      for (let i = 0; i < N; i++) {
+        const o = i * 3; ang[i] += w[i] * (0.6 + 0.4 * Math.min(1, power)) * dt; y[i] += 0.5 * dt; if (y[i] > y1 + 0.1) y[i] = y0 - 0.05;
+        const k = (y[i] - y0) / (span + 0.15), r = rad[i] * (0.8 + 0.4 * k);
+        P.pos[o] = cx + Math.cos(ang[i]) * r; P.pos[o + 1] = y[i]; P.pos[o + 2] = cz + Math.sin(ang[i]) * r;
+        P.size[i] = 0.02 + 0.025 * (i % 3 === 0 ? 1 : 0.5); c.copy(dust).lerp(pale, i % 3 === 0 ? 1 : 0.3); P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b;
+        P.alpha[i] = (0.35 + 0.4 * Math.sin(ang[i] * 2)) * (0.5 + 0.5 * Math.min(1, power)); P.rot[i] = 0;
+      }
+      P.flush();
+      for (const m of rings) { m.userData.k += dt * 0.5; if (m.userData.k > 1) m.userData.k -= 1; const k = m.userData.k; m.position.y = y0 + k * span; m.scale.setScalar(0.8 + 0.5 * k); m.material.uniforms.uT.value = t * 3; m.material.uniforms.uPow.value = power * 0.6 * Math.sin(k * Math.PI); }
+    };
+  },
+  // SLASHES: crescents of wind flicked off the blade's edges, growing and flying away as they fade
+  slashes(g, bx, power, { span, wide, cx, cz }) {
+    const [x0, x1, y0, y1, z0, z1] = bx, N = Math.round(10 + power * 8);
+    const P = pointCloud(g, N, crescentTex()), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), ro = new Float32Array(N);
+    const spawn = i => { const o = i * 3, side = rnd() < 0.5 ? -1 : 1; P.pos[o] = side < 0 ? x0 - 0.02 : x1 + 0.02; P.pos[o + 1] = y0 + rnd() * span; P.pos[o + 2] = cz + (rnd() - 0.5) * (z1 - z0); vel[o] = side * (0.6 + rnd() * 0.6); vel[o + 1] = (rnd() - 0.3) * 0.4; vel[o + 2] = (rnd() - 0.5) * 0.3; max[i] = 0.35 + rnd() * 0.3; life[i] = -rnd() * 1.2; ro[i] = side < 0 ? Math.PI / 2 : -Math.PI / 2; };
+    for (let i = 0; i < N; i++) spawn(i);
+    // a faint sleeve of moving air to tie them together
+    const sleeveU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 0.35 }, uAsp: { value: 1 }, uFlash: { value: 0.25 } };
+    const sleeve = new THREE.Mesh(crossedPlanes(bx, 0.1, 0.08), sheet(HAZE_FS, sleeveU)); sleeve.frustumCulled = false; g.add(sleeve);
+    const c = new THREE.Color('#eafcff');
+    return (t, dt) => {
+      sleeveU.uT.value = t * 3;
+      for (let i = 0; i < N; i++) {
+        life[i] += dt; if (life[i] >= max[i]) spawn(i);
+        const o = i * 3; if (life[i] < 0) { P.alpha[i] = 0; continue; }
+        const k = life[i] / max[i];
+        P.pos[o] += vel[o] * dt; P.pos[o + 1] += vel[o + 1] * dt; P.pos[o + 2] += vel[o + 2] * dt;
+        P.size[i] = 0.08 + k * 0.22; P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b;
+        P.alpha[i] = Math.min(1, k * 5) * (1 - k) * (0.5 + 0.5 * Math.min(1, power)); P.rot[i] = ro[i] + (k - 0.5) * 0.4;
+      }
+      P.flush();
     };
   },
   // ---------------------------------------------------------------- FROST
