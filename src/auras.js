@@ -4,7 +4,7 @@
 //   water     ribbons of water spiralling round the blade, beads forming on the steel and running down it to fall, splashes
 //   wind      helix streaks racing around the blade, with leaves caught in the gust
 //   frost     ice crystals (real six-pointed ones) grown on the blade that grow and shatter, snow, glints
-//   shadow    black smoke puffs billowing off it (normal blending, so they darken what is behind), purple wisps sinking down
+//   shadow    black smoke billowing off it (normal blending, so it darkens what is behind), purple wisps sinking down
 //   holy      two counter-rotating rune rings, light rays, golden motes drifting up, a soft halo
 // everything lives in the weapon's own frame; the things that care which way the world's up is (embers, drops,
 // snow, wisps) read it from the group's world quaternion each frame.
@@ -621,40 +621,26 @@ const BUILD = {
   // ---------------------------------------------------------------- SHADOW
   shadow(g, bx, power, { span, wide, cx, cz }) {
     const [x0, x1, y0, y1, z0, z1] = bx;
-    // black smoke: dark puffs born on the steel that swell, drift off and sink as they thin (normal blending, so they
-    // darken what's behind them); the same from any side
-    // (like the fire's tongues, but dark and upside down: each puff a tongue shape with its point trailing down as it sinks)
-    const N = Math.round((30 + span * 50) * Math.min(2, power));
-    const P = pointCloud(g, N, tongueTex()), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), ph = new Float32Array(N);
-    P.mat.blending = THREE.NormalBlending; P.mat.fragmentShader = `uniform sampler2D tM; varying vec3 vCol; varying float vA, vR;
-void main(){ float m = texture2D(tM, gl_PointCoord).a; gl_FragColor = vec4(vCol, m * vA); }`; P.mat.needsUpdate = true;
-    const spawn = i => { const o = i * 3; P.pos[o] = x0 + rnd() * (x1 - x0); P.pos[o + 1] = y0 + rnd() * (y1 - y0); P.pos[o + 2] = rnd() < 0.5 ? z0 - 0.01 : z1 + 0.01; max[i] = 1 + rnd() * 1.2; life[i] = 0; vel[o] = (rnd() - 0.5) * 0.3; vel[o + 1] = (rnd() - 0.5) * 0.1; vel[o + 2] = (rnd() - 0.5) * 0.3; ph[i] = rnd() * 6.28; };
-    for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
-    const c = new THREE.Color(), ink = new THREE.Color('#120620'), violet = new THREE.Color('#3a1468');
-    // wisps: violet ribbons on helixes that swing out from the blade and back, sinking (their streaks run downward)
+    const up = 0.25 + span * 0.4 * power;
+    const smokeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: 1 }, uCol: { value: new THREE.Color('#4a1a8a') } };
+    const smoke = new THREE.Mesh(crossedPlanes(bx, up, 0.1 + 0.08 * power), sheet(SMOKE_FS, smokeU, THREE.NormalBlending)); smoke.frustumCulled = false; g.add(smoke);
+    const smoke2U = { ...smokeU, uT: { value: 0 }, uCol: { value: new THREE.Color('#2a0a4a') } };
+    const smoke2 = new THREE.Mesh(crossedPlanes(bx, up * 0.7, 0.06, true), sheet(SMOKE_FS, smoke2U, THREE.NormalBlending)); smoke2.rotation.y = Math.PI / 4; smoke2.position.set(cx, 0, cz); smoke2.frustumCulled = false; g.add(smoke2);
+    // wisps: dark ribbons on a helix, sinking (their streaks run downward)
     const wisps = [];
     for (let i = 0; i < 3; i++) {
       const u = { uT: { value: 0 }, uPow: { value: power }, uPhase: { value: i }, uCol: { value: new THREE.Color('#b060ff') } };
-      const m = new THREE.Mesh(helixGeo(bx, 1.2 + i * 0.4, i * 2.1, 0.03, 64, 1.1 + i * 0.15, { amp: 0.8 + rnd() * 1.2, freq: 0.5 + rnd() * 0.6, ph: rnd() * 6.28 }), sheet(HELIX_FS, u)); m.frustumCulled = false; g.add(m); wisps.push(m);
+      const m = new THREE.Mesh(helixGeo(bx, 1.2 + i * 0.4, i * 2.1, 0.03, 64, 1.1 + i * 0.15), sheet(HELIX_FS, u)); m.frustumCulled = false; g.add(m); wisps.push(m);
     }
     const motes = cloud(g, Math.round(24 * power), { size: 0.07, tex: softTex(), colors: ['#d08cff', '#5a1aa0'] });
-    const spawnM = i => { inBox(motes, i, bx); motes.max[i] = 0.8 + rnd() * 1; motes.life[i] = 0; jitter(motes, i, 0.3); motes.ph[i] = rnd() * 6.28; };
-    for (let i = 0; i < motes.N; i++) { spawnM(i); motes.life[i] = rnd() * motes.max[i]; }
+    const spawn = i => { inBox(motes, i, bx); motes.max[i] = 0.8 + rnd() * 1; motes.life[i] = 0; jitter(motes, i, 0.3); motes.ph[i] = rnd() * 6.28; };
+    for (let i = 0; i < motes.N; i++) { spawn(i); motes.life[i] = rnd() * motes.max[i]; }
     return (t, dt, up) => {
+      smokeU.uT.value = t * 0.8; smoke2U.uT.value = t * 0.6 + 4;
       for (const m of wisps) m.material.uniforms.uT.value = -t * 0.6;
-      P.mat.uniforms.uUpL.value.copy(up).negate();   // (the tongues' points trail downward)
-      for (let i = 0; i < N; i++) {
-        life[i] += dt; if (life[i] >= max[i]) spawn(i);
-        const k = life[i] / max[i], o = i * 3, sw = Math.sin(t * 2 + ph[i]) * 0.15;
-        P.pos[o] += (vel[o] + sw - up.x * 0.3 * k) * dt; P.pos[o + 1] += (vel[o + 1] - up.y * 0.3 * k) * dt; P.pos[o + 2] += (vel[o + 2] + sw * 0.5 - up.z * 0.3 * k) * dt;
-        P.size[i] = (0.14 + 0.26 * Math.sin(Math.min(1, k * 1.1) * Math.PI)) * (0.7 + 0.3 * Math.min(1, power));
-        c.copy(ink).lerp(violet, k * 0.6); P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b;
-        P.alpha[i] = Math.min(1, k * 4) * (1 - k) * (0.6 + 0.3 * Math.min(1, power)); P.rot[i] = (ph[i] - 3.14) * 0.12;
-      }
-      P.flush();
       const Mo = motes;
       for (let i = 0; i < Mo.N; i++) {
-        Mo.life[i] += dt; if (Mo.life[i] >= Mo.max[i]) spawnM(i);
+        Mo.life[i] += dt; if (Mo.life[i] >= Mo.max[i]) spawn(i);
         const k = Mo.life[i] / Mo.max[i], o = i * 3, sw = Math.sin(t * 3 + Mo.ph[i]) * 0.3;
         Mo.pos[o] += (Mo.vel[o] * 0.4 - up.x * 0.35 * k + sw * 0.2) * dt; Mo.pos[o + 1] += (Mo.vel[o + 1] * 0.4 - up.y * 0.35 * k) * dt; Mo.pos[o + 2] += (Mo.vel[o + 2] * 0.4 - up.z * 0.35 * k + sw * 0.2) * dt;
         Mo.paint(i, k, Math.sin(k * Math.PI) * 0.9);
