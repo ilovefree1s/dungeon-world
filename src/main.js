@@ -39,10 +39,11 @@ if (Q.has('q')) UI.autoQ = false;
 audioState.music = opts.music ?? 0.45; audioState.sfx = opts.sfx ?? 0.8;
 input.mouseSpeed = opts.mouse ?? 1;
 // the mouse: a cursor (the default on a PC: drag to look, click to fight or loot) or captured (click the world, Esc lets go)
-input.cursorMode = opts.cursor ?? matchMedia('(pointer:fine)').matches;   // (any machine with a mouse, touch screen or not)
+// (any machine with a mouse, touch screen or not; a save from before the cursor was the default is reset once)
+input.cursorMode = opts.cursorV === 2 ? (opts.cursor ?? true) : matchMedia('(pointer:fine)').matches;
 document.documentElement.classList.toggle('cursor', input.cursorMode);
 setSfx(audioState.sfx);
-function saveOpts() { ls.set(OPT_KEY, JSON.stringify({ quality: UI.autoQ ? -1 : UI.quality, music: audioState.music, sfx: audioState.sfx, mouse: input.mouseSpeed, cursor: input.cursorMode })); }
+function saveOpts() { ls.set(OPT_KEY, JSON.stringify({ quality: UI.autoQ ? -1 : UI.quality, music: audioState.music, sfx: audioState.sfx, mouse: input.mouseSpeed, cursor: input.cursorMode, cursorV: 2 })); }
 setQuality(UI.quality);
 
 // ---------------------------------------------------------------- the world and the hero
