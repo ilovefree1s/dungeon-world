@@ -150,9 +150,6 @@ export const AURAS = [
   { id: 'lightning', name: 'LIGHTNING', color: '#9fe0ff' },
   { id: 'water', name: 'WATER', color: '#4aa8ff' },
   { id: 'wind', name: 'WIND', color: '#d8f0e8' },
-  { id: 'gust', name: 'GUST', color: '#dffff4' },
-  { id: 'vortex', name: 'VORTEX', color: '#dff6ff' },
-  { id: 'slashes', name: 'SLASHES', color: '#eafcff' },
   { id: 'frost', name: 'FROST', color: '#bfe8ff' },
   { id: 'shadow', name: 'SHADOW', color: '#7a3cff' },
   { id: 'holy', name: 'HOLY', color: '#ffe08a' },
@@ -361,7 +358,7 @@ export function buildForged(spec) {
   g.userData.bladeMat = metal;
   // the aura, along the business end
   if (spec.aura && spec.aura !== 'none' && g.userData.auraBox) {
-    const auraTick = attachAura(g, ({ flame2: 'flame', arcs: 'lightning', plasma: 'lightning', coil: 'lightning', static: 'lightning', drops: 'water', stream: 'water', swirl: 'water' })[spec.aura] || spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1);
+    const auraTick = attachAura(g, ({ flame2: 'flame', arcs: 'lightning', plasma: 'lightning', coil: 'lightning', static: 'lightning', drops: 'water', stream: 'water', swirl: 'water', gust: 'wind', vortex: 'wind', slashes: 'wind' })[spec.aura] || spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1);
     const base = g.userData.tick;
     g.userData.tick = t => { if (base) base(t); auraTick(t); };
   }
