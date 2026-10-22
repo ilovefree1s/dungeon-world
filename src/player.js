@@ -63,6 +63,8 @@ export class Player {
     for (const c of [...hold.children]) hold.remove(c);
     const w = buildForged(spec);
     if (this.cls === 0) w.rotation.x = Math.PI / 2;
+    // (a staff is gripped a third of the way up its shaft, its foot near the ground, leaning out a little; a wand by its handle)
+    if (this.cls === 1 && spec.type === 'staff') { w.position.y = -0.55 * (spec.length || 1); w.rotation.z = -0.1; w.rotation.x = 0.08; }
     hold.add(w);
     u.wtick = w.userData.tick; u.glowK = 1;
     if (this.cls === 0) { u.bladeMat = w.userData.bladeMat; u.bladeBase = u.bladeMat.emissive.clone(); u.bladeBaseI = u.bladeMat.emissiveIntensity; }
