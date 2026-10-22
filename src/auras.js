@@ -302,27 +302,20 @@ const BUILD = {
     const LEADER = 0.22, STROKE = 0.06, TAIL = 0.3;
     const gap = () => (0.6 + rnd() * 1.2) / (0.5 + 0.5 * Math.min(power, 1)) / (power > 1 ? 1 + (power - 1) * 0.5 : 1);
     const lanes = []; for (let i = 0; i < slots; i++) lanes.push({ strike: null, wait: 0.3 + i * 0.5 + rnd() * 0.5 });
-    // a glow around the blade: three soft additive shells of the blade's own shape, each a little bigger (much fatter
-    // through the thin side), like the halo round a bolt; it brightens with power and flares with each stroke.
-    // the steel itself only takes a faint blue tint
+    // a glow around the blade: a column of soft, camera-facing blobs along its length (so it reads the same from any
+    // side, with no hard edge), light blue, additive. nothing at the slider's bottom, growing with power, flaring
+    // with each stroke. the steel itself only takes a faint blue tint
     const bm = g.userData.bladeMat, e0 = bm && bm.emissive ? bm.emissive.clone() : null, i0 = bm ? bm.emissiveIntensity || 0 : 0, charge = new THREE.Color('#8ec8ff');
-    const shells = [];
-    if (bm) g.traverse(o => {
-      if (!o.isMesh || o.material !== bm) return;
-      [[1.1, 1.01, 2.2, 0.3], [1.22, 1.02, 4, 0.16], [1.38, 1.03, 6.5, 0.08]].forEach(([sx, sy, sz, op]) => {
-        const sh = new THREE.Mesh(o.geometry, new THREE.MeshBasicMaterial({ color: '#7fc4ff', transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-        sh.position.copy(o.position); sh.rotation.copy(o.rotation); sh.scale.set(o.scale.x * sx, o.scale.y * sy, o.scale.z * sz);
-        sh.userData.aura = true; sh.userData.op = op; sh.frustumCulled = false; o.parent.add(sh); shells.push(sh);
-      });
-    });
+    const glows = [], NG = Math.max(3, Math.round(span / 0.12)), gw = wide + 0.3, gh = span / NG * 2.4;
+    const glowMat = new THREE.SpriteMaterial({ map: softTex(), color: '#6ab8ff', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+    for (let i = 0; i < NG; i++) { const sp = new THREE.Sprite(glowMat); sp.position.set(cx, bx[2] + span * (i + 0.5) / NG, cz); sp.scale.set(gw, gh, 1); sp.userData.aura = true; g.add(sp); glows.push(sp); }
     let flash = 0;
     const lines = [];
     return (t, dt) => {
       hazeU.uT.value = t;
       lines.length = 0; let bright = 0;
-      if (e0) { const k = Math.min(1, 0.1 + power * 0.1 + flash * 0.3); bm.emissive.copy(e0).lerp(charge, k); bm.emissiveIntensity = Math.max(i0, 0.05 + power * 0.08 + flash * 0.3); }
-      const glowK = (0.4 + 0.6 * Math.min(power, 1)) * (power > 1 ? 1 + (power - 1) * 0.5 : 1) * (1 + flash * 1.6);
-      for (const sh of shells) sh.material.opacity = Math.min(1, sh.userData.op * glowK);
+      if (e0) { const k = Math.min(1, power * 0.12 + flash * 0.3); bm.emissive.copy(e0).lerp(charge, k); bm.emissiveIntensity = Math.max(i0, power * 0.08 + flash * 0.3); }
+      glowMat.opacity = Math.min(1, (power <= 1 ? power * 0.22 : 0.22 + (power - 1) * 0.2) * (1 + flash * 1.5));
       for (const lane of lanes) {
         if (!lane.strike && (lane.wait -= dt) <= 0) {
           lane.strike = { ...genBolt(bx, power), age: 0, steps: [], restrikes: [0.08 + rnd() * 0.08, 0.17 + rnd() * 0.1] };
