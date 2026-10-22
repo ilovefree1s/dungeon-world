@@ -452,15 +452,26 @@ const BUILD = {
     const leaves = cloud(g, Math.round(10 * power), { size: 0.11, tex: leafTex(), colors: ['#8ad66a', '#c8b24a'], blending: THREE.NormalBlending, opacity: 0.95 });
     const spawn = i => { inBox(leaves, i, bx); leaves.max[i] = 1.2 + rnd() * 1.2; leaves.life[i] = 0; leaves.ph[i] = rnd() * 6.28; leaves.vel[i * 3] = 0.3 + rnd() * 0.5; };
     for (let i = 0; i < leaves.N; i++) { spawn(i); leaves.life[i] = rnd() * leaves.max[i]; }
-    const r0 = wide / 2 + 0.12;
+    const r0 = wide / 2 + 0.12, pivot = new THREE.Vector3(cx, (bx[2] + bx[3]) / 2, cz);
+    for (const m of streaks) { m.userData.ph = rnd() * 10; m.userData.spd = 1 + rnd() * 0.8; m.userData.flick = rnd() * 6.28; }
+    let gust = 1;
     return (t, dt) => {
-      for (const m of streaks) m.material.uniforms.uT.value = t * (m.userData.dir || 1);
-      sleeveU.uT.value = t * 3;
+      // it blows in gusts: everything races and brightens, then eases; the whole cloud of streaks sways with it
+      gust = 0.55 + 0.45 * Math.max(0, Math.sin(t * 1.3) + 0.5 * Math.sin(t * 3.7) + 0.3 * Math.sin(t * 7.1));
+      const swayX = Math.sin(t * 1.1) * 0.12 * gust, swayZ = Math.cos(t * 0.8) * 0.12 * gust;
+      for (const m of streaks) {
+        const d = m.userData; d.ph += dt * d.spd * (0.6 + 1.2 * gust) * (d.dir || 1);
+        m.material.uniforms.uT.value = d.ph;
+        // each streak flickers on its own, strongest in a gust
+        m.material.uniforms.uPow.value = power * (0.5 + 0.5 * gust) * (0.55 + 0.45 * Math.sin(t * 5 + d.flick));
+        m.rotation.set(swayX, 0, swayZ); m.position.copy(pivot).sub(pivot.clone().applyEuler(m.rotation));
+      }
+      sleeveU.uT.value = t * 3; sleeveU.uFlash.value = 0.15 + 0.3 * gust;
       const L = leaves;
       for (let i = 0; i < L.N; i++) {
         L.life[i] += dt; if (L.life[i] >= L.max[i]) spawn(i);
-        const k = L.life[i] / L.max[i], o = i * 3, a = L.ph[i] + t * (5 + L.vel[o] * 3), r = r0 + 0.1 * Math.sin(t * 3 + L.ph[i]) + k * 0.15;
-        L.pos[o] = cx + Math.cos(a) * r; L.pos[o + 2] = cz + Math.sin(a) * r; L.pos[o + 1] += 0.35 * dt; if (L.pos[o + 1] > bx[3] + 0.15) L.pos[o + 1] = bx[2];
+        const k = L.life[i] / L.max[i], o = i * 3, a = L.ph[i] + t * (5 + L.vel[o] * 3) * (0.5 + gust), r = r0 + 0.1 * Math.sin(t * 3 + L.ph[i]) + k * (0.15 + 0.3 * gust);
+        L.pos[o] = cx + Math.cos(a) * r; L.pos[o + 2] = cz + Math.sin(a) * r; L.pos[o + 1] += (0.35 + 0.6 * gust) * dt; if (L.pos[o + 1] > bx[3] + 0.15) L.pos[o + 1] = bx[2];
         L.paint(i, i % 2 ? 1 : 0, Math.sin(k * Math.PI) * 0.9);
       }
       L.flush();
