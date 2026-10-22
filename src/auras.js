@@ -116,6 +116,55 @@ const VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMat
 const VS_FACE = `varying vec2 vUv; varying float vFace; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vec3 n = normalize(normalMatrix * normal); vFace = abs(dot(n, normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }`;
 const sheetFaced = (frag, uniforms, blending = THREE.AdditiveBlending) => new THREE.ShaderMaterial({ vertexShader: VS_FACE, fragmentShader: frag, uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending });
 const sheet = (frag, uniforms, blending = THREE.AdditiveBlending) => new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: frag, uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending });
+// a sheet of fire that always rises: anchored along the blade, it stands up toward the world's up whichever way the
+// blade is held (and when the blade itself points up, it rises along it and spreads across its width instead).
+// built in view space per vertex; position.x runs along (-0.5..0.5), position.y is the rise (-0.25..1)
+const RISE_VS = `
+uniform vec3 uUpL, uCenter; uniform float uSpan, uWide, uH, uOff;
+varying vec2 vUv; varying float vFace;
+void main(){
+  mat3 M = mat3(modelViewMatrix);
+  vec3 Av = M * vec3(0.0, 1.0, 0.0); float sc = length(Av); Av /= sc;
+  vec3 Uv = normalize(M * uUpL);
+  vec3 n = cross(Av, Uv); float dg = length(n);
+  // the blade across the up direction: the sheet lies along the blade. the blade along it: the sheet faces the camera
+  vec3 alongB = normalize(cross(Uv, vec3(0.0, 0.0, 1.0)));
+  float k = smoothstep(0.15, 0.45, dg);
+  vec3 along = normalize(mix(alongB, Av, k));
+  vec3 nn = normalize(mix(normalize(cross(along, Uv)), n / max(dg, 1e-4), k));
+  float len = mix(uWide, uSpan, k) * sc;
+  vec3 c = (modelViewMatrix * vec4(uCenter, 1.0)).xyz;
+  vec3 p = c + along * position.x * len + Uv * position.y * uH * sc + nn * uOff * sc;
+  vUv = vec2(position.x + 0.5, position.y); vFace = abs(nn.z);
+  gl_Position = projectionMatrix * vec4(p, 1.0);
+}`;
+const RISE_FS = `
+uniform sampler2D tN; uniform float uT, uPow, uAsp; varying vec2 vUv; varying float vFace;
+void main(){
+  // noise rising at two speeds; the fire sits on the blade (y near 0) and thins as it rises, tapering at both ends
+  float n1 = texture2D(tN, vec2(vUv.x * 1.3 * uAsp, vUv.y * 0.7 - uT * 0.9)).r;
+  float n2 = texture2D(tN, vec2(vUv.x * 2.6 * uAsp + 0.37, vUv.y * 1.5 - uT * 1.7)).r;
+  float n = n1 * 0.6 + n2 * 0.4;
+  float ends = smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
+  float y = max(vUv.y, 0.0);
+  float body = ends * (1.0 - y * 0.6) * smoothstep(-0.25, -0.05, vUv.y);
+  float f = body * 1.35 - 0.55 + (n - 0.5) * 1.6 * (0.4 + y);
+  float a = smoothstep(0.0, 0.35, f) * (0.55 + 0.45 * uPow) * min(1.0, uPow) * smoothstep(0.05, 0.6, vFace);
+  vec3 col = mix(vec3(1.0, 0.95, 0.75), vec3(1.0, 0.75, 0.2), smoothstep(0.9, 0.5, f));
+  col = mix(col, vec3(1.0, 0.35, 0.05), smoothstep(0.55, 0.15, f));
+  col = mix(col, vec3(0.6, 0.08, 0.02), smoothstep(0.2, 0.0, f));
+  gl_FragColor = vec4(col * a * 1.3, a);
+}`;
+// the sheet's grid: x along (-0.5..0.5), y the rise (-0.25..1)
+function riseGeo(nx = 24, ny = 12) {
+  const pos = [], uv = [], idx = [];
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { pos.push(i / nx - 0.5, -0.25 + 1.25 * j / ny, 0); uv.push(i / nx, j / ny); }
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i; idx.push(a, a + 1, a + nx + 1, a + 1, a + nx + 2, a + nx + 1); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+  return g;
+}
+const riseSheet = (uniforms) => new THREE.ShaderMaterial({ vertexShader: RISE_VS, fragmentShader: RISE_FS, uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
 const FLAME_FS = `
 uniform sampler2D tN; uniform float uT, uPow, uAsp; varying vec2 vUv; varying float vFace;
 void main(){
@@ -264,23 +313,25 @@ const BUILD = {
   // ---------------------------------------------------------------- FLAME
   flame(g, bx, power, { span, wide, cx, cz }) {
     const [x0, x1, y0, y1, z0, z1] = bx;
-    const up = 0.3 + span * 0.5 * power, side = 0.1 + 0.08 * power;
-    const uni = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: (wide + side * 2) / (span + up) } };
-    const fire = new THREE.Mesh(crossedPlanes(bx, up, side), sheetFaced(FLAME_FS, uni)); fire.frustumCulled = false; g.add(fire);
+    const up = 0.3 + span * 0.5 * power, side = 0.06 + 0.05 * power;
+    const center = new THREE.Vector3(cx, (y0 + y1) / 2, cz), upL0 = new THREE.Vector3(0, 1, 0);
+    // three sheets of fire that rise toward the world's up: two a little apart (so there's some thickness), an inner hotter one
+    const mk = (off, h, pw, speed) => {
+      const u = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: pw }, uAsp: { value: 1 }, uUpL: { value: upL0.clone() }, uCenter: { value: center }, uSpan: { value: span * 1.08 }, uWide: { value: wide + side * 2 + 0.1 }, uH: { value: h }, uOff: { value: off } };
+      const m = new THREE.Mesh(riseGeo(), riseSheet(u)); m.frustumCulled = false; g.add(m); return { m, u, speed };
+    };
+    const sheets = [mk(side, up, power, 1), mk(-side, up, power, 1.1), mk(0, up * 0.55, power * 1.2, 1.5)];
     // a body for the fire: soft orange blobs along the blade, facing the camera, so from the tip or edge-on it's a glow and not a cross
     const NB = Math.max(3, Math.round(span / 0.12)), bodyMat = new THREE.SpriteMaterial({ map: softTex(), color: '#ff7a20', transparent: true, opacity: 0.22 * Math.min(1, power), blending: THREE.AdditiveBlending, depthWrite: false });
     for (let i = 0; i < NB; i++) { const sp = new THREE.Sprite(bodyMat); sp.position.set(cx, y0 + span * (i + 0.5) / NB, cz); sp.scale.set(wide + 0.25 + 0.1 * power, span / NB * 2.4, 1); sp.frustumCulled = false; g.add(sp); }
-    // an inner, hotter, narrower sheet, faster
-    const uni2 = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 1.2 }, uAsp: { value: uni.uAsp.value } };
-    const core = new THREE.Mesh(crossedPlanes([x0 + wide * 0.2, x1 - wide * 0.2, y0, y1, z0 + (z1 - z0) * 0.2, z1 - (z1 - z0) * 0.2], up * 0.5, 0.02), sheetFaced(FLAME_FS, uni2)); core.frustumCulled = false; g.add(core);
     // (no smoke: it was asked off; the fire is cleaner without it)
     const embers = cloud(g, Math.round(28 * power), { size: 0.09, tex: emberTex(), colors: ['#fff2b0', '#ff5a10'] });
     const spawn = i => { inBox(embers, i, bx); embers.max[i] = 0.7 + rnd() * 0.9; embers.life[i] = 0; jitter(embers, i, 0.5); embers.ph[i] = rnd() * 6.28; };
     for (let i = 0; i < embers.N; i++) { spawn(i); embers.life[i] = rnd() * embers.max[i]; }
     return (t, dt, up) => {
-      uni.uT.value = t; uni2.uT.value = t * 1.5 + 3;
-      // the sheets flicker a touch
-      fire.material.uniforms.uPow.value = power * (0.9 + 0.1 * Math.sin(t * 23) + 0.08 * Math.sin(t * 37));
+      // the sheets flicker a touch, and stand toward the world's up
+      const flick = 0.9 + 0.1 * Math.sin(t * 23) + 0.08 * Math.sin(t * 37);
+      for (const sh of sheets) { sh.u.uT.value = t * sh.speed + sh.speed * 2; sh.u.uUpL.value.copy(up); sh.u.uPow.value = power * flick * (sh.speed > 1.2 ? 1.2 : 1); }
       bodyMat.opacity = 0.22 * Math.min(1, power) * (0.85 + 0.15 * Math.sin(t * 19));
       const E = embers;
       for (let i = 0; i < E.N; i++) {
