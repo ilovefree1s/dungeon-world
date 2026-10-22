@@ -90,7 +90,7 @@ function render() {
   seg('fHead', t.heads.map(h => [h, h.toUpperCase()]), s.head, v => { s.head = v; });
   seg('fMat', MATERIALS.map(m => [m.id, m.name, m.color]), s.material, v => { s.material = v; });
   const bladed = s.type === 'sword' || s.type === 'greatsword' || s.type === 'dagger', ranged = s.type === 'bow' || s.type === 'crossbow';
-  $('fGuardRow').hidden = !bladed; $('fPommelRow').hidden = ranged; $('fHiltRow').hidden = ranged;
+  $('fGuardRow').hidden = !bladed; $('fPommelRow').hidden = ranged; $('fHiltRow').hidden = ranged; $('fGuardSizeRow').hidden = !bladed; $('fPommelSizeRow').hidden = ranged;
   seg('fGuard', GUARDS.map(x => [x, x.toUpperCase()]), s.guard, v => { s.guard = v; });
   $('fHaftRow').hidden = !hasHaft(s);
   seg('fHaft', HAFTS.map(([id, n, c]) => [id, n, c]), s.haft || 'oak', v => { s.haft = v; });
@@ -111,7 +111,7 @@ function render() {
   });
   $('fHeadRow').hidden = drawable && !!s.shape;
   if (s.shape) { pad.set(s.shape, shapeMode); $('fMirror').classList.toggle('on', !!s.shape.mirror); $('fPadHint').textContent = shapeMode === 'draw' ? 'TRACE THE SILHOUETTE IN ONE STROKE' : shapeMode === 'erase' ? 'RUB OUT WHATEVER YOU DRAG OVER' : 'DRAG THE CORNERS · CLICK AN EDGE TO ADD ONE · DOUBLE-CLICK ONE TO REMOVE IT'; }
-  $('fLen').value = s.length; $('fHilt').value = s.hilt ?? 1; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1;
+  $('fLen').value = s.length; $('fHilt').value = s.gripSize ?? s.hilt ?? 1; $('fGuardSize').value = s.guardSize ?? s.hilt ?? 1; $('fPommelSize').value = s.pommelSize ?? s.hilt ?? 1; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1;
   $('fPowRow').hidden = !s.aura || s.aura === 'none';
   $('fName').value = s.name || '';
   // the saved ones
@@ -159,7 +159,9 @@ function wire() {
   $('fMorePts').addEventListener('click', () => { if (shapeMode !== 'points') { shapeMode = 'points'; render(); } pad.addPoints(); sfx('pickup'); });
   $('fSpin').addEventListener('click', () => { spin = spin ? 0 : 1; $('fSpin').classList.toggle('on', !!spin); $('fSpin').textContent = spin ? 'SPINNING' : 'STILL'; });
   $('fLen').addEventListener('input', e => { forge.spec.length = +e.target.value; rebuild(); });
-  $('fHilt').addEventListener('input', e => { forge.spec.hilt = +e.target.value; rebuild(); });
+  $('fHilt').addEventListener('input', e => { forge.spec.gripSize = +e.target.value; rebuild(); });
+  $('fGuardSize').addEventListener('input', e => { forge.spec.guardSize = +e.target.value; rebuild(); });
+  $('fPommelSize').addEventListener('input', e => { forge.spec.pommelSize = +e.target.value; rebuild(); });
   $('fWid').addEventListener('input', e => { forge.spec.width = +e.target.value; rebuild(); });
   $('fPow').addEventListener('input', e => { forge.spec.auraPower = +e.target.value; rebuild(); });
   $('fName').addEventListener('input', e => { forge.spec.name = e.target.value.toUpperCase().slice(0, 28); });
