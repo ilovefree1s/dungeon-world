@@ -288,9 +288,9 @@ const BUILD = {
   lightning(g, bx, power, { span, wide, cx, cz }) {
     // thin bolts that strike: each one races from its start to its end in a few hundredths of a second
     // (the forks lighting as the leader passes their joint), holds a beat flickering, then is gone; a pause, the next
-    const bolts = makeBolts(g, 1, 0.7 * Math.min(1, Math.max(0.3, span / 1.1)), true);   // (one strike at a time, drawn over the steel)
-    const hazeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: 1 }, uFlash: { value: 0 } };
-    const haze = new THREE.Mesh(crossedPlanes(bx, 0.1, 0.1 + 0.08 * power), sheet(HAZE_FS, hazeU)); haze.frustumCulled = false; g.add(haze);
+    const bolts = makeBolts(g, 2, (0.45 + 0.35 * power) * Math.min(1, Math.max(0.3, span / 1.1)), true);   // (one strike at a time, drawn over the steel; power fattens it)
+    const hazeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: Math.min(1, power) * 0.35 }, uAsp: { value: 1 }, uFlash: { value: 0 } };
+    const haze = new THREE.Mesh(crossedPlanes(bx, 0.06, 0.05), sheet(HAZE_FS, hazeU)); haze.frustumCulled = false; g.add(haze);
     const sparks = cloud(g, Math.round(9 * power), { size: 0.035 + 0.02 * Math.min(1, span), tex: glintTex(), colors: ['#ffffff', '#8ab8ff'] });
     const spawn = i => { inBox(sparks, i, bx); sparks.max[i] = 0.15 + rnd() * 0.25; sparks.life[i] = 0; jitter(sparks, i, 2.6); };
     for (let i = 0; i < sparks.N; i++) { spawn(i); sparks.life[i] = rnd() * sparks.max[i]; }
@@ -303,7 +303,7 @@ const BUILD = {
     return (t, dt) => {
       hazeU.uT.value = t;
       if (!strike && (wait -= dt) <= 0) {
-        strike = { ...genBolt(bx, power), age: 0, steps: [], restrikes: [0.08 + rnd() * 0.08, 0.17 + rnd() * 0.1], stepHold: 0, stepAt: 0 };
+        strike = { ...genBolt(bx, power, Math.round(power * 1.5)), age: 0, steps: [], restrikes: [0.08 + rnd() * 0.08, 0.17 + rnd() * 0.1], stepHold: 0, stepAt: 0 };
         // the leader's jerks: a random schedule of how far along it is at each moment
         let k = 0; while (k < 1) { k = Math.min(1, k + 0.08 + rnd() * 0.22); strike.steps.push(k); }
       }
@@ -321,7 +321,7 @@ const BUILD = {
           bright = 0.35 + rnd() * 0.1;
         } else {
           const a = S.age - LEADER;
-          if (a > STROKE + TAIL) { strike = null; wait = 0.6 + rnd() * 1.2; }
+          if (a > STROKE + TAIL) { strike = null; wait = (0.6 + rnd() * 1.2) / (0.4 + 0.6 * power); }
           else {
             lines.push({ pts: S.main, ws: S.ws });
             for (const f of S.forks) lines.push({ pts: f.pts, w: 0.6 });
@@ -335,7 +335,7 @@ const BUILD = {
         }
       }
       bolts.drawLines(lines, bright);
-      flash = Math.max(0.12, flash - dt * 5); hazeU.uFlash.value = Math.max(flash, bright * 0.5);
+      flash = Math.max(0, flash - dt * 5); hazeU.uFlash.value = Math.max(flash, bright * 0.5) * Math.min(1.5, power);
       const S = sparks;
       for (let i = 0; i < S.N; i++) {
         S.life[i] += dt; if (S.life[i] >= S.max[i]) spawn(i);
@@ -667,7 +667,7 @@ function makeBolts(g, n, sc = 1, overSteel = false) {
 }
 // one bolt's shape, kept as data: the main line low to high along the head's skin (arcing out now and then)
 // and its forks, each noting which joint it leaves from
-function genBolt(bx, power) {
+function genBolt(bx, power, extraForks = 0) {
   const SEG = 9, [x0, x1, y0, y1, z0, z1] = bx, wx = x1 - x0, wz = z1 - z0, span = y1 - y0;
   // (the bolt runs in the blade's middle plane and is drawn over the steel, never hidden by it, so one channel
   // reads the same from either side and edge-on)
@@ -680,7 +680,7 @@ function genBolt(bx, power) {
     if (arcAt >= 0 && Math.abs(i - arcAt) <= 1) { const k = 1 - Math.abs(i - arcAt) * 0.5; x += arcDir * arcR * k; }
     main.push(new THREE.Vector3(x, ya + (yb - ya) * t, z));
   }
-  const forks = [], nf = 1 + Math.floor(rnd() * 3);
+  const forks = [], nf = 1 + Math.floor(rnd() * 2) + extraForks;
   for (let f = 0; f < nf; f++) {
     const j = 1 + Math.floor(rnd() * (SEG - 1)); let a = main[j].clone(); const pts = [a];
     const dx = (rnd() - 0.5) * 0.5, dy = (rnd() - 0.3) * 0.3, len = 2 + Math.floor(rnd() * 2);
