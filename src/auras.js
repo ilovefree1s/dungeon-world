@@ -224,6 +224,18 @@ const tongueTex = () => TX.tongue || (TX.tongue = canvas(128, 128, (x, w, h) => 
   x.fillStyle = g; x.fill();
   x.restore();
 }));
+// a streak: a soft line, bright in the middle, for water running along the blade
+const streakTex = () => TX.streak || (TX.streak = canvas(64, 64, (x, w, h) => { const g = x.createRadialGradient(32, 32, 1, 32, 32, 30); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,0.5)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.beginPath(); x.ellipse(32, 32, 7, 30, 0, 0, 6.3); x.fill(); }));
+// a cloud of points with their own size, alpha, color and lean (the flame's shader), for any of these
+function pointCloud(g, N, tex, tipDir) {
+  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), size = new Float32Array(N), alpha = new Float32Array(N), rot = new Float32Array(N);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1)); geo.setAttribute('aRot', new THREE.BufferAttribute(rot, 1));
+  const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tex }, uUpL: { value: tipDir || new THREE.Vector3(0, 1, 0) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
+  return { pos, col, size, alpha, rot, geo, mat, N, flush() { for (const k of ['position', 'aColor', 'aSize', 'aAlpha', 'aRot']) geo.attributes[k].needsUpdate = true; } };
+}
 // ---------------------------------------------------------------- particles (a cloud of points that knows which way is down)
 function cloud(g, N, { size, tex, colors, blending = THREE.AdditiveBlending, opacity = 1 }) {
   const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), ph = new Float32Array(N);
@@ -405,6 +417,81 @@ const BUILD = {
       D.flush();
       if ((nextRing -= dt) <= 0) { nextRing = 0.25 / power; const m = rings.find(r => r.userData.k >= 1); if (m) { m.userData.k = 0; m.position.set(x0 + rnd() * (x1 - x0), y0 + rnd() * span, z0 + rnd() * (z1 - z0)); m.quaternion.copy(qW); } }
       for (const m of rings) { if (m.userData.k >= 1) { m.material.opacity = 0; continue; } m.userData.k += dt * 2.2; const k = m.userData.k; m.scale.setScalar(0.5 + k * 2.5); m.material.opacity = (1 - k) * 0.8; }
+    };
+  },
+  // ---------------------------------------------------------------- WATER, three more ways
+  // DROPS: no sheath; beads of water forming on the steel, running down it, letting go and falling; splashes where they land
+  drops(g, bx, power, { span, wide, cx, cz }) {
+    const [x0, x1, y0, y1, z0, z1] = bx, N = Math.round((30 + span * 60) * Math.min(2, power));
+    const P = pointCloud(g, N, tongueTex()), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), base = new Float32Array(N);
+    const spawn = i => { const o = i * 3; P.pos[o] = x0 + rnd() * (x1 - x0); P.pos[o + 1] = y0 + rnd() * (y1 - y0); P.pos[o + 2] = rnd() < 0.5 ? z0 - 0.01 : z1 + 0.01; if (rnd() < 0.3) P.pos[o] = rnd() < 0.5 ? x0 - 0.01 : x1 + 0.01; max[i] = 0.9 + rnd() * 0.9; life[i] = 0; vel[o] = vel[o + 1] = vel[o + 2] = 0; base[i] = 0.035 + rnd() * 0.035; };
+    for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
+    const rings = [];
+    for (let i = 0; i < 5; i++) { const m = new THREE.Mesh(ringGeo(0.06, 0.03, 20), new THREE.MeshBasicMaterial({ color: '#9fd8ff', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); m.userData.k = 1; m.frustumCulled = false; g.add(m); rings.push(m); }
+    const c = new THREE.Color(), pale = new THREE.Color('#e4f6ff'), blue = new THREE.Color('#5ab0ff');
+    return (t, dt, up) => {
+      P.mat.uniforms.uUpL.value.copy(up);   // (a drop's round end is down, its point up)
+      for (let i = 0; i < N; i++) {
+        life[i] += dt; const k = life[i] / max[i], o = i * 3;
+        if (k >= 1) { if (rnd() < 0.5) { const m = rings.find(r => r.userData.k >= 1); if (m) { m.userData.k = 0; m.position.set(P.pos[o], P.pos[o + 1], P.pos[o + 2]); m.quaternion.copy(qW); } } spawn(i); continue; }
+        // it beads up, creeps down the steel, then lets go and falls
+        const g0 = k < 0.45 ? 0.25 : 7 * (k - 0.45);
+        vel[o] -= up.x * g0 * dt; vel[o + 1] -= up.y * g0 * dt; vel[o + 2] -= up.z * g0 * dt;
+        P.pos[o] += vel[o] * dt; P.pos[o + 1] += vel[o + 1] * dt; P.pos[o + 2] += vel[o + 2] * dt;
+        P.size[i] = base[i] * (0.5 + Math.min(1, k * 3)) * (k > 0.45 ? 1.25 : 1);
+        c.copy(pale).lerp(blue, Math.min(1, k * 1.5)); P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b;
+        P.alpha[i] = Math.min(1, k * 4) * (k > 0.8 ? 1 - (k - 0.8) * 5 : 1) * (0.6 + 0.4 * Math.min(1, power)); P.rot[i] = 0;
+      }
+      P.flush();
+      for (const m of rings) { if (m.userData.k >= 1) { m.material.opacity = 0; continue; } m.userData.k += dt * 2.2; const kk = m.userData.k; m.scale.setScalar(0.5 + kk * 2.5); m.material.opacity = (1 - kk) * 0.6; }
+    };
+  },
+  // STREAM: a current running up the blade from the hilt and breaking into spray at the tip
+  stream(g, bx, power, { span, wide, cx, cz }) {
+    const [x0, x1, y0, y1, z0, z1] = bx, N = Math.round((40 + span * 80) * Math.min(2, power));
+    const P = pointCloud(g, N, streakTex(), new THREE.Vector3(0, 1, 0)), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), base = new Float32Array(N);
+    const spd = 1.6 + power * 0.6;
+    const spawn = i => { const o = i * 3; P.pos[o] = x0 - 0.01 + rnd() * (x1 - x0 + 0.02); P.pos[o + 1] = y0 + rnd() * span * 0.15; P.pos[o + 2] = rnd() < 0.5 ? z0 - 0.012 : z1 + 0.012; if (rnd() < 0.3) P.pos[o] = rnd() < 0.5 ? x0 - 0.012 : x1 + 0.012; max[i] = (span * 0.95 / spd) * (0.85 + rnd() * 0.3) + 0.25; life[i] = 0; vel[o] = (rnd() - 0.5) * 0.08; vel[o + 1] = spd * (0.85 + rnd() * 0.3); vel[o + 2] = (rnd() - 0.5) * 0.08; base[i] = 0.05 + rnd() * 0.05; };
+    for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
+    const c = new THREE.Color(), deep = new THREE.Color('#3a8cff'), foam = new THREE.Color('#ffffff');
+    return (t, dt, up) => {
+      for (let i = 0; i < N; i++) {
+        life[i] += dt; if (life[i] >= max[i]) spawn(i);
+        const k = life[i] / max[i], o = i * 3;
+        const past = P.pos[o + 1] > y1;   // off the tip: spray, slowing, scattering, falling a little
+        if (past) { vel[o] += (rnd() - 0.5) * 2 * dt - up.x * 3 * dt; vel[o + 1] = vel[o + 1] * (1 - 2.5 * dt) - up.y * 3 * dt; vel[o + 2] += (rnd() - 0.5) * 2 * dt - up.z * 3 * dt; }
+        P.pos[o] += vel[o] * dt; P.pos[o + 1] += vel[o + 1] * dt; P.pos[o + 2] += vel[o + 2] * dt;
+        P.size[i] = past ? base[i] * 0.7 : base[i] * (1.6 + 0.6 * Math.sin(t * 9 + i));
+        c.copy(deep).lerp(foam, past ? 0.9 : 0.25 + 0.3 * rnd()); P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b;
+        P.alpha[i] = Math.min(1, k * 6) * (1 - k * k) * (0.5 + 0.5 * Math.min(1, power)); P.rot[i] = past ? rnd() * 6.28 : 0;
+      }
+      P.flush();
+    };
+  },
+  // SWIRL: two ribbons of water spiralling round the blade, slowly turning, with drops thrown off
+  swirl(g, bx, power, { span, wide, cx, cz }) {
+    const [x0, x1, y0, y1, z0, z1] = bx;
+    const ribbons = [];
+    for (let i = 0; i < 2; i++) {
+      const u = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: 4 } };
+      const m = new THREE.Mesh(helixGeo(bx, 2.2 + i * 0.4, i * Math.PI, 0.07 + 0.03 * power, 96, 1.1 + i * 0.15), sheet(WATER_FS, u)); m.frustumCulled = false; g.add(m); ribbons.push({ m, u });
+    }
+    const pivot = new THREE.Vector3(cx, 0, cz);
+    const N = Math.round(16 * power), P = pointCloud(g, N, tongueTex()), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3);
+    const spawn = i => { const o = i * 3, a = rnd() * 6.28, r = wide / 2 + 0.12; P.pos[o] = cx + Math.cos(a) * r; P.pos[o + 1] = y0 + rnd() * span; P.pos[o + 2] = cz + Math.sin(a) * r; vel[o] = Math.cos(a) * 0.4; vel[o + 1] = 0; vel[o + 2] = Math.sin(a) * 0.4; max[i] = 0.5 + rnd() * 0.5; life[i] = 0; };
+    for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
+    const c = new THREE.Color(), pale = new THREE.Color('#e4f6ff'), blue = new THREE.Color('#5ab0ff');
+    return (t, dt, up) => {
+      for (const r of ribbons) { r.u.uT.value = t; r.m.position.set(0, 0, 0); r.m.rotation.y = 0; r.m.position.copy(pivot); r.m.rotation.y = t * 1.2 * power; r.m.position.sub(pivot.clone().applyAxisAngle(upW, r.m.rotation.y)); }
+      P.mat.uniforms.uUpL.value.copy(up);
+      for (let i = 0; i < N; i++) {
+        life[i] += dt; if (life[i] >= max[i]) spawn(i);
+        const k = life[i] / max[i], o = i * 3;
+        vel[o] -= up.x * 5 * dt; vel[o + 1] -= up.y * 5 * dt; vel[o + 2] -= up.z * 5 * dt;
+        P.pos[o] += vel[o] * dt; P.pos[o + 1] += vel[o + 1] * dt; P.pos[o + 2] += vel[o + 2] * dt;
+        P.size[i] = 0.05; c.copy(pale).lerp(blue, k); P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b; P.alpha[i] = (1 - k) * 0.8; P.rot[i] = 0;
+      }
+      P.flush();
     };
   },
   // ---------------------------------------------------------------- WIND
