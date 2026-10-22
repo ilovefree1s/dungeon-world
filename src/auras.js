@@ -562,8 +562,11 @@ const BUILD = {
     };
   },
   // BLIZZARD: snow whipping round the blade in a cold whirl, thick with flakes, glinting
-  blizzard(g, bx, power, { span, wide, cx, cz }) {
-    const [x0, x1, y0, y1, z0, z1] = bx, N = Math.round((80 + span * 120) * Math.min(2, power));
+  blizzard(g, bx, power, opts) {
+    const { span, wide, cx, cz } = opts;
+    // (with a little of the frost's crystals and glints underneath it)
+    const frostTick = BUILD.frost(g, bx, 0.2, opts);
+    const [x0, x1, y0, y1, z0, z1] = bx, N = Math.round((140 + span * 200) * Math.min(2, power));
     const P = pointCloud(g, N, softTex()), ang = new Float32Array(N), rad = new Float32Array(N), y = new Float32Array(N), w = new Float32Array(N), ph = new Float32Array(N), big = new Float32Array(N);
     const r0 = wide / 2 + 0.05;
     for (let i = 0; i < N; i++) { ang[i] = rnd() * 6.28; rad[i] = r0 + rnd() * rnd() * 0.5; y[i] = y0 - 0.1 + rnd() * (span + 0.2); w[i] = (2 + rnd() * 4) * (rnd() < 0.5 ? 1 : -1); ph[i] = rnd() * 6.28; big[i] = rnd() < 0.15 ? 1 : 0; }
@@ -584,6 +587,7 @@ const BUILD = {
       const G = glints;
       for (let i = 0; i < G.N; i++) { const k = (t * G.max[i] + G.ph[i]) % 1; G.paint(i, 0, Math.max(0, Math.sin(k * Math.PI) ** 6)); }
       G.flush();
+      frostTick(t, dt, up);
     };
   },
   // SHARDS: a ring of long ice shards floating round the blade, turning slowly and tumbling, in a cold mist
