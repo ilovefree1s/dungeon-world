@@ -288,7 +288,7 @@ const BUILD = {
   lightning(g, bx, power, { span, wide, cx, cz }) {
     // thin bolts that strike: each one races from its start to its end in a few hundredths of a second
     // (the forks lighting as the leader passes their joint), holds a beat flickering, then is gone; a pause, the next
-    const bolts = makeBolts(g, 2, (0.45 + 0.35 * power) * Math.min(1, Math.max(0.3, span / 1.1)), true);   // (one strike at a time, drawn over the steel; power fattens it)
+    const bolts = makeBolts(g, 2, 0.7 * Math.min(1, Math.max(0.3, span / 1.1)) * (power > 1 ? 1 + (power - 1) * 0.15 : 0.6 + 0.4 * power), true);   // (one strike at a time, drawn over the steel; thin as before at 1, only a touch fatter above)
     const hazeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: Math.min(1, power) * 0.35 }, uAsp: { value: 1 }, uFlash: { value: 0 } };
     const haze = new THREE.Mesh(crossedPlanes(bx, 0.06, 0.05), sheet(HAZE_FS, hazeU)); haze.frustumCulled = false; g.add(haze);
     const sparks = cloud(g, Math.round(9 * power), { size: 0.035 + 0.02 * Math.min(1, span), tex: glintTex(), colors: ['#ffffff', '#8ab8ff'] });
