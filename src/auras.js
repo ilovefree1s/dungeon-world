@@ -1,5 +1,5 @@
 // the weapon auras: each one its own build, not a recolored cloud of dots.
-//   flame     fire sheets licking up the blade (a noise-shaped shader on crossed planes), embers rising, smoke
+//   flame     fire sheets licking up the blade (a noise-shaped shader on crossed planes), embers rising
 //   lightning jagged forking bolts with a hot white core and a violet glow, an ion haze that flashes with them, sparks
 //   water     a rippling water sheath wrapped around the blade, drops running off it, falling world-down
 //   wind      helix streaks racing around the blade, with leaves caught in the gust
@@ -238,13 +238,12 @@ const BUILD = {
     // an inner, hotter, narrower sheet, faster
     const uni2 = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 1.2 }, uAsp: { value: uni.uAsp.value } };
     const core = new THREE.Mesh(crossedPlanes([x0 + wide * 0.2, x1 - wide * 0.2, y0, y1, z0 + (z1 - z0) * 0.2, z1 - (z1 - z0) * 0.2], up * 0.5, 0.02), sheet(FLAME_FS, uni2)); core.frustumCulled = false; g.add(core);
-    const smokeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 0.6 }, uAsp: { value: 1 }, uCol: { value: new THREE.Color('#5a4a42') } };
-    const smoke = new THREE.Mesh(crossedPlanes([x0 - 0.05, x1 + 0.05, y0 + span * 0.6, y1 + up * 0.9, z0 - 0.05, z1 + 0.05], span * 0.8, 0.1), sheet(SMOKE_FS, smokeU, THREE.NormalBlending)); smoke.material.uniforms.uPow.value = power * 0.35; smoke.frustumCulled = false; smoke.renderOrder = -1; g.add(smoke);
+    // (no smoke: it was asked off; the fire is cleaner without it)
     const embers = cloud(g, Math.round(28 * power), { size: 0.09, tex: emberTex(), colors: ['#fff2b0', '#ff5a10'] });
     const spawn = i => { inBox(embers, i, bx); embers.max[i] = 0.7 + rnd() * 0.9; embers.life[i] = 0; jitter(embers, i, 0.5); embers.ph[i] = rnd() * 6.28; };
     for (let i = 0; i < embers.N; i++) { spawn(i); embers.life[i] = rnd() * embers.max[i]; }
     return (t, dt, up) => {
-      uni.uT.value = t; uni2.uT.value = t * 1.5 + 3; smokeU.uT.value = t * 0.7;
+      uni.uT.value = t; uni2.uT.value = t * 1.5 + 3;
       // the sheets flicker a touch
       fire.material.uniforms.uPow.value = power * (0.9 + 0.1 * Math.sin(t * 23) + 0.08 * Math.sin(t * 37));
       const E = embers;

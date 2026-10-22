@@ -17,7 +17,7 @@ export const MAT = {
   land: linearColors(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide })),
   flora: linearColors(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })),
   glow: linearColors(new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.9, 1.9, 1.9) })),
-  water: linearColors(new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, opacity: 0.74, shininess: 110, specular: new THREE.Color('#d8ecff'), depthWrite: false })),
+  water: linearColors(new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, opacity: 0.74, shininess: 48, specular: new THREE.Color('#6a86a8'), depthWrite: false })),
 };
 const UNLOADED = 255;
 const key = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
