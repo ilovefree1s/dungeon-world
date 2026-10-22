@@ -53,8 +53,8 @@ with sync_playwright() as pw:
     check(n == 400, f'every type, head and material combination builds ({n})')
     n = page.evaluate("""(async () => { const K = await import('./src/weaponkit.js'); let n = 0;
       for (const a of K.AURAS) for (const t of ['sword', 'staff', 'bow']) { const s = K.defaultSpec(); s.type = t; s.head = K.TYPES.find(x => x.id === t).heads[0]; s.aura = a.id; const g = K.buildForged(s); if (a.id !== 'none' && !g.userData.tick) throw new Error('no aura tick'); if (g.userData.tick) { g.userData.tick(1); g.userData.tick(1.05); } n++; } return n; })()""")
-    check(n == 39, f'every aura builds and ticks on a blade, a staff and a bow ({n})')
-    check(page.evaluate("document.querySelectorAll('#fAura button').length") == 13, 'thirteen aura choices')
+    check(n == 36, f'every aura builds and ticks on a blade, a staff and a bow ({n})')
+    check(page.evaluate("document.querySelectorAll('#fAura button').length") == 12, 'twelve aura choices')
     # drawing the blade: POINTS (drag a corner) and DRAW (trace a silhouette)
     page.evaluate("[...document.querySelectorAll('#fType button')].find(b => b.dataset.v === 'sword').click()"); frames(2)
     page.evaluate("[...document.querySelectorAll('#fShape button')].find(b => b.dataset.v === 'points').click()"); frames(2)

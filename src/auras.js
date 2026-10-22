@@ -1,5 +1,5 @@
 // the weapon auras: each one its own build, not a recolored cloud of dots.
-//   flame     fire sheets licking up the blade (a noise-shaped shader on crossed planes), embers rising
+//   flame     tongues of fire born all over the blade, rising toward the world's up (points with their own size, lean and color)
 //   lightning jagged forking bolts with a hot white core and a light-blue glow, an ion haze that flashes with them, sparks
 //   arcs / plasma / coil / static: four more takes on lightning (slow writhing arcs; a filament skin; coil rings with
 //             jumps between them; a crackle of tiny sparks)
@@ -286,41 +286,10 @@ export function attachAura(g, kind, bx, power = 1, size = 1) {
 }
 
 const BUILD = {
-  // ---------------------------------------------------------------- FLAME
-  flame(g, bx, power, { span, wide, cx, cz }) {
-    const [x0, x1, y0, y1, z0, z1] = bx;
-    const up = 0.3 + span * 0.5 * power, side = 0.1 + 0.08 * power;
-    const uni = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: (wide + side * 2) / (span + up) } };
-    const fire = new THREE.Mesh(crossedPlanes(bx, up, side), sheetFaced(FLAME_FS, uni)); fire.frustumCulled = false; g.add(fire);
-    // a body for the fire: soft orange blobs along the blade, facing the camera, so from the tip or edge-on it's a glow and not a cross
-    const NB = Math.max(3, Math.round(span / 0.12)), bodyMat = new THREE.SpriteMaterial({ map: softTex(), color: '#ff7a20', transparent: true, opacity: 0.22 * Math.min(1, power), blending: THREE.AdditiveBlending, depthWrite: false });
-    for (let i = 0; i < NB; i++) { const sp = new THREE.Sprite(bodyMat); sp.position.set(cx, y0 + span * (i + 0.5) / NB, cz); sp.scale.set(wide + 0.25 + 0.1 * power, span / NB * 2.4, 1); sp.frustumCulled = false; g.add(sp); }
-    // an inner, hotter, narrower sheet, faster
-    const uni2 = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 1.2 }, uAsp: { value: uni.uAsp.value } };
-    const core = new THREE.Mesh(crossedPlanes([x0 + wide * 0.2, x1 - wide * 0.2, y0, y1, z0 + (z1 - z0) * 0.2, z1 - (z1 - z0) * 0.2], up * 0.5, 0.02), sheetFaced(FLAME_FS, uni2)); core.frustumCulled = false; g.add(core);
-    // (no smoke: it was asked off; the fire is cleaner without it)
-    const embers = cloud(g, Math.round(28 * power), { size: 0.09, tex: emberTex(), colors: ['#fff2b0', '#ff5a10'] });
-    const spawn = i => { inBox(embers, i, bx); embers.max[i] = 0.7 + rnd() * 0.9; embers.life[i] = 0; jitter(embers, i, 0.5); embers.ph[i] = rnd() * 6.28; };
-    for (let i = 0; i < embers.N; i++) { spawn(i); embers.life[i] = rnd() * embers.max[i]; }
-    return (t, dt, up) => {
-      uni.uT.value = t; uni2.uT.value = t * 1.5 + 3;
-      // the sheets flicker a touch
-      fire.material.uniforms.uPow.value = power * (0.9 + 0.1 * Math.sin(t * 23) + 0.08 * Math.sin(t * 37));
-      bodyMat.opacity = 0.22 * Math.min(1, power) * (0.85 + 0.15 * Math.sin(t * 19));
-      const E = embers;
-      for (let i = 0; i < E.N; i++) {
-        E.life[i] += dt; if (E.life[i] >= E.max[i]) spawn(i);
-        const k = E.life[i] / E.max[i], o = i * 3, sw = Math.sin(t * 6 + E.ph[i]) * 0.25;
-        E.pos[o] += (E.vel[o] * 0.4 + up.x * (1.2 + k) + sw * 0.3) * dt; E.pos[o + 1] += (E.vel[o + 1] * 0.4 + up.y * (1.2 + k)) * dt; E.pos[o + 2] += (E.vel[o + 2] * 0.4 + up.z * (1.2 + k) + sw * 0.3) * dt;
-        E.paint(i, k, (1 - k) * Math.min(1, k * 8) * (0.7 + 0.3 * Math.sin(t * 20 + E.ph[i])));
-      }
-      E.flush();
-    };
-  },
-  // ---------------------------------------------------------------- FLAME 2: particles
+  // ---------------------------------------------------------------- FLAME (particles)
   // tongues of flame born all over the blade, rising toward the world's up, swelling then shrinking as they cool from
   // white to yellow to orange to a red that fades out; the same from any side, and they rise off a tilted blade
-  flame2(g, bx, power, { span, wide, cx, cz, size: tongue }) {
+  flame(g, bx, power, { span, wide, cx, cz, size: tongue }) {
     const [x0, x1, y0, y1, z0, z1] = bx;
     const N = Math.round((30 + span * 70) * Math.min(2, power));
     const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), size = new Float32Array(N), alpha = new Float32Array(N), rot = new Float32Array(N);

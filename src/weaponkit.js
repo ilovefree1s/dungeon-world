@@ -147,7 +147,6 @@ export const POMMELS = ['none', 'ball', 'disc', 'spike', 'gem', 'ring'];
 export const AURAS = [
   { id: 'none', name: 'NONE' },
   { id: 'flame', name: 'FLAME', color: '#ff8a2a' },
-  { id: 'flame2', name: 'FLAME 2', color: '#ff8a2a' },
   { id: 'lightning', name: 'BOLTS', color: '#9fe0ff' },
   { id: 'arcs', name: 'ARCS', color: '#b8d8ff' },
   { id: 'plasma', name: 'PLASMA', color: '#6ae0ff' },
@@ -363,7 +362,7 @@ export function buildForged(spec) {
   g.userData.bladeMat = metal;
   // the aura, along the business end
   if (spec.aura && spec.aura !== 'none' && g.userData.auraBox) {
-    const auraTick = attachAura(g, spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1);
+    const auraTick = attachAura(g, spec.aura === 'flame2' ? 'flame' : spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1);
     const base = g.userData.tick;
     g.userData.tick = t => { if (base) base(t); auraTick(t); };
   }
