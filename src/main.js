@@ -13,6 +13,7 @@ import { Monsters, Bolts, stats, xpToNext } from './combat.js';
 import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollDrop } from './loot.js';
+import { statsOf } from './weaponkit.js';
 import { burst, ring, stepFx } from './fx.js';
 import { grassUniforms } from './flora.js';
 import { updateAmbience } from './ambience.js';
@@ -67,7 +68,11 @@ function openLoot(b) {
   lootBody = b; const d = bodies.describe(b.spec);
   $('lootName').textContent = d.name; $('lootName').style.color = d.rare ? '#9fe0ff' : '';
   $('lootLine').textContent = d.line;
-  $('lootStats').textContent = `DAMAGE x${d.stats.dmg} · SPEED x${d.stats.spd} · REACH ${d.stats.reach}` + (d.stats.cls !== 0 ? ` · SHOT x${d.stats.shot}` : '');
+  // each number beside what the hero of that class wields now (the plain weapon if nothing's forged): up in green, down in red
+  const have = equippedSpec(d.cls), cur = have ? statsOf(have) : { dmg: 1, spd: 1, reach: 4.6, shot: 1 };
+  const row = (label, a, b, pre = 'x') => { const dlt = +(a - b).toFixed(2); const col = dlt > 0 ? '#5ce65c' : dlt < 0 ? '#ff6a55' : 'var(--dim)'; const arrow = dlt > 0 ? '▲' : dlt < 0 ? '▼' : '='; return `<div><span style="display:inline-block;width:72px;text-align:left">${label}</span> ${pre}${a} <b style="color:${col}">${arrow} ${dlt > 0 ? '+' : ''}${dlt || ''}</b> <span style="color:var(--dim);font-weight:700">(now ${pre}${b})</span></div>`; };
+  $('lootStats').innerHTML = row('DAMAGE', d.stats.dmg, cur.dmg) + row('SPEED', d.stats.spd, cur.spd) + row('REACH', d.stats.reach, cur.reach, '') + (d.stats.cls !== 0 ? row('SHOT', d.stats.shot, cur.shot) : '')
+    + `<div class="small" style="margin-top:6px">${have ? 'AGAINST ' + (have.name || 'YOUR FORGED WEAPON') : 'AGAINST THE PLAIN ONE'}</div>`;
   $('lootWield').textContent = d.cls === player.cls ? 'TAKE & WIELD' : `TAKE & WIELD (AS THE ${['WARRIOR', 'MAGE', 'HUNTER'][d.cls]})`;
   unlockMouse(); UI.state = 'loot'; $('loot').hidden = false; sfx('rare');
 }
