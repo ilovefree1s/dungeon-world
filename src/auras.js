@@ -229,8 +229,8 @@ void main(){
 // (the tip of each tongue points the way the flames rise as the camera sees it, plus its own small lean)
 const FIRE_PTS_VS = `attribute float aSize, aAlpha, aRot; attribute vec3 aColor; uniform vec3 uUpL; varying vec3 vCol; varying float vA, vR;
 void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * 340.0 / max(0.5, -mv.z);
-  vec3 uv3 = normalize(mat3(modelViewMatrix) * uUpL); float flat = clamp(length(uv3.xy) * 2.0, 0.0, 1.0);
-  vCol = aColor; vA = aAlpha; vR = atan(-uv3.x, uv3.y) * flat + aRot; gl_Position = projectionMatrix * mv; }`;
+  vec3 uv3 = normalize(mat3(modelViewMatrix) * uUpL); float fl = clamp(length(uv3.xy) * 2.0, 0.0, 1.0);
+  vCol = aColor; vA = aAlpha; vR = atan(-uv3.x, uv3.y) * fl + aRot; gl_Position = projectionMatrix * mv; }`;
 // (each tongue leans its own way: the texture lookup is turned by the point's angle)
 const FIRE_PTS_FS = `uniform sampler2D tM; varying vec3 vCol; varying float vA, vR;
 void main(){ vec2 c = gl_PointCoord - 0.5; float cs = cos(vR), sn = sin(vR); vec2 q = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs) + 0.5;
