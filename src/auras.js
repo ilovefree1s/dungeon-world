@@ -157,8 +157,9 @@ void main(){
   // ridges of the ripple catch the light as thin bright bands
   float ridge = smoothstep(0.52, 0.6, n) * smoothstep(0.7, 0.62, n);
   float a = edge * cap * (0.25 + 0.45 * smoothstep(0.35, 0.75, n)) * (0.5 + 0.5 * uPow) * min(1.0, uPow);
-  vec3 col = mix(vec3(0.1, 0.4, 0.95), vec3(0.45, 0.8, 1.0), n) + ridge * vec3(0.7, 0.9, 1.0);
-  gl_FragColor = vec4(col * (a + ridge * 0.5), a + ridge * edge * cap * 0.6);
+  // the drops' blue: a deep blue body, a lighter sky blue where it ripples, the ridges a pale blue rather than white
+  vec3 col = mix(vec3(0.12, 0.42, 1.0), vec3(0.35, 0.69, 1.0), n) + ridge * vec3(0.45, 0.72, 1.0);
+  gl_FragColor = vec4(col * (a + ridge * 0.4), a + ridge * edge * cap * 0.5);
 }`;
 const RAYS_FS = `
 uniform sampler2D tN; uniform float uT, uPow, uAsp; varying vec2 vUv;
