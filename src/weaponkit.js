@@ -358,7 +358,7 @@ export function buildForged(spec) {
   g.userData.bladeMat = metal;
   // the aura, along the business end
   if (spec.aura && spec.aura !== 'none' && g.userData.auraBox) {
-    const auraTick = attachAura(g, ({ flame2: 'flame', arcs: 'lightning', plasma: 'lightning', coil: 'lightning', static: 'lightning', drops: 'water', stream: 'water', swirl: 'water', gust: 'wind', vortex: 'wind', slashes: 'wind' })[spec.aura] || spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1);
+    const auraTick = attachAura(g, ({ flame2: 'flame', arcs: 'lightning', plasma: 'lightning', coil: 'lightning', static: 'lightning', drops: 'water', stream: 'water', swirl: 'water', gust: 'wind', vortex: 'wind', slashes: 'wind' })[spec.aura] || spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1, spec.auraSpeed ?? 1);
     const base = g.userData.tick;
     g.userData.tick = t => { if (base) base(t); auraTick(t); };
   }

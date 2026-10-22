@@ -257,14 +257,14 @@ const jitter = (c, i, s) => { c.vel[i * 3] = (rnd() - 0.5) * s; c.vel[i * 3 + 1]
 
 // ---------------------------------------------------------------- the auras
 const upW = new THREE.Vector3(0, 1, 0), qW = new THREE.Quaternion(), upL = new THREE.Vector3();
-export function attachAura(g, kind, bx, power = 1, size = 1) {
+export function attachAura(g, kind, bx, power = 1, size = 1, speed = 1) {
   power = Math.max(0.05, Math.min(3, power));
   const [x0, x1, y0, y1, z0, z1] = bx, span = Math.max(0.1, y1 - y0), wide = Math.max(x1 - x0, z1 - z0);
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   const build = BUILD[kind];
   if (!build) return () => {};
   const before = new Set(g.children);
-  const parts = build(g, bx, power, { span, wide, cx, cz, size: Math.max(0.3, Math.min(3, size)) });
+  const parts = build(g, bx, power, { span, wide, cx, cz, size: Math.max(0.3, Math.min(3, size)), speed: Math.max(0.05, Math.min(3, speed)) });
   for (const o of g.children) if (!before.has(o)) o.traverse(c => { c.userData.aura = true; });
   let last = -1;
   return t => {
@@ -429,7 +429,7 @@ const BUILD = {
     };
   },
   // ---------------------------------------------------------------- WIND
-  wind(g, bx, power, { span, wide, cx, cz }) {
+  wind(g, bx, power, { span, wide, cx, cz, speed }) {
     const streaks = [];
     // (the slider runs 0 .. 1.2: at the top, four big streaks and ten small; down from there, fewer and fainter)
     const n = Math.max(1, Math.round(power * 3.33));
@@ -454,8 +454,10 @@ const BUILD = {
     for (let i = 0; i < leaves.N; i++) { spawn(i); leaves.life[i] = rnd() * leaves.max[i]; }
     const r0 = wide / 2 + 0.12, pivot = new THREE.Vector3(cx, (bx[2] + bx[3]) / 2, cz);
     for (const m of streaks) { m.userData.ph = rnd() * 10; m.userData.spd = 1 + rnd() * 0.8; m.userData.flick = rnd() * 6.28; }
-    let gust = 1;
-    return (t, dt) => {
+    let gust = 1, clock = 0;
+    return (t0, dt0) => {
+      // (its own clock, so the SPEED slider slows or quickens all of it together)
+      const dt = dt0 * speed; clock += dt; const t = clock;
       // it blows in gusts: everything races and brightens, then eases; the whole cloud of streaks sways with it
       gust = 0.55 + 0.45 * Math.max(0, Math.sin(t * 1.3) + 0.5 * Math.sin(t * 3.7) + 0.3 * Math.sin(t * 7.1));
       const swayX = Math.sin(t * 1.1) * 0.12 * gust, swayZ = Math.cos(t * 0.8) * 0.12 * gust;
