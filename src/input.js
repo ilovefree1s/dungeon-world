@@ -10,7 +10,7 @@ export const input = {
   jump: false, jumpEdge: false, sprint: false, atk: false, atkEdge: false, useEdge: false, abEdge: [false, false, false],
   menuEdge: [], lastDevice: 'kb', stickX: 0, stickY: 0, stickId: null,
   mouseSpeed: 1, zoom: 0, wantLock: null, onLockChange: null,
-  cursorMode: false, cursor: { x: 0, y: 0, in: false }, clickAt: null, bothHeld: false, turnWith: false,
+  cursorMode: false, cursor: { x: 0, y: 0, in: false }, clickAt: null, rclickAt: null, bothHeld: false, turnWith: false, autoAtk: false,
 };
 const keys = {};
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyD: 'right',
@@ -98,7 +98,8 @@ export function initTouch(canvas) {
     if (e.pointerType === 'mouse' && input.cursorMode) {
       mouseButtons &= ~(1 << e.button); input.bothHeld = (mouseButtons & 3) === 3;
       // a click that didn't drag: pick what's under the cursor (left), or the first ability (right)
-      if (l && l.moved !== undefined && l.moved < 6 && performance.now() - l.t0 < 400) { if (l.button === 0) input.clickAt = { x: e.clientX, y: e.clientY }; else if (l.button === 2) input.abEdge[0] = true; }
+      // a click that didn't drag: the left picks what's under the cursor (a target, loot); the right attacks it (auto-attack)
+      if (l && l.moved !== undefined && l.moved < 6 && performance.now() - l.t0 < 400) { if (l.button === 0) input.clickAt = { x: e.clientX, y: e.clientY }; else if (l.button === 2) input.rclickAt = { x: e.clientX, y: e.clientY }; }
       return;
     }
     if (e.button === 0) input.mAtk = 0;
@@ -166,7 +167,7 @@ export function readInput() {
   input.lookRY = p ? p.ry : 0;
   input.jump = !!(keys.jump || input.tJump || (p && p.now.jump));
   input.sprint = !!(keys.sprint || (p && p.now.sprint));
-  input.atk = !!(keys.atk || input.tAtk || input.mAtk || (p && p.now.atk));
+  input.atk = !!(keys.atk || input.tAtk || input.mAtk || input.autoAtk || (p && p.now.atk));
   return input;
 }
 export function takeLook() { const x = input.lookX, y = input.lookY; input.lookX = input.lookY = 0; return [x, y]; }

@@ -97,9 +97,10 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 | Move | WASD | left stick / d-pad | the stick |
 | Look | drag with the mouse (left-drag orbits the camera, right-drag turns you with it, both buttons held walk you forward), Q / E, ← → | right stick | swipe the screen |
 | Zoom | the scroll wheel | | |
-| Attack | click a monster (it's focused: your attacks aim at it until it falls), or J / click the ground to swing where you look | X / ▢ | ATTACK |
-| Look at loot | click a fallen monster, or F near one | X / ▢ | ATTACK |
-| Abilities 1, 2, 3 | 1, 2, 3 (or right click / K, Q, E) | B / ○, Y / △, LB | the ability bar |
+| Target | left click a monster (your attacks aim at it until it falls; a click on the ground lets it go) | | |
+| Attack | right click a monster: auto-attack until it falls (right click again stops); right click elsewhere or J swings where you look | X / ▢ | ATTACK |
+| Look at loot | left click a fallen monster, or F near one | X / ▢ | ATTACK |
+| Abilities 1, 2, 3 | 1, 2, 3 (or K, Q, E; right click too with the captured mouse) | B / ○, Y / △, LB | the ability bar |
 | Jump | Space | A / ✕ | JUMP |
 | Run | Shift (the stick pushed all the way runs too) | RB, LT or a stick's click | push the stick to its edge |
 | Menu | Esc, P | Start | the ☰ button |

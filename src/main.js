@@ -104,13 +104,24 @@ function heroCombat(dt, inp, frozen) {
     if (inp.turnWith) { player.aimFace = player.yaw + Math.PI; inp.turnWith = false; }
     // what's under the cursor shapes it: a sword over a monster, a hand over loot
     if (inp.cursor.in) { const m = pickMonster(monsters, inp.cursor.x, inp.cursor.y, w, h); const b = m ? null : bodies.pickAt(inp.cursor.x, inp.cursor.y, w, h); gl.style.cursor = m ? 'crosshair' : b ? 'pointer' : 'default'; }
-    // a click: a monster is focused (attacks aim at it) and struck at; a body with loot is looked at; else a swing where you look
+    // the left click targets: a monster is focused (attacks aim at it), a body with loot is looked at, the ground clears the focus
     if (inp.clickAt) {
       const c = inp.clickAt; inp.clickAt = null;
       const m = pickMonster(monsters, c.x, c.y, w, h);
-      if (m) { monsters.focus = m; inp.atkEdge = true; }
-      else { const b = bodies.pickAt(c.x, c.y, w, h); if (b) { openLoot(b); return; } monsters.focus = null; inp.atkEdge = true; }
+      if (m) monsters.focus = m;
+      else { const b = bodies.pickAt(c.x, c.y, w, h); if (b) { openLoot(b); return; } monsters.focus = null; inp.autoAtk = false; }
     }
+    // the right click attacks: on a monster, it's focused and auto-attack starts (another right click stops it);
+    // on nothing, with a focus, auto-attack toggles; with none, one swing where you look
+    if (inp.rclickAt) {
+      const c = inp.rclickAt; inp.rclickAt = null;
+      const m = pickMonster(monsters, c.x, c.y, w, h);
+      if (m && m !== monsters.focus) { monsters.focus = m; inp.autoAtk = true; }
+      else if (monsters.focus) inp.autoAtk = !inp.autoAtk;
+      else inp.atkEdge = true;
+    }
+    // auto-attack ends with its target
+    if (inp.autoAtk && !monsters.focus) inp.autoAtk = false;
     // F looks at the loot you're near, as before
     if (bodies.target && inp.useEdge) { inp.useEdge = false; openLoot(bodies.target); return; }
   }
