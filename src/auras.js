@@ -226,12 +226,30 @@ void main(){
 }`;
 
 // ---------------------------------------------------------------- flame particles: points with their own size and alpha
-const FIRE_PTS_VS = `attribute float aSize, aAlpha; attribute vec3 aColor; varying vec3 vCol; varying float vA;
-void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * 340.0 / max(0.5, -mv.z); vCol = aColor; vA = aAlpha; gl_Position = projectionMatrix * mv; }`;
-const FIRE_PTS_FS = `uniform sampler2D tM; varying vec3 vCol; varying float vA;
-void main(){ float m = texture2D(tM, gl_PointCoord).a; gl_FragColor = vec4(vCol * m * vA, m * vA); }`;
-// a flame tongue: soft, a little taller than wide, bright at the bottom
-const tongueTex = () => TX.tongue || (TX.tongue = canvas(64, 64, (x, w, h) => { const g = x.createRadialGradient(32, 38, 2, 32, 34, 30); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.7)'); g.addColorStop(0.7, 'rgba(255,255,255,0.2)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.beginPath(); x.ellipse(32, 34, 26, 30, 0, 0, 6.3); x.fill(); }));
+// (the tip of each tongue points the way the flames rise as the camera sees it, plus its own small lean)
+const FIRE_PTS_VS = `attribute float aSize, aAlpha, aRot; attribute vec3 aColor; uniform vec3 uUpL; varying vec3 vCol; varying float vA, vR;
+void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * 340.0 / max(0.5, -mv.z);
+  vec3 uv3 = normalize(mat3(modelViewMatrix) * uUpL); float flat = clamp(length(uv3.xy) * 2.0, 0.0, 1.0);
+  vCol = aColor; vA = aAlpha; vR = atan(-uv3.x, uv3.y) * flat + aRot; gl_Position = projectionMatrix * mv; }`;
+// (each tongue leans its own way: the texture lookup is turned by the point's angle)
+const FIRE_PTS_FS = `uniform sampler2D tM; varying vec3 vCol; varying float vA, vR;
+void main(){ vec2 c = gl_PointCoord - 0.5; float cs = cos(vR), sn = sin(vR); vec2 q = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs) + 0.5;
+  float m = texture2D(tM, q).a; gl_FragColor = vec4(vCol * m * vA, m * vA); }`;
+// a tongue of flame: a round base narrowing to a licking point, with a ragged edge, brightest low down
+const tongueTex = () => TX.tongue || (TX.tongue = canvas(128, 128, (x, w, h) => {
+  x.clearRect(0, 0, w, h);
+  // the silhouette: a teardrop, its tip bent a little, with a few notches up the sides
+  x.save(); x.translate(64, 0);
+  x.beginPath(); x.moveTo(0, 8);
+  x.bezierCurveTo(10, 30, 36, 60, 34, 90); x.bezierCurveTo(32, 112, 12, 124, 0, 124); x.bezierCurveTo(-12, 124, -34, 112, -34, 90); x.bezierCurveTo(-36, 62, -14, 34, -6, 20); x.bezierCurveTo(-4, 14, -2, 10, 0, 8);
+  x.closePath();
+  // soft edge: paint the shape blurred a few times, then its bright heart
+  x.shadowColor = '#fff'; x.shadowBlur = 10; x.fillStyle = 'rgba(255,255,255,0.55)'; x.fill(); x.fill();
+  x.shadowBlur = 0;
+  const g = x.createRadialGradient(0, 96, 4, 0, 84, 50); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.5, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fill();
+  x.restore();
+}));
 // ---------------------------------------------------------------- particles (a cloud of points that knows which way is down)
 function cloud(g, N, { size, tex, colors, blending = THREE.AdditiveBlending, opacity = 1 }) {
   const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), ph = new Float32Array(N);
@@ -304,13 +322,13 @@ const BUILD = {
   // white to yellow to orange to a red that fades out; the same from any side, and they rise off a tilted blade
   flame2(g, bx, power, { span, wide, cx, cz }) {
     const [x0, x1, y0, y1, z0, z1] = bx;
-    const N = Math.round((40 + span * 90) * Math.min(2, power));
-    const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), size = new Float32Array(N), alpha = new Float32Array(N);
+    const N = Math.round((30 + span * 70) * Math.min(2, power));
+    const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), size = new Float32Array(N), alpha = new Float32Array(N), rot = new Float32Array(N);
     const life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), base = new Float32Array(N), ph = new Float32Array(N);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
-    geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1));
-    const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tongueTex() } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1)); geo.setAttribute('aRot', new THREE.BufferAttribute(rot, 1));
+    const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tongueTex() }, uUpL: { value: new THREE.Vector3(0, 1, 0) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
     const rise = 0.9 + power * 0.5, h = 0.25 + span * 0.35 * Math.min(1.5, power);
     const spawn = i => {
@@ -320,11 +338,12 @@ const BUILD = {
       if (rnd() < 0.3) pos[o] = rnd() < 0.5 ? x0 - 0.01 : x1 + 0.01;
       max[i] = (0.35 + rnd() * 0.4) * (h / 0.6); life[i] = 0;
       vel[o] = (rnd() - 0.5) * 0.25; vel[o + 1] = 0; vel[o + 2] = (rnd() - 0.5) * 0.25;
-      base[i] = 0.07 + rnd() * 0.07 + 0.02 * Math.min(1, power); ph[i] = rnd() * 6.28;
+      base[i] = 0.14 + rnd() * 0.12 + 0.03 * Math.min(1, power); ph[i] = rnd() * 6.28; rot[i] = (rnd() - 0.5) * 0.7;
     };
     for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
     const c = new THREE.Color(), hot = new THREE.Color('#fff6d0'), yel = new THREE.Color('#ffd040'), ora = new THREE.Color('#ff6a10'), red = new THREE.Color('#8a1a04');
     return (t, dt, up) => {
+      mat.uniforms.uUpL.value.copy(up);
       for (let i = 0; i < N; i++) {
         life[i] += dt; if (life[i] >= max[i]) spawn(i);
         const k = life[i] / max[i], o = i * 3, sw = Math.sin(t * 7 + ph[i]) * 0.18;
