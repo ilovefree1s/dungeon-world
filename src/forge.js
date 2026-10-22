@@ -9,6 +9,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { TYPES, MATERIALS, GUARDS, GRIPS, POMMELS, ACCENTS, GRIP_COLORS, AURAS, HAFTS, HERO_NAME, rarityOf, CRYSTALS, clsOf, hasHaft, canDraw, presetShape, randomSpec, defaultSpec, nameOf, statsOf, buildForged } from './weaponkit.js';
 import { ShapePad } from './shapepad.js';
 import { sfx } from './audio.js';
+import { AURA_VIEW } from './auras.js';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dungeonworld.forge.v1';
@@ -74,6 +75,7 @@ function frame(now) {
   raf = requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (!dragging) turn += dt * 0.6 * spin;
+  AURA_VIEW.h = renderer.domElement.height;
   if (model) { model.rotation.order = 'XYZ'; model.rotation.set(tilt, turn, spin ? Math.sin(now / 1000 * 0.5) * 0.1 : 0); if (model.userData.tick) model.userData.tick(now / 1000); }
   renderer.render(scene, camera);
 }
@@ -122,7 +124,7 @@ function render() {
   if (s.shape) { pad.set(s.shape, shapeMode); $('fMirror').classList.toggle('on', !!s.shape.mirror); $('fPadHint').textContent = shapeMode === 'draw' ? 'TRACE THE SILHOUETTE IN ONE STROKE' : shapeMode === 'erase' ? 'RUB OUT WHATEVER YOU DRAG OVER' : 'DRAG THE CORNERS · CLICK AN EDGE TO ADD ONE · DOUBLE-CLICK ONE TO REMOVE IT'; }
   $('fLen').value = s.length; $('fHilt').value = s.gripSize ?? s.hilt ?? 1; $('fGuardSize').value = s.guardSize ?? s.hilt ?? 1; $('fPommelSize').value = s.pommelSize ?? s.hilt ?? 1; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1; $('fSize').value = s.auraSize ?? 1; $('fSpeed').value = s.auraSpeed ?? 1;
   $('fCrystalRow').hidden = s.aura !== 'frost';
-  seg('fCrystal', CRYSTALS.map(([id, name]) => [id, name]), s.crystal || 'flake', v => { s.crystal = v; });
+  seg('fCrystal', CRYSTALS.map(([id, name]) => [id, name]), s.crystal || 'simple', v => { s.crystal = v; });
   $('fPowRow').hidden = !s.aura || s.aura === 'none'; $('fSizeRow').hidden = true; $('fSpeedRow').hidden = s.aura !== 'wind';
   // (the fire's slider runs a narrower range, and its size follows along)
   const pw = $('fPow'); if (s.aura === 'flame' || s.aura === 'flame2') { pw.min = 0.45; pw.max = 2.95; } else if (s.aura === 'water') { pw.min = 0.05; pw.max = 1.45; } else if (s.aura === 'wind') { pw.min = 0; pw.max = 1.2; } else if (s.aura === 'shadow') { pw.min = 0.05; pw.max = 2.9; } else { pw.min = 0.05; pw.max = 3; }

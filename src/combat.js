@@ -60,11 +60,29 @@ const barMats = {
 const shotGeo = new THREE.SphereGeometry(0.5, 10, 7);
 const camRight = new THREE.Vector3();
 
+// the monster under a screen point (x, y in pixels; w, h the canvas size), if any: by its projected size
+const prj = new THREE.Vector3();
+export function pickMonster(monsters, x, y, w, h) {
+  let best = null, bd = 1e9;
+  const f = (h / 2) / Math.tan(camera.fov * Math.PI / 360);
+  for (const m of monsters.list) {
+    prj.set(m.pos.x, m.pos.y + m.k.h * 0.6, m.pos.z);
+    const dist = prj.distanceTo(camera.position); if (dist > 120) continue;
+    prj.project(camera); if (prj.z > 1) continue;
+    const sx = (prj.x + 1) / 2 * w, sy = (1 - prj.y) / 2 * h, r = Math.max(14, Math.max(m.k.r, m.k.h * 0.6) * f / dist * 1.3);
+    const d = Math.hypot(sx - x, sy - y);
+    if (d < r && dist < bd) { bd = dist; best = m; }
+  }
+  return best;
+}
 export class Monsters {
   constructor(world, player) {
     this.world = world; this.player = player; this.list = []; this.spawnT = 2; this.timer = 0;
     this.hooks = { hurt: null, level: null, dead: null, fallen: null };
     this.shots = [];                 // what the ranged ones throw
+    this.focus = null;               // the one clicked on: attacks aim at it
+    this.focusRing = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 40), new THREE.MeshBasicMaterial({ color: '#ff6a55', transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    this.focusRing.rotation.x = -Math.PI / 2; this.focusRing.visible = false; scene.add(this.focusRing);
     this.calm = 0; this.regenAcc = 0; // seconds since the hero was last hurt; healing in progress
   }
   spawn(type, x, y, z) {
@@ -192,6 +210,10 @@ export class Monsters {
   }
   update(dt) {
     this.updateShots(dt);
+    // the focused one: a ring at its feet, until it dies or is far away
+    if (this.focus && (!this.list.includes(this.focus) || this.focus.pos.distanceTo(this.player.pos) > 90)) this.focus = null;
+    this.focusRing.visible = !!this.focus;
+    if (this.focus) { const m = this.focus; this.focusRing.position.set(m.pos.x, m.pos.y + 0.12, m.pos.z); const sc = m.k.r * 1.4; this.focusRing.scale.set(sc, sc, sc); this.focusRing.material.opacity = 0.6 + 0.3 * Math.sin(performance.now() / 150); }
     // healing, once the fight has been over a while
     if (stats.hp > 0 && stats.hp < stats.maxHp) {
       this.calm += dt;
@@ -447,6 +469,7 @@ export class Bolts {
 const ray = new THREE.Vector3(), tmp = new THREE.Vector3();
 export function aimPoint(world, monsters, from) {
   camera.getWorldDirection(ray);
+  if (monsters.focus && monsters.list.includes(monsters.focus)) { const m = monsters.focus; return new V3(m.pos.x, m.pos.y + m.k.h * 0.5, m.pos.z); }
   let best = null, bd = 0.96;
   for (const m of monsters.list) {
     tmp.set(m.pos.x, m.pos.y + m.k.h * 0.5, m.pos.z).sub(camera.position);

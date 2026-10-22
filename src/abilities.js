@@ -10,8 +10,9 @@ import { burst, ring } from './fx.js';
 import { sfx } from './audio.js';
 
 const BOLT = '#9ad8ff', FIRE = '#ff8a2a', FROST = '#9fe6ff', ARROW = '#e8d8b0';
-// the way the camera looks, flat
-const camFlat = p => { const d = new V3(-Math.sin(p.yaw), 0, -Math.cos(p.yaw)); return d; };
+// the way the camera looks, flat; or, with a monster focused (clicked on), the way to it
+let monstersRef = null;
+const camFlat = p => { const f = monstersRef && monstersRef.focus; if (f && monstersRef.list.includes(f)) { const d = new V3(f.pos.x - p.pos.x, 0, f.pos.z - p.pos.z); if (d.length() > 0.5) return d.normalize(); } const d = new V3(-Math.sin(p.yaw), 0, -Math.cos(p.yaw)); return d; };
 // the way the stick or keys push, else the way the camera looks (a shove from a monster doesn't count)
 let inputRef = null;
 const moveDir = p => {
@@ -162,7 +163,7 @@ export const KITS = [
 export class Abilities {
   constructor(ctx) {
     this.ctx = ctx; this.cd = [0, 0, 0]; this.atkCd = 0; this.timers = [];
-    ctx.later = (t, f) => this.timers.push({ t, f });
+    ctx.later = (t, f) => this.timers.push({ t, f }); monstersRef = ctx.monsters;
     ctx.aimAt = new V3();
     ctx.aim = from => { const to = aimPoint(ctx.world, ctx.monsters, from); ctx.aimAt.copy(to); const d = to.sub(from); if (d.length() < 1) return camFlat(ctx.player); return d.normalize(); };
   }

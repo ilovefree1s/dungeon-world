@@ -128,6 +128,16 @@ with sync_playwright() as pw:
         print('  info pointer lock in headless Chromium:', page.evaluate('!!document.pointerLockElement'))
         page.evaluate('document.pointerLockElement && document.exitPointerLock()'); frames(5)
         if page.evaluate('__dw.UI.state') == 'menu': page.evaluate("document.getElementById('resume').click()")
+        # the cursor scheme (a PC's default): a left-drag orbits the camera; a click on a monster focuses it
+        page.evaluate('__dw.input.cursorMode = true')
+        y0 = page.evaluate('__dw.player.yaw')
+        page.mouse.move(500, 324); page.mouse.down(); page.mouse.move(560, 324, steps=4); page.mouse.move(620, 324, steps=4); page.mouse.up(); frames(3)
+        check(abs(page.evaluate('__dw.player.yaw') - y0) > 0.15, 'cursor: a left-drag turns the camera')
+        page.evaluate("(() => { const p = __dw.player; __dw.monsters.list.slice().forEach(m => __dw.monsters.remove(m)); const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); const m = __dw.monsters.spawn(1, p.pos.x + fx * 8, p.pos.y, p.pos.z + fz * 8); m.atk = 0; m.state = 'wander'; m.k = { ...m.k, see: 0 }; })()"); frames(3)
+        at = page.evaluate("(() => { const m = __dw.monsters.list[0], v = new __dw.THREE.Vector3(m.pos.x, m.pos.y + m.k.h * 0.6, m.pos.z).project(__dw.camera || __dw.scene.children.find(o => o.isCamera)); const c = document.getElementById('gl'); return [(v.x + 1) / 2 * c.clientWidth, (1 - v.y) / 2 * c.clientHeight]; })()")
+        page.mouse.click(at[0], at[1]); frames(3)
+        check(page.evaluate('__dw.monsters.focus === __dw.monsters.list[0]'), f'cursor: a click on a slime focuses it (at {at[0]:.0f}, {at[1]:.0f})')
+        page.evaluate('__dw.monsters.focus = null')
     page.evaluate('__dw.setQuality(1)')
 
     # ---- the mage's combat: bolts, a blink, a bite

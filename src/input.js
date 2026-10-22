@@ -10,6 +10,7 @@ export const input = {
   jump: false, jumpEdge: false, sprint: false, atk: false, atkEdge: false, useEdge: false, abEdge: [false, false, false],
   menuEdge: [], lastDevice: 'kb', stickX: 0, stickY: 0, stickId: null,
   mouseSpeed: 1, zoom: 0, wantLock: null, onLockChange: null,
+  cursorMode: false, cursor: { x: 0, y: 0, in: false }, clickAt: null, bothHeld: false, turnWith: false,
 };
 const keys = {};
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyD: 'right',
@@ -57,25 +58,51 @@ export function initTouch(canvas) {
     el.addEventListener('pointerdown', e => { e.preventDefault(); onAny(); input.abEdge[i] = true; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 120); });
     el.addEventListener('contextmenu', e => e.preventDefault());
   });
-  // swipes on the open screen (or a mouse drag) turn the camera
+  // swipes on the open screen (or a mouse drag) turn the camera.
+  // a mouse has two ways to work (input.cursorMode): captured (click the world and every movement looks; Esc lets go)
+  // or a cursor (the pointer stays: left-drag orbits the camera, right-drag turns you with it, both buttons held
+  // walk you forward, and a plain click picks what's under it: a monster to fight, a body to loot)
   const looks = new Map();
+  let mouseButtons = 0;
   canvas.addEventListener('pointerdown', e => {
     onAny();
-    // on a PC, a click in the world captures the mouse (Esc lets it go)
-    if (e.pointerType === 'mouse' && input.wantLock && input.wantLock()) { lockMouse(canvas); return; }
-    if (mouseLocked()) { if (e.button === 0) { input.mAtk = 1; input.atkEdge = true; } else if (e.button === 2) input.abEdge[0] = true; return; }
+    if (e.pointerType === 'mouse') {
+      if (!input.cursorMode) {
+        // on a PC, a click in the world captures the mouse (Esc lets it go)
+        if (input.wantLock && input.wantLock()) { lockMouse(canvas); return; }
+        if (mouseLocked()) { if (e.button === 0) { input.mAtk = 1; input.atkEdge = true; } else if (e.button === 2) input.abEdge[0] = true; return; }
+      } else {
+        mouseButtons |= (1 << e.button); input.bothHeld = (mouseButtons & 3) === 3;
+        looks.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, touch: false, button: e.button, moved: 0, t0: performance.now(), turn: e.button === 2 });
+        try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
+        return;
+      }
+    }
     looks.set(e.pointerId, { x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse' });
     try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
   });
   canvas.addEventListener('pointermove', e => {
+    input.cursor.x = e.clientX; input.cursor.y = e.clientY; input.cursor.in = true;
     const l = looks.get(e.pointerId);
     if (!l || mouseLocked()) return;
     // (a finger turns a little faster than a mouse: the screen is small)
     const k = l.touch ? 0.0085 : 0.0055 * input.mouseSpeed;
+    if (l.moved !== undefined) l.moved += Math.abs(e.clientX - l.x) + Math.abs(e.clientY - l.y);
     input.lookX += (e.clientX - l.x) * k; input.lookY += (e.clientY - l.y) * k;
+    if (l.turn) input.turnWith = true;   // (the right button: the hero turns with the camera)
     l.x = e.clientX; l.y = e.clientY;
   });
-  const lend = e => { looks.delete(e.pointerId); if (e.button === 0) input.mAtk = 0; };
+  canvas.addEventListener('pointerleave', () => { input.cursor.in = false; });
+  const lend = e => {
+    const l = looks.get(e.pointerId); looks.delete(e.pointerId);
+    if (e.pointerType === 'mouse' && input.cursorMode) {
+      mouseButtons &= ~(1 << e.button); input.bothHeld = (mouseButtons & 3) === 3;
+      // a click that didn't drag: pick what's under the cursor (left), or the first ability (right)
+      if (l && l.moved !== undefined && l.moved < 6 && performance.now() - l.t0 < 400) { if (l.button === 0) input.clickAt = { x: e.clientX, y: e.clientY }; else if (l.button === 2) input.abEdge[0] = true; }
+      return;
+    }
+    if (e.button === 0) input.mAtk = 0;
+  };
   canvas.addEventListener('pointerup', lend); canvas.addEventListener('pointercancel', lend); canvas.addEventListener('lostpointercapture', lend);
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   // the captured mouse: every movement turns the camera
@@ -134,6 +161,7 @@ export function readInput() {
   const l = Math.hypot(dx, dy);
   input.mx = l > 1 ? dx / l : dx; input.my = l > 1 ? dy / l : dy;
   if (l < 0.12) input.mx = input.my = 0;
+  if (input.bothHeld && input.cursorMode) { input.my = -1; input.mx = dx > 0.3 ? 1 : dx < -0.3 ? -1 : 0; }
   input.lookRX = (keys.turnR ? 1 : 0) - (keys.turnL ? 1 : 0) + (p ? p.rx : 0);
   input.lookRY = p ? p.ry : 0;
   input.jump = !!(keys.jump || input.tJump || (p && p.now.jump));

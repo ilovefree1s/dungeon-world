@@ -89,6 +89,8 @@ html.touchy #abil .slot .k{display:none}
 @media (max-width:640px){#compass{top:calc(58px + env(safe-area-inset-top,0px));width:min(260px,70vw)}#where{max-width:56vw}#bars{top:calc(96px + env(safe-area-inset-top,0px))}}
 @media (pointer:fine){html:not(.touchy) #touch{display:none}}
 html:not(.touchy) #hint .t{display:none}
+html.cursor #hint .kl{display:none}html:not(.cursor) #hint .kc{display:none}
+html.cursor #gl{cursor:default}
 html.touchy #hint .k{display:none}
 
 /* ---------- panels */
@@ -190,7 +192,7 @@ html.touchy .keys{display:none}
     <div id="banner"><h1 id="bannerT"></h1><p id="bannerS"></p></div>
     <div id="abil"><div class="slot"><b class="g"></b><span class="n"></span><em class="k">1</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">2</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">3</em><i class="cd"></i></div></div>
     <div id="lootHint" class="chip" style="position:absolute;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(90,60,10,.8);color:var(--gold)" hidden>IT DROPPED SOMETHING · CLICK OR F TO LOOK</div>
-    <div id="hint"><span class="t">Swipe the screen to look around</span><span class="k">Click the world to look around · WASD to move · Space to jump · left click attacks · 1, 2, 3 (or right click, Q, E) for your abilities · Esc for the menu</span></div>
+    <div id="hint"><span class="t">Swipe the screen to look around</span><span class="k kc">Drag to look around (right-drag turns you, both buttons walk) · WASD to move · Space to jump · click a monster to fight it, a fallen one to loot it · 1, 2, 3 (or right click, Q, E) for your abilities · Esc for the menu</span><span class="k kl">Click the world to look around · WASD to move · Space to jump · left click attacks · 1, 2, 3 (or right click, Q, E) for your abilities · Esc for the menu</span></div>
     <div id="dbg" hidden></div>
   </div>
   <div id="touch" hidden>
@@ -273,6 +275,7 @@ html.touchy .keys{display:none}
       <h2>PAUSED</h2>
       <div class="row"><span>Hero</span><div class="seg" id="segHero"><button data-v="0">Warrior</button><button data-v="1">Mage</button><button data-v="2">Hunter</button></div></div>
       <div class="row"><span>Graphics</span><div class="seg" id="segQ"><button data-v="-1">Auto</button><button data-v="0">Fast</button><button data-v="1">Good</button><button data-v="2">Best</button></div></div>
+      <div class="row"><span>Mouse</span><div class="seg" id="segCursor"><button data-v="1">Cursor</button><button data-v="0">Captured</button></div></div>
       <div class="row"><span>Mouse speed</span><div class="seg" id="segMouse"><button data-v="0.5">Slow</button><button data-v="1">Normal</button><button data-v="1.7">Fast</button></div></div>
       <div class="row"><span>Music</span><div class="seg" id="segM"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
       <div class="row"><span>Sounds</span><div class="seg" id="segS"><button data-v="1">On</button><button data-v="0">Off</button></div></div>

@@ -95,16 +95,18 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 | | Keyboard and mouse | Controller | Phone |
 |---|---|---|---|
 | Move | WASD | left stick / d-pad | the stick |
-| Look | the mouse (click the world to capture it; Esc lets it go), Q / E, ← → | right stick | swipe the screen |
+| Look | drag with the mouse (left-drag orbits the camera, right-drag turns you with it, both buttons held walk you forward), Q / E, ← → | right stick | swipe the screen |
 | Zoom | the scroll wheel | | |
-| Attack | left click, J | X / ▢ | ATTACK |
-| Look at loot | click or F on a fallen monster | X / ▢ | ATTACK |
+| Attack | click a monster (it's focused: your attacks aim at it until it falls), or J / click the ground to swing where you look | X / ▢ | ATTACK |
+| Look at loot | click a fallen monster, or F near one | X / ▢ | ATTACK |
 | Abilities 1, 2, 3 | 1, 2, 3 (or right click / K, Q, E) | B / ○, Y / △, LB | the ability bar |
 | Jump | Space | A / ✕ | JUMP |
 | Run | Shift (the stick pushed all the way runs too) | RB, LT or a stick's click | push the stick to its edge |
 | Menu | Esc, P | Start | the ☰ button |
 
-Mouse speed (slow, normal, fast) is in the menu.
+Mouse speed (slow, normal, fast) is in the menu, and so is the mouse's way of working: **Cursor** (the
+above, the default on a PC) or **Captured** (click the world to capture the mouse and every movement
+looks around, left click attacks, Esc lets go).
 
 ## Next stages
 3D combat and roaming monsters; gear, talents and pets; villages and merchants; dungeon

@@ -188,7 +188,7 @@ export function nameOf(spec, rnd = Math.random) {
   return rnd() < 0.5 ? `${ADJ[spec.material]} ${n}` : `${n} ${pick(EPITHET)}`;
 }
 // the frost's crystals
-export const CRYSTALS = [['flake', 'FLAKE'], ['shard', 'SHARD'], ['spike', 'SPIKE'], ['cluster', 'CLUSTER'], ['plate', 'PLATE']];
+export const CRYSTALS = [['simple', 'SIMPLE'], ['stellar', 'STELLAR'], ['dendrite', 'DENDRITE'], ['fern', 'FERN'], ['sectored', 'SECTORED'], ['mixed', 'MIXED']];
 // ---------------------------------------------------------------- rarity (of a dropped weapon; a forged one is common)
 export const RARITIES = [
   { id: 'common', name: 'COMMON', color: '#d8d0c0', mult: 1 },

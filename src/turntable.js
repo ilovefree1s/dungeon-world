@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildForged } from './weaponkit.js';
+import { AURA_VIEW } from './auras.js';
 
 export class Turntable {
   constructor(canvas) {
@@ -42,6 +43,7 @@ export class Turntable {
       const dt = this.last ? Math.min(0.05, (now - this.last) / 1000) : 0.016; this.last = now;
       this.turn += dt * 0.8;
       m.rotation.set(0.15, this.turn, Math.sin(now / 1000 * 0.5) * 0.08);
+      AURA_VIEW.h = this.renderer.domElement.height;
       if (m.userData.tick) m.userData.tick(now / 1000);
       this.renderer.render(this.scene, this.camera);
       this.raf = requestAnimationFrame(frame);

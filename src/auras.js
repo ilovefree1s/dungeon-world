@@ -98,6 +98,36 @@ function helixGeo(bx, turns, phase, w, segs = 64, rScale = 1, wild = null) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
   return g;
 }
+// real snowflakes: six arms of thin bars with side branches leaving at 60 degrees, and a hexagonal heart.
+//   stellar: arms with two pairs of broad branches. dendrite: arms with many fine branches, each branched again.
+//   fern: long arms crowded with fine branches. sectored: a hexagonal plate with six short arms and ridges
+function flakeGeo(style) {
+  const key = 'flake_' + style; if (TX[key]) return TX[key];
+  const pos = [];
+  // a bar from (x0,y0) to (x1,y1) of width w, as two triangles
+  const bar = (x0, y0, x1, y1, w) => { const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy) || 1, nx = -dy / l * w / 2, ny = dx / l * w / 2; pos.push(x0 + nx, y0 + ny, 0, x1 + nx, y1 + ny, 0, x1 - nx, y1 - ny, 0, x0 + nx, y0 + ny, 0, x1 - nx, y1 - ny, 0, x0 - nx, y0 - ny, 0); };
+  const hex = r => { for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2, b = (i + 1) / 6 * Math.PI * 2; pos.push(0, 0, 0, Math.cos(a) * r, Math.sin(a) * r, 0, Math.cos(b) * r, Math.sin(b) * r, 0); } };
+  const cfg = {
+    stellar: { armW: 0.09, heart: 0.16, branches: [[0.45, 0.32, 0.07], [0.72, 0.22, 0.06]], tip: 0.08, sub: 0 },
+    dendrite: { armW: 0.06, heart: 0.1, branches: [[0.25, 0.22, 0.045], [0.42, 0.26, 0.045], [0.58, 0.22, 0.04], [0.74, 0.16, 0.035], [0.88, 0.1, 0.03]], tip: 0, sub: 1 },
+    fern: { armW: 0.05, heart: 0.08, branches: [[0.18, 0.2, 0.035], [0.3, 0.24, 0.035], [0.42, 0.26, 0.035], [0.54, 0.24, 0.03], [0.66, 0.2, 0.03], [0.78, 0.15, 0.025], [0.9, 0.09, 0.02]], tip: 0, sub: 1 },
+    sectored: { armW: 0.07, heart: 0.42, branches: [[0.62, 0.18, 0.05]], tip: 0.1, sub: 0, plate: true },
+  }[style] || { armW: 0.08, heart: 0.14, branches: [[0.5, 0.3, 0.06]], tip: 0.08, sub: 0 };
+  hex(cfg.heart);
+  if (cfg.plate) { for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; bar(0, 0, Math.cos(a) * cfg.heart * 0.95, Math.sin(a) * cfg.heart * 0.95, 0.03); } }
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+    bar(0, 0, ca, sa, cfg.armW);
+    if (cfg.tip) { for (const s of [-1, 1]) { const b = a + s * Math.PI / 3; bar(ca * 0.92, sa * 0.92, ca * 0.92 + Math.cos(b) * cfg.tip, sa * 0.92 + Math.sin(b) * cfg.tip, cfg.armW * 0.7); } }
+    for (const [t, len, w] of cfg.branches) for (const s of [-1, 1]) {
+      const b = a + s * Math.PI / 3, bx = ca * t, by = sa * t, ex = bx + Math.cos(b) * len, ey = by + Math.sin(b) * len;
+      bar(bx, by, ex, ey, w);
+      if (cfg.sub) for (const u of [0.45, 0.8]) for (const s2 of [-1, 1]) { const c = b + s2 * Math.PI / 3, px = bx + (ex - bx) * u, py = by + (ey - by) * u; bar(px, py, px + Math.cos(c) * len * 0.3, py + Math.sin(c) * len * 0.3, w * 0.6); }
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  return TX[key] = g;
+}
 // a six-pointed ice crystal, flat, with a hexagonal heart
 function crystalGeo() {
   if (TX.crystal) return TX.crystal;
@@ -204,8 +234,11 @@ void main(){
 
 // ---------------------------------------------------------------- flame particles: points with their own size and alpha
 // (the tip of each tongue points the way the flames rise as the camera sees it, plus its own small lean)
-const FIRE_PTS_VS = `attribute float aSize, aAlpha, aRot; attribute vec3 aColor; uniform vec3 uUpL; varying vec3 vCol; varying float vA, vR;
-void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * 340.0 / max(0.5, -mv.z);
+// (a point's size on screen is its world size in true perspective: the projection's focal length times the
+// render's height in pixels, over its distance. whoever renders tells the auras the height: AURA_VIEW.h)
+export const AURA_VIEW = { h: 600 };
+const FIRE_PTS_VS = `attribute float aSize, aAlpha, aRot; attribute vec3 aColor; uniform vec3 uUpL; uniform float uH; varying vec3 vCol; varying float vA, vR;
+void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * projectionMatrix[1][1] * uH * 0.5 / max(0.5, -mv.z);
   vec3 uv3 = normalize(mat3(modelViewMatrix) * uUpL); float fl = clamp(length(uv3.xy) * 2.0, 0.0, 1.0);
   vCol = aColor; vA = aAlpha; vR = atan(-uv3.x, uv3.y) * fl + aRot; gl_Position = projectionMatrix * mv; }`;
 // (each tongue leans its own way: the texture lookup is turned by the point's angle)
@@ -235,7 +268,8 @@ function pointCloud(g, N, tex, tipDir) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
   geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1)); geo.setAttribute('aRot', new THREE.BufferAttribute(rot, 1));
-  const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tex }, uUpL: { value: tipDir || new THREE.Vector3(0, 1, 0) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tex }, uUpL: { value: tipDir || new THREE.Vector3(0, 1, 0) }, uH: { value: AURA_VIEW.h } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  mat.userData.auraPts = true;
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
   return { pos, col, size, alpha, rot, geo, mat, pts, N, flush() { for (const k of ['position', 'aColor', 'aSize', 'aAlpha', 'aRot']) geo.attributes[k].needsUpdate = true; } };
 }
@@ -264,12 +298,14 @@ export function attachAura(g, kind, bx, power = 1, size = 1, speed = 1, extra = 
   const build = BUILD[kind];
   if (!build) return () => {};
   const before = new Set(g.children);
-  const parts = build(g, bx, power, { span, wide, cx, cz, size: Math.max(0.3, Math.min(3, size)), speed: Math.max(0.05, Math.min(3, speed)), crystal: extra.crystal || 'flake' });
+  const parts = build(g, bx, power, { span, wide, cx, cz, size: Math.max(0.3, Math.min(3, size)), speed: Math.max(0.05, Math.min(3, speed)), crystal: extra.crystal || 'simple' });
   for (const o of g.children) if (!before.has(o)) o.traverse(c => { c.userData.aura = true; });
+  const ptMats = []; g.traverse(o => { if (o.material && o.material.userData && o.material.userData.auraPts) ptMats.push(o.material); });
   let last = -1;
   return t => {
     const dt = last < 0 ? 0.016 : Math.min(0.05, t - last); last = t;
     g.getWorldQuaternion(qW); upL.copy(upW).applyQuaternion(qW.invert());
+    for (const m of ptMats) m.uniforms.uH.value = AURA_VIEW.h;
     parts(t, dt, upL);
   };
 }
@@ -288,7 +324,8 @@ const BUILD = {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
     geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1)); geo.setAttribute('aRot', new THREE.BufferAttribute(rot, 1));
-    const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tongueTex() }, uUpL: { value: new THREE.Vector3(0, 1, 0) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tongueTex() }, uUpL: { value: new THREE.Vector3(0, 1, 0) }, uH: { value: AURA_VIEW.h } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    mat.userData.auraPts = true;
     const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
     const rise = 0.9 + power * 0.5, h = 0.25 + span * 0.35 * Math.min(1.5, power);
     const spawn = i => {
@@ -480,39 +517,26 @@ const BUILD = {
     };
   },
   // ---------------------------------------------------------------- FROST
-  // (crystal: the shape of the ice. flake: the flat six-pointed one. shard: long ice crystals jutting out of the steel.
-  // spike: icicles. cluster: knots of hexagonal prisms. plate: hexagonal plates of rime lying flat on the steel)
-  crystals(g, bx, power, { span, wide, cx, cz, crystal = 'flake' }) {
+  // (crystal: the flake's shape. simple: the six-pointed star. stellar, dendrite, fern, sectored: real snowflakes,
+  // six arms with branches, see flakeGeo. mixed: every flake its own kind)
+  crystals(g, bx, power, { span, wide, cx, cz, crystal = 'simple' }) {
     const [x0, x1, y0, y1, z0, z1] = bx;
     const N = Math.round(14 * power) + 4;
-    const flat = crystal === 'flake';
-    let geo;
-    if (crystal === 'shard') { geo = new THREE.OctahedronGeometry(1, 0); geo.scale(0.3, 1.5, 0.3); geo.translate(0, 1.1, 0); }
-    else if (crystal === 'spike') { geo = new THREE.ConeGeometry(0.3, 2.2, 5); geo.translate(0, 1.05, 0); }
-    else if (crystal === 'cluster') {
-      const parts = [];
-      for (let i = 0; i < 4; i++) { const c = new THREE.CylinderGeometry(0.22, 0.28, 1 + i * 0.25, 6); c.translate(0, 0.5 + i * 0.12, 0); c.rotateX((rnd() - 0.5) * 0.9); c.rotateZ((rnd() - 0.5) * 0.9); c.rotateY(i * 1.6); parts.push(c); }
-      const pos = []; for (const c of parts) { const a = c.toNonIndexed().attributes.position.array; for (let i = 0; i < a.length; i++) pos.push(a[i]); }
-      geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.computeVertexNormals();
-    }
-    else if (crystal === 'plate') { geo = new THREE.CylinderGeometry(1, 1, 0.08, 6); geo.translate(0, 0.04, 0); }
-    else geo = crystalGeo();
-    const iceMat = flat ? new THREE.MeshBasicMaterial({ color: '#eaf8ff', transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false })
-      : new THREE.MeshStandardMaterial({ color: '#dff4ff', emissive: '#5aaaff', emissiveIntensity: 0.3, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.88, flatShading: true });
-    const ice = new THREE.InstancedMesh(geo, iceMat, N);
-    const rim = flat ? new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: '#2a78d8', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }), N) : null;
-    ice.frustumCulled = false; if (rim) { rim.frustumCulled = false; rim.renderOrder = 1; g.add(rim); } ice.renderOrder = 2; g.add(ice);
+    const flat = true;
+    const KINDS = ['stellar', 'dendrite', 'fern', 'sectored'];
+    const geoOf = k => k === 'simple' ? crystalGeo() : flakeGeo(k);
+    const geo = crystal === 'mixed' ? geoOf(KINDS[0]) : geoOf(crystal);
+    const iceMat = new THREE.MeshBasicMaterial({ color: '#eaf8ff', transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+    const rimMat = new THREE.MeshBasicMaterial({ color: '#2a78d8', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false });
+    // (mixed: four kinds, each its own instanced pair; the flakes are dealt round them)
+    const sets = (crystal === 'mixed' ? KINDS : [crystal]).map(k => { const gk = geoOf(k); const ice = new THREE.InstancedMesh(gk, iceMat, N), rim = new THREE.InstancedMesh(gk, rimMat, N); ice.frustumCulled = rim.frustumCulled = false; rim.renderOrder = 1; ice.renderOrder = 2; g.add(rim); g.add(ice); return { ice, rim }; });
+    const hide = new THREE.Matrix4().makeScale(0, 0, 0);
+    const ice = sets[0].ice, rim = sets[0].rim;
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), E = new THREE.Euler();
     const cr = []; // each crystal: where, which way it faces, how big, where in its life
     const seedOne = c => {
-      if (flat) { c.p = [x0 + rnd() * (x1 - x0), y0 + rnd() * span, z0 + rnd() * (z1 - z0)]; c.e = [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28]; }
-      else {
-        // rooted on the steel's skin, standing out from it (a plate lies on it), with a little tilt
-        const face = rnd();
-        if (face < 0.7) { const sgn = rnd() < 0.5 ? -1 : 1; c.p = [x0 + rnd() * (x1 - x0), y0 + rnd() * span, sgn < 0 ? z0 : z1]; c.e = [sgn * Math.PI / 2 + (rnd() - 0.5) * 0.6, rnd() * 6.28, (rnd() - 0.5) * 0.6]; }
-        else { const sgn = rnd() < 0.5 ? -1 : 1; c.p = [sgn < 0 ? x0 : x1, y0 + rnd() * span, z0 + rnd() * (z1 - z0)]; c.e = [(rnd() - 0.5) * 0.6, rnd() * 6.28, -sgn * Math.PI / 2 + (rnd() - 0.5) * 0.6]; }
-      }
-      c.s = (crystal === 'plate' ? 0.05 + rnd() * 0.05 : crystal === 'flake' ? 0.09 + rnd() * 0.1 : 0.05 + rnd() * 0.06) * (0.7 + 0.3 * power); c.max = 1.6 + rnd() * 2; c.life = 0; c.spin = flat ? (rnd() - 0.5) * 0.6 : 0;
+      c.p = [x0 + rnd() * (x1 - x0), y0 + rnd() * span, z0 + rnd() * (z1 - z0)]; c.e = [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28];
+      c.s = (0.09 + rnd() * 0.1) * (0.7 + 0.3 * power); c.max = 1.6 + rnd() * 2; c.life = 0; c.spin = (rnd() - 0.5) * 0.6;
     };
     for (let i = 0; i < N; i++) { const c = {}; seedOne(c); c.life = rnd() * c.max; cr.push(c); }
     const snow = cloud(g, Math.round(30 * power), { size: 0.05, tex: softTex(), colors: ['#ffffff', '#bfe8ff'] });
@@ -530,10 +554,13 @@ const BUILD = {
         // grows quickly, holds, then shatters (shrinks fast at the end)
         const grow = k < 0.2 ? k / 0.2 : k > 0.9 ? (1 - k) / 0.1 : 1;
         const s = c.s * grow * (1 + 0.05 * Math.sin(t * 4 + i));
-        E.set(c.e[0], c.e[1] + t * c.spin, c.e[2]); Q.setFromEuler(E); P.set(c.p[0], c.p[1], c.p[2]); if (flat) S.set(s, s, s * 0.3); else S.set(s, s, s);
-        M.compose(P, Q, S); ice.setMatrixAt(i, M); if (rim) { S.multiplyScalar(1.3); M.compose(P, Q, S); rim.setMatrixAt(i, M); }
+        E.set(c.e[0], c.e[1] + t * c.spin, c.e[2]); Q.setFromEuler(E); P.set(c.p[0], c.p[1], c.p[2]); S.set(s, s, s * 0.3);
+        M.compose(P, Q, S);
+        const mine = sets[i % sets.length];
+        for (const st of sets) { if (st !== mine) { st.ice.setMatrixAt(i, hide); st.rim.setMatrixAt(i, hide); } }
+        mine.ice.setMatrixAt(i, M); S.multiplyScalar(1.3); M.compose(P, Q, S); mine.rim.setMatrixAt(i, M);
       }
-      ice.instanceMatrix.needsUpdate = true; if (rim) rim.instanceMatrix.needsUpdate = true;
+      for (const st of sets) { st.ice.instanceMatrix.needsUpdate = true; st.rim.instanceMatrix.needsUpdate = true; }
       const SN = snow;
       for (let i = 0; i < SN.N; i++) {
         SN.life[i] += dt; if (SN.life[i] >= SN.max[i]) spawnS(i);

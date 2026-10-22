@@ -9,12 +9,13 @@ import { sky, updateSky, clock } from './sky.js';
 import { readInput, takeLook, menuKeys, initTouch, onFirstInput, input, lockMouse, unlockMouse, mouseLocked } from './input.js';
 import { startAudio, sfx, setSfx, setMusic, audioState } from './audio.js';
 import { BIOME_NAME, BIOME_SUB, CH } from './gen.js';
-import { Monsters, Bolts, stats, xpToNext } from './combat.js';
+import { Monsters, Bolts, stats, xpToNext, pickMonster } from './combat.js';
 import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollDrop } from './loot.js';
 import { statsOf } from './weaponkit.js';
 import { Turntable } from './turntable.js';
+import { AURA_VIEW } from './auras.js';
 import { burst, ring, stepFx } from './fx.js';
 import { grassUniforms } from './flora.js';
 import { updateAmbience } from './ambience.js';
@@ -36,8 +37,11 @@ UI.quality = Q.has('q') ? +Q.get('q') : UI.autoQ ? (IS_TOUCH ? 1 : 2) : opts.qua
 if (Q.has('q')) UI.autoQ = false;
 audioState.music = opts.music ?? 0.45; audioState.sfx = opts.sfx ?? 0.8;
 input.mouseSpeed = opts.mouse ?? 1;
+// the mouse: a cursor (the default on a PC: drag to look, click to fight or loot) or captured (click the world, Esc lets go)
+input.cursorMode = opts.cursor ?? !IS_TOUCH;
+document.documentElement.classList.toggle('cursor', input.cursorMode);
 setSfx(audioState.sfx);
-function saveOpts() { ls.set(OPT_KEY, JSON.stringify({ quality: UI.autoQ ? -1 : UI.quality, music: audioState.music, sfx: audioState.sfx, mouse: input.mouseSpeed })); }
+function saveOpts() { ls.set(OPT_KEY, JSON.stringify({ quality: UI.autoQ ? -1 : UI.quality, music: audioState.music, sfx: audioState.sfx, mouse: input.mouseSpeed, cursor: input.cursorMode })); }
 setQuality(UI.quality);
 
 // ---------------------------------------------------------------- the world and the hero
@@ -91,8 +95,24 @@ function heroCombat(dt, inp, frozen) {
   ctx.frozen = frozen;
   // a body in your sights: a click or F looks at what it dropped instead of swinging
   bodies.update(dt, monsters.list.some(m => m.state === 'chase' && m.pos.distanceTo(player.pos) < 16));
-  $('lootHint').hidden = !bodies.target;
-  if (bodies.target && (inp.atkEdge || inp.useEdge)) { inp.atkEdge = false; inp.useEdge = false; openLoot(bodies.target); return; }
+  $('lootHint').hidden = !bodies.target || input.cursorMode;
+  if (!input.cursorMode && bodies.target && (inp.atkEdge || inp.useEdge)) { inp.atkEdge = false; inp.useEdge = false; openLoot(bodies.target); return; }
+  if (input.cursorMode) {
+    const gl = $('gl'), w = gl.clientWidth, h = gl.clientHeight;
+    // the right button turns the hero with the camera
+    if (inp.turnWith) { player.aimFace = player.yaw + Math.PI; inp.turnWith = false; }
+    // what's under the cursor shapes it: a sword over a monster, a hand over loot
+    if (inp.cursor.in) { const m = pickMonster(monsters, inp.cursor.x, inp.cursor.y, w, h); const b = m ? null : bodies.pickAt(inp.cursor.x, inp.cursor.y, w, h); gl.style.cursor = m ? 'crosshair' : b ? 'pointer' : 'default'; }
+    // a click: a monster is focused (attacks aim at it) and struck at; a body with loot is looked at; else a swing where you look
+    if (inp.clickAt) {
+      const c = inp.clickAt; inp.clickAt = null;
+      const m = pickMonster(monsters, c.x, c.y, w, h);
+      if (m) { monsters.focus = m; inp.atkEdge = true; }
+      else { const b = bodies.pickAt(c.x, c.y, w, h); if (b) { openLoot(b); return; } monsters.focus = null; inp.atkEdge = true; }
+    }
+    // F looks at the loot you're near, as before
+    if (bodies.target && inp.useEdge) { inp.useEdge = false; openLoot(bodies.target); return; }
+  }
   inp.useEdge = false;
   abilities.update(dt, inp);
 }
@@ -221,11 +241,11 @@ for (let c = 0; c < 3; c++) player.equipForged(equippedSpec(c), c);
 $('menuBtn').addEventListener('click', openMenu);
 $('resume').addEventListener('click', () => { closeMenu(); if (!IS_TOUCH) lockMouse(); });
 // the mouse: captured by a click in the world while you play; letting it go (Esc) opens the menu
-input.wantLock = () => UI.state === 'play' && !mouseLocked();
+input.wantLock = () => UI.state === 'play' && !mouseLocked() && !input.cursorMode;
 input.onLockChange = locked => { document.documentElement.classList.toggle('locked', locked); if (!locked && UI.state === 'play') openMenu(); };
 function syncMenu() {
   const on = (seg, v) => [...$(seg).children].forEach(b => b.classList.toggle('on', +b.dataset.v === v));
-  on('segHero', UI.cls); on('segQ', UI.autoQ ? -1 : UI.quality); on('segM', audioState.music > 0 ? 1 : 0); on('segS', audioState.sfx > 0 ? 1 : 0); on('segMouse', input.mouseSpeed);
+  on('segHero', UI.cls); on('segQ', UI.autoQ ? -1 : UI.quality); on('segM', audioState.music > 0 ? 1 : 0); on('segS', audioState.sfx > 0 ? 1 : 0); on('segMouse', input.mouseSpeed); on('segCursor', input.cursorMode ? 1 : 0);
   const p = player.pos;
   $('where2').textContent = `${BIOME_NAME[biomeNow] || ''} · ${Math.round(p.x)}, ${Math.round(p.z)} · ${QUALITY[UI.quality].name} graphics`;
 }
@@ -235,6 +255,7 @@ seg('segQ', v => { if (v < 0) { UI.autoQ = true; } else { UI.autoQ = false; UI.q
 seg('segM', v => setMusic(v ? 0.45 : 0));
 seg('segS', v => setSfx(v ? 0.8 : 0));
 seg('segMouse', v => { input.mouseSpeed = v; });
+seg('segCursor', v => { input.cursorMode = !!v; document.documentElement.classList.toggle('cursor', input.cursorMode); if (input.cursorMode) unlockMouse(); });
 // (the menus by controller and keyboard: a focus that moves, ok presses it)
 let menuFocus = 0;
 function markMenuFocus() { const bs = [...document.querySelectorAll('#menu button')]; bs.forEach((b, i) => b.classList.toggle('focus', i === menuFocus && input.lastDevice !== 'touch')); }
@@ -324,6 +345,7 @@ function frame(now) {
   }
   fwd.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   world.update(p.x, p.z, fwd.x, fwd.z);
+  AURA_VIEW.h = renderer.domElement.height;   // (the auras' particles size themselves to the render)
   if (UI.state === 'play') { monsters.update(dt); bolts.update(dt); }
   stepFx(dt);
   // the grass: the wind, and who walks through it
@@ -368,7 +390,7 @@ document.getElementById('boot')?.remove();
 
 // a hook for testing
 window.__dw = {
-  world, player, sky, UI, input, view, renderer, scene, THREE, monsters, bolts, hero: stats, abilities, forge, bodies, openLoot, closeLoot,
+  world, player, sky, UI, input, view, renderer, scene, camera, THREE, monsters, bolts, hero: stats, abilities, forge, bodies, openLoot, closeLoot,
   start(cls = 0) { pickHero(cls); },
   teleport(x, z) { player.place(x + 0.5, 90, z + 0.5); placed = false; },
   setQuality(q) { UI.autoQ = false; UI.quality = q; setQuality(q); },
