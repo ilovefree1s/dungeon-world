@@ -17,6 +17,16 @@ function extrude(pts, depth, bevel = 0.012) {
   g.translate(0, 0, -depth / 2);
   return g;
 }
+// a drawn axe head: the exact silhouette extruded (so every notch and waist in the drawing stays), then ground:
+// thick where it meets the haft (x = 0) and thinning to an edge at the outermost reach of the blade
+function axeHeadGeo(pts, thick) {
+  const g = extrude(pts, thick, 0.006);
+  let xm = 0.01; for (const [x] of pts) xm = Math.max(xm, Math.abs(x));
+  const P = g.attributes.position;
+  for (let i = 0; i < P.count; i++) { const k = 0.12 + 0.88 * Math.max(0, 1 - Math.abs(P.getX(i)) / xm); P.setZ(i, P.getZ(i) * k); }
+  P.needsUpdate = true; g.computeVertexNormals();
+  return g;
+}
 // a ground blade: the outline lofted with a diamond cross-section, thick along the spine and
 // sharp at both edges (an extrusion would leave the edges flat, like a bar of metal)
 // spine: thick down the middle (a sword). haft: thick along x = 0, where it meets the handle, and sharp at the
@@ -260,7 +270,7 @@ export function buildForged(spec) {
     const haft = mesh(cyl(0.04, 0.045, hl, 10), haftMat); haft.position.y = y0 + hl / 2; g.add(haft);
     const sw = SHAPE_W[spec.type] * W, hh = SHAPE_L[spec.type] * L, base = y0 + hl * 0.55;
     const pts = fullOutline(spec.shape).map(([x, y]) => [x * sw, y * hh]), bx = outlineBox(pts);
-    const head = mesh(spec.type === 'axe' ? bladeGeo(pts, 0.1, 'haft') : extrude(pts, spec.type === 'hammer' ? 0.22 * W : 0.06), metal); head.position.y = base; g.add(head);
+    const head = mesh(spec.type === 'axe' ? axeHeadGeo(pts, 0.1) : extrude(pts, spec.type === 'hammer' ? 0.22 * W : 0.06), metal); head.position.y = base; g.add(head);
     const cap = mesh(cyl(0.055, 0.055, Math.max(0.1, (bx[3] - bx[2]) * 0.9), 10), iron); cap.position.y = base + (bx[2] + bx[3]) / 2; g.add(cap);
     g.userData.auraBox = [bx[0], bx[1], base + bx[2], base + bx[3], spec.type === 'hammer' ? -0.12 * W : -0.06, spec.type === 'hammer' ? 0.12 * W : 0.06];
     g.userData.tipY = Math.max(y0 + hl, base + bx[3]);
