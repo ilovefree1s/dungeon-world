@@ -120,7 +120,7 @@ void main(){
   float cx = abs(vUv.x * 2.0 - 1.0);
   float body = (1.0 - cx * cx) * (1.0 - vUv.y * 0.55);
   float f = body * 1.35 - 0.55 + (n - 0.5) * 1.6 * (0.4 + vUv.y);
-  float a = smoothstep(0.0, 0.35, f) * (0.55 + 0.45 * uPow);
+  float a = smoothstep(0.0, 0.35, f) * (0.55 + 0.45 * uPow) * min(1.0, uPow);
   // heat ramp: white core, yellow, orange, deep red at the tips
   vec3 col = mix(vec3(1.0, 0.95, 0.75), vec3(1.0, 0.75, 0.2), smoothstep(0.9, 0.5, f));
   col = mix(col, vec3(1.0, 0.35, 0.05), smoothstep(0.55, 0.15, f));
@@ -136,7 +136,7 @@ void main(){
   float cx = abs(vUv.x * 2.0 - 1.0);
   float body = (1.0 - cx * cx * 0.7) * (1.0 - vUv.y * 0.6);
   float f = body * 1.2 - 0.5 + (n - 0.5) * 1.7;
-  float a = smoothstep(0.0, 0.5, f) * (0.5 + 0.4 * uPow);
+  float a = smoothstep(0.0, 0.5, f) * (0.5 + 0.4 * uPow) * min(1.0, uPow);
   // the heart of the smoke goes black; the fringe is the given colour
   vec3 col = mix(uCol, vec3(0.0), smoothstep(0.2, 0.8, f));
   gl_FragColor = vec4(col, a * 0.9);
@@ -152,7 +152,7 @@ void main(){
   float cap = smoothstep(0.0, 0.08, vUv.y) * smoothstep(1.0, 0.85, vUv.y);
   // ridges of the ripple catch the light as thin bright bands
   float ridge = smoothstep(0.52, 0.6, n) * smoothstep(0.7, 0.62, n);
-  float a = edge * cap * (0.25 + 0.45 * smoothstep(0.35, 0.75, n)) * (0.5 + 0.5 * uPow);
+  float a = edge * cap * (0.25 + 0.45 * smoothstep(0.35, 0.75, n)) * (0.5 + 0.5 * uPow) * min(1.0, uPow);
   vec3 col = mix(vec3(0.1, 0.4, 0.95), vec3(0.45, 0.8, 1.0), n) + ridge * vec3(0.7, 0.9, 1.0);
   gl_FragColor = vec4(col * (a + ridge * 0.5), a + ridge * edge * cap * 0.6);
 }`;
@@ -164,7 +164,7 @@ void main(){
   float n2 = texture2D(tN, vec2(vUv.x * 9.0 * uAsp - uT * 0.04, 0.7)).r;
   float ray = smoothstep(0.45, 0.8, n * 0.6 + n2 * 0.4);
   float cx = abs(vUv.x * 2.0 - 1.0);
-  float a = ray * (1.0 - cx * cx) * (1.0 - vUv.y * vUv.y) * (0.35 + 0.35 * uPow);
+  float a = ray * (1.0 - cx * cx) * (1.0 - vUv.y * vUv.y) * (0.35 + 0.35 * uPow) * min(1.0, uPow);
   gl_FragColor = vec4(vec3(1.0, 0.9, 0.6) * a, a);
 }`;
 const HAZE_FS = `
@@ -172,7 +172,7 @@ uniform sampler2D tN; uniform float uT, uPow, uAsp, uFlash; varying vec2 vUv;
 void main(){
   float n = texture2D(tN, vec2(vUv.x * 2.0 * uAsp + uT * 0.4, vUv.y * 1.5 - uT * 0.9)).r;
   float cx = abs(vUv.x * 2.0 - 1.0);
-  float a = (1.0 - cx * cx) * smoothstep(0.3, 0.8, n) * (0.15 + 0.55 * uFlash) * (0.4 + 0.6 * uPow);
+  float a = (1.0 - cx * cx) * smoothstep(0.3, 0.8, n) * (0.15 + 0.55 * uFlash) * (0.4 + 0.6 * uPow) * min(1.0, uPow);
   gl_FragColor = vec4(vec3(0.55, 0.65, 1.0) * a, a);
 }`;
 const HELIX_FS = `
@@ -183,7 +183,7 @@ void main(){
   float p = fract(x);
   float streak = smoothstep(0.0, 0.08, p) * smoothstep(0.75, 0.2, p);
   float ey = 1.0 - abs(vUv.y * 2.0 - 1.0);
-  float a = streak * ey * (0.6 + 0.5 * uPow);
+  float a = streak * ey * (0.6 + 0.5 * uPow) * min(1.0, uPow);
   gl_FragColor = vec4(uCol * a, a);
 }`;
 const RING_FS = `
@@ -191,7 +191,7 @@ uniform sampler2D tR; uniform float uT, uPow; uniform vec3 uCol; varying vec2 vU
 void main(){
   float r = texture2D(tR, vec2(vUv.x + uT * 0.05, vUv.y)).r;
   float pulse = 0.75 + 0.25 * sin(uT * 3.0 + vUv.x * 12.0);
-  float a = r * pulse * (0.6 + 0.4 * uPow);
+  float a = r * pulse * (0.6 + 0.4 * uPow) * min(1.0, uPow);
   gl_FragColor = vec4(uCol * a * 2.0, min(1.0, a * 1.6));
 }`;
 
@@ -214,7 +214,7 @@ const jitter = (c, i, s) => { c.vel[i * 3] = (rnd() - 0.5) * s; c.vel[i * 3 + 1]
 // ---------------------------------------------------------------- the auras
 const upW = new THREE.Vector3(0, 1, 0), qW = new THREE.Quaternion(), upL = new THREE.Vector3();
 export function attachAura(g, kind, bx, power = 1) {
-  power = Math.max(0.2, Math.min(2, power));
+  power = Math.max(0.05, Math.min(3, power));
   const [x0, x1, y0, y1, z0, z1] = bx, span = Math.max(0.1, y1 - y0), wide = Math.max(x1 - x0, z1 - z0);
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   const build = BUILD[kind];
@@ -260,7 +260,7 @@ const BUILD = {
   },
   // ---------------------------------------------------------------- LIGHTNING
   lightning(g, bx, power, { span, wide, cx, cz }) {
-    const bolts = makeBolts(g, Math.max(2, Math.round(1 + power * 2.5)), Math.min(1, Math.max(0.3, span / 1.1)));
+    const bolts = makeBolts(g, Math.max(1, Math.round(1 + power * 2.5)), Math.min(1, Math.max(0.3, span / 1.1)));
     const hazeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: 1 }, uFlash: { value: 0 } };
     const haze = new THREE.Mesh(crossedPlanes(bx, 0.1, 0.1 + 0.08 * power), sheet(HAZE_FS, hazeU)); haze.frustumCulled = false; g.add(haze);
     const sparks = cloud(g, Math.round(22 * power), { size: 0.035 + 0.02 * Math.min(1, span), tex: glintTex(), colors: ['#ffffff', '#8ab8ff'] });
@@ -272,7 +272,7 @@ const BUILD = {
       if ((flick -= dt) <= 0) {
         // always at least one bolt crawling the blade; now and then a burst of all of them
         const burst = rnd() < 0.25;
-        flick = 0.03 + rnd() * 0.06;
+        flick = 0.09 + rnd() * 0.16;
         bolts.draw(burst ? bolts.n : 1 + Math.floor(rnd() * Math.max(1, bolts.n - 1)), bx, power);
         if (burst) flash = 1;
       }
