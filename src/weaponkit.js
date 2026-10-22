@@ -77,8 +77,8 @@ const mirror = half => [...half, ...half.slice().reverse().map(([x, y]) => [-x, 
 // spec.shape = { pts: [[x, y], ...], mirror }: an outline of your own for the blade or the head, in units
 // of the type's half-width (x, -1 .. 1) and length (y, 0 at the base, 1 at the tip). With mirror, pts is
 // the right half from base to tip and the left is its reflection.
-export const SHAPE_W = { sword: 0.25, greatsword: 0.3, dagger: 0.2, axe: 0.45, hammer: 0.5, mace: 0.3 };
-export const SHAPE_L = { sword: 1.2, greatsword: 1.7, dagger: 0.6, axe: 0.6, hammer: 0.5, mace: 0.5 };
+export const SHAPE_W = { sword: 0.25, greatsword: 0.3, dagger: 0.2, axe: 0.45, hammer: 0.5, mace: 0.3, staff: 0.32, wand: 0.18 };
+export const SHAPE_L = { sword: 1.2, greatsword: 1.7, dagger: 0.6, axe: 0.6, hammer: 0.5, mace: 0.5, staff: 0.55, wand: 0.3 };
 export const canDraw = spec => spec.type in SHAPE_W;
 export const fullOutline = shape => shape.mirror ? mirror(shape.pts) : shape.pts;
 // the preset head as a shape to start editing from
@@ -93,6 +93,8 @@ export function presetShape(spec) {
   if (t === 'axe') return { pts: [[0, 0.25], [0.5, 0.42], [1, 0.35], [1.0, 0.75], [0.5, 0.95], [0, 0.8]], mirror: spec.head === 'double' };
   if (t === 'hammer') return { pts: [[0.9, 0.2], [0.9, 0.8], [0, 0.85], [0, 0.15]].map(([x, y]) => [x, y]), mirror: true };
   if (t === 'mace') return { pts: [[0.3, 0], [0.9, 0.3], [0.9, 0.6], [0.4, 0.85], [0, 1]], mirror: true };
+  // a staff's or wand's head: a cup of metal round the gem, open at the top
+  if (t === 'staff' || t === 'wand') return { pts: [[0.12, 0], [0.5, 0.1], [0.9, 0.45], [0.95, 0.75], [0.7, 1], [0.5, 0.78], [0.3, 0.6], [0, 0.55]], mirror: true };
   return { pts: [[0.6, 0], [0.6, 0.8], [0, 1]], mirror: true };
 }
 // the preset blade's outline (the right half, base to tip; 'curved' is a whole outline)
@@ -319,7 +321,17 @@ export function buildForged(spec) {
     const orbMat = std({ color: accent, emissive: accent, emissiveIntensity: 1.4, roughness: 0.1, metalness: 0.1 });
     g.userData.orbMat = orbMat;
     let orb;
-    if (spec.head === 'orb' || spec.head === 'gem') { orb = mesh(spec.head === 'gem' ? new THREE.OctahedronGeometry(r * 1.2) : sph(r, 14, 10), orbMat, false); orb.position.y = hy + r * 0.9; const cup = mesh(cyl(r * 0.7, 0.05, r * 0.8, 8), metal); cup.position.y = hy + r * 0.2; g.add(cup); }
+    if (spec.shape) {
+      // a drawn head: the drawing, in the staff's metal, standing on the shaft with the gem glowing at its heart
+      const sw = SHAPE_W[spec.type] * W, hh = SHAPE_L[spec.type] * L;
+      const pts = fullOutline(spec.shape).map(([x, y]) => [x * sw, y * hh]), bx = outlineBox(pts);
+      const head = mesh(extrude(pts, wand ? 0.035 : 0.05), metal); head.position.y = hy - 0.02; g.add(head);
+      const cy = hy + (bx[2] + bx[3]) / 2, gr = Math.min(r, (bx[1] - bx[0]) * 0.3, (bx[3] - bx[2]) * 0.3);
+      orb = mesh(sph(Math.max(0.04, gr), 14, 10), orbMat, false); orb.position.y = cy;
+      g.userData.auraBox = [bx[0], bx[1], hy + bx[2], hy + bx[3], -0.08, 0.08];
+      g.userData.tipY = hy + bx[3];
+    }
+    else if (spec.head === 'orb' || spec.head === 'gem') { orb = mesh(spec.head === 'gem' ? new THREE.OctahedronGeometry(r * 1.2) : sph(r, 14, 10), orbMat, false); orb.position.y = hy + r * 0.9; const cup = mesh(cyl(r * 0.7, 0.05, r * 0.8, 8), metal); cup.position.y = hy + r * 0.2; g.add(cup); }
     else if (spec.head === 'crescent') { const c = mesh(new THREE.TorusGeometry(r * 1.6, r * 0.25, 8, 20, Math.PI * 1.3), metal); c.position.y = hy + r * 1.4; c.rotation.z = Math.PI * 0.85; g.add(c); orb = mesh(sph(r * 0.7, 12, 8), orbMat, false); orb.position.y = hy + r * 1.4; }
     else if (spec.head === 'claw') { for (let i = 0; i < 3; i++) { const a = i * Math.PI * 2 / 3, c = mesh(new THREE.ConeGeometry(r * 0.3, r * 2.4, 6), metal); c.position.set(Math.cos(a) * r * 0.7, hy + r * 1.1, Math.sin(a) * r * 0.7); c.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); g.add(c); } orb = mesh(new THREE.OctahedronGeometry(r * 0.9), orbMat, false); orb.position.y = hy + r * 1.6; }
     else if (spec.head === 'lantern') { for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2; const rib = mesh(box(0.025, r * 2.6, 0.025), metal); rib.position.set(Math.cos(a) * r * 1.1, hy + r * 1.4, Math.sin(a) * r * 1.1); g.add(rib); } const cap = mesh(cyl(r * 1.3, r * 1.3, 0.05, 8), metal); cap.position.y = hy + r * 2.7; g.add(cap); orb = mesh(sph(r * 0.8, 12, 8), orbMat, false); orb.position.y = hy + r * 1.4; }
@@ -327,9 +339,8 @@ export function buildForged(spec) {
     else if (spec.head === 'twist') { for (const ph of [0, Math.PI]) { const pts = []; for (let i = 0; i <= 12; i++) { const y = i / 12 * r * 2.6, a = ph + y * 9; pts.push(new V3(Math.cos(a) * r * 0.5, hy + y, Math.sin(a) * r * 0.5)); } g.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.02, 6), metal)); } orb = mesh(sph(r * 0.6, 12, 8), orbMat, false); orb.position.y = hy + r * 2.8; }
     else { const sk = mesh(sph(r * 1.1, 12, 10), std({ color: '#e6dccb', roughness: 0.6 })); sk.position.y = hy + r * 1.1; g.add(sk); for (const s of [-1, 1]) { const e = mesh(sph(r * 0.3, 8, 6), orbMat, false); e.position.set(s * r * 0.45, hy + r * 1.2, r * 0.85); g.add(e); } orb = mesh(sph(r * 0.5, 10, 8), orbMat, false); orb.position.y = hy + r * 2.4; }
     g.add(orb); g.userData.orb = orb;
-    g.userData.auraBox = [-r * 1.4, r * 1.4, hy, hy + r * 3, -r * 1.4, r * 1.4];
-    const l = new THREE.PointLight(accent, 0, 8, 2); l.position.y = hy + r; g.add(l);
-    g.userData.tipY = hy + r * 3;
+    if (!spec.shape) { g.userData.auraBox = [-r * 1.4, r * 1.4, hy, hy + r * 3, -r * 1.4, r * 1.4]; g.userData.tipY = hy + r * 3; }
+    const l = new THREE.PointLight(accent, 0, 8, 2); l.position.y = orb.position.y; g.add(l);
     g.userData.tick = t => { orb.rotation.y = t * 1.2; orb.position.y += Math.sin(t * 3) * 0.002; };
   } else if (spec.type === 'bow' || spec.type === 'crossbow') {
     // the hunter's: limbs along y, the string behind at z = stringZ, drawn back when shooting (as Dungeon Heart's)

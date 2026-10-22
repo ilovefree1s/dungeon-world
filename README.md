@@ -26,8 +26,9 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   other way round, longer reaches farther; a wand casts fast and light, a crossbow shoots hard
   and slow; a staff's gem colors the mage's bolts. Name it (or roll one), save up to sixteen,
   wield one per hero; they stay in hand across reloads.
-  **Draw the shape yourself** (DRAW IT: DRAG CORNERS or FREEHAND, on blades and on axe, hammer
-  and mace heads; the pad appears under the preview): drag the corners of the outline (click an edge to add one, double-click to remove), or
+  **Draw the shape yourself** (DRAW IT: DRAG CORNERS or FREEHAND, on blades, on axe, hammer
+  and mace heads, and on a staff's or wand's head, where the drawing stands in metal round the
+  gem; the pad appears under the preview): drag the corners of the outline (click an edge to add one, double-click to remove), or
   trace the silhouette freehand and it's cleaned into an outline; MIRROR shapes one half and
   reflects it, or off, the whole outline. The drawing's area and length count: a fat blade hits
   harder and swings slower, a short one reaches less. Hafts and shafts (axes, hammers, maces,
