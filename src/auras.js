@@ -257,14 +257,14 @@ const jitter = (c, i, s) => { c.vel[i * 3] = (rnd() - 0.5) * s; c.vel[i * 3 + 1]
 
 // ---------------------------------------------------------------- the auras
 const upW = new THREE.Vector3(0, 1, 0), qW = new THREE.Quaternion(), upL = new THREE.Vector3();
-export function attachAura(g, kind, bx, power = 1, size = 1, speed = 1) {
+export function attachAura(g, kind, bx, power = 1, size = 1, speed = 1, extra = {}) {
   power = Math.max(0.05, Math.min(3, power));
   const [x0, x1, y0, y1, z0, z1] = bx, span = Math.max(0.1, y1 - y0), wide = Math.max(x1 - x0, z1 - z0);
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   const build = BUILD[kind];
   if (!build) return () => {};
   const before = new Set(g.children);
-  const parts = build(g, bx, power, { span, wide, cx, cz, size: Math.max(0.3, Math.min(3, size)), speed: Math.max(0.05, Math.min(3, speed)) });
+  const parts = build(g, bx, power, { span, wide, cx, cz, size: Math.max(0.3, Math.min(3, size)), speed: Math.max(0.05, Math.min(3, speed)), crystal: extra.crystal || 'flake' });
   for (const o of g.children) if (!before.has(o)) o.traverse(c => { c.userData.aura = true; });
   let last = -1;
   return t => {
@@ -480,16 +480,40 @@ const BUILD = {
     };
   },
   // ---------------------------------------------------------------- FROST
-  crystals(g, bx, power, { span, wide, cx, cz }) {
+  // (crystal: the shape of the ice. flake: the flat six-pointed one. shard: long ice crystals jutting out of the steel.
+  // spike: icicles. cluster: knots of hexagonal prisms. plate: hexagonal plates of rime lying flat on the steel)
+  crystals(g, bx, power, { span, wide, cx, cz, crystal = 'flake' }) {
     const [x0, x1, y0, y1, z0, z1] = bx;
     const N = Math.round(14 * power) + 4;
-    const geo = crystalGeo();
-    const ice = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: '#eaf8ff', transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false }), N);
-    const rim = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: '#2a78d8', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }), N);
-    ice.frustumCulled = rim.frustumCulled = false; rim.renderOrder = 1; ice.renderOrder = 2; g.add(rim); g.add(ice);
+    const flat = crystal === 'flake';
+    let geo;
+    if (crystal === 'shard') { geo = new THREE.OctahedronGeometry(1, 0); geo.scale(0.3, 1.5, 0.3); geo.translate(0, 1.1, 0); }
+    else if (crystal === 'spike') { geo = new THREE.ConeGeometry(0.3, 2.2, 5); geo.translate(0, 1.05, 0); }
+    else if (crystal === 'cluster') {
+      const parts = [];
+      for (let i = 0; i < 4; i++) { const c = new THREE.CylinderGeometry(0.22, 0.28, 1 + i * 0.25, 6); c.translate(0, 0.5 + i * 0.12, 0); c.rotateX((rnd() - 0.5) * 0.9); c.rotateZ((rnd() - 0.5) * 0.9); c.rotateY(i * 1.6); parts.push(c); }
+      const pos = []; for (const c of parts) { const a = c.toNonIndexed().attributes.position.array; for (let i = 0; i < a.length; i++) pos.push(a[i]); }
+      geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.computeVertexNormals();
+    }
+    else if (crystal === 'plate') { geo = new THREE.CylinderGeometry(1, 1, 0.08, 6); geo.translate(0, 0.04, 0); }
+    else geo = crystalGeo();
+    const iceMat = flat ? new THREE.MeshBasicMaterial({ color: '#eaf8ff', transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false })
+      : new THREE.MeshStandardMaterial({ color: '#dff4ff', emissive: '#5aaaff', emissiveIntensity: 0.3, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.88, flatShading: true });
+    const ice = new THREE.InstancedMesh(geo, iceMat, N);
+    const rim = flat ? new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: '#2a78d8', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }), N) : null;
+    ice.frustumCulled = false; if (rim) { rim.frustumCulled = false; rim.renderOrder = 1; g.add(rim); } ice.renderOrder = 2; g.add(ice);
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), E = new THREE.Euler();
     const cr = []; // each crystal: where, which way it faces, how big, where in its life
-    const seedOne = c => { c.p = [x0 + rnd() * (x1 - x0), y0 + rnd() * span, z0 + rnd() * (z1 - z0)]; c.e = [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28]; c.s = (0.09 + rnd() * 0.1) * (0.7 + 0.3 * power); c.max = 1.6 + rnd() * 2; c.life = 0; c.spin = (rnd() - 0.5) * 0.6; };
+    const seedOne = c => {
+      if (flat) { c.p = [x0 + rnd() * (x1 - x0), y0 + rnd() * span, z0 + rnd() * (z1 - z0)]; c.e = [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28]; }
+      else {
+        // rooted on the steel's skin, standing out from it (a plate lies on it), with a little tilt
+        const face = rnd();
+        if (face < 0.7) { const sgn = rnd() < 0.5 ? -1 : 1; c.p = [x0 + rnd() * (x1 - x0), y0 + rnd() * span, sgn < 0 ? z0 : z1]; c.e = [sgn * Math.PI / 2 + (rnd() - 0.5) * 0.6, rnd() * 6.28, (rnd() - 0.5) * 0.6]; }
+        else { const sgn = rnd() < 0.5 ? -1 : 1; c.p = [sgn < 0 ? x0 : x1, y0 + rnd() * span, z0 + rnd() * (z1 - z0)]; c.e = [(rnd() - 0.5) * 0.6, rnd() * 6.28, -sgn * Math.PI / 2 + (rnd() - 0.5) * 0.6]; }
+      }
+      c.s = (crystal === 'plate' ? 0.05 + rnd() * 0.05 : crystal === 'flake' ? 0.09 + rnd() * 0.1 : 0.05 + rnd() * 0.06) * (0.7 + 0.3 * power); c.max = 1.6 + rnd() * 2; c.life = 0; c.spin = flat ? (rnd() - 0.5) * 0.6 : 0;
+    };
     for (let i = 0; i < N; i++) { const c = {}; seedOne(c); c.life = rnd() * c.max; cr.push(c); }
     const snow = cloud(g, Math.round(30 * power), { size: 0.05, tex: softTex(), colors: ['#ffffff', '#bfe8ff'] });
     const spawnS = i => { inBox(snow, i, [x0 - 0.1, x1 + 0.1, y0, y1 + 0.1, z0 - 0.1, z1 + 0.1]); snow.max[i] = 1 + rnd() * 1.2; snow.life[i] = 0; snow.ph[i] = rnd() * 6.28; };
@@ -506,10 +530,10 @@ const BUILD = {
         // grows quickly, holds, then shatters (shrinks fast at the end)
         const grow = k < 0.2 ? k / 0.2 : k > 0.9 ? (1 - k) / 0.1 : 1;
         const s = c.s * grow * (1 + 0.05 * Math.sin(t * 4 + i));
-        E.set(c.e[0], c.e[1] + t * c.spin, c.e[2]); Q.setFromEuler(E); P.set(c.p[0], c.p[1], c.p[2]); S.set(s, s, s * 0.3);
-        M.compose(P, Q, S); ice.setMatrixAt(i, M); S.multiplyScalar(1.3); M.compose(P, Q, S); rim.setMatrixAt(i, M);
+        E.set(c.e[0], c.e[1] + t * c.spin, c.e[2]); Q.setFromEuler(E); P.set(c.p[0], c.p[1], c.p[2]); if (flat) S.set(s, s, s * 0.3); else S.set(s, s, s);
+        M.compose(P, Q, S); ice.setMatrixAt(i, M); if (rim) { S.multiplyScalar(1.3); M.compose(P, Q, S); rim.setMatrixAt(i, M); }
       }
-      ice.instanceMatrix.needsUpdate = true; rim.instanceMatrix.needsUpdate = true;
+      ice.instanceMatrix.needsUpdate = true; if (rim) rim.instanceMatrix.needsUpdate = true;
       const SN = snow;
       for (let i = 0; i < SN.N; i++) {
         SN.life[i] += dt; if (SN.life[i] >= SN.max[i]) spawnS(i);

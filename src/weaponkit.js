@@ -187,6 +187,8 @@ export function nameOf(spec, rnd = Math.random) {
   const n = pick(NOUN[spec.type]);
   return rnd() < 0.5 ? `${ADJ[spec.material]} ${n}` : `${n} ${pick(EPITHET)}`;
 }
+// the frost's crystals
+export const CRYSTALS = [['flake', 'FLAKE'], ['shard', 'SHARD'], ['spike', 'SPIKE'], ['cluster', 'CLUSTER'], ['plate', 'PLATE']];
 // ---------------------------------------------------------------- rarity (of a dropped weapon; a forged one is common)
 export const RARITIES = [
   { id: 'common', name: 'COMMON', color: '#d8d0c0', mult: 1 },
@@ -389,7 +391,7 @@ export function buildForged(spec) {
   g.userData.bladeMat = metal;
   // the aura, along the business end
   if (spec.aura && spec.aura !== 'none' && g.userData.auraBox) {
-    const auraTick = attachAura(g, ({ flame2: 'flame', arcs: 'lightning', plasma: 'lightning', coil: 'lightning', static: 'lightning', drops: 'water', stream: 'water', swirl: 'water', gust: 'wind', vortex: 'wind', slashes: 'wind', shadow2: 'shadow', rime: 'frost', blizzard: 'frost', shards: 'frost' })[spec.aura] || spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1, spec.auraSpeed ?? 1);
+    const auraTick = attachAura(g, ({ flame2: 'flame', arcs: 'lightning', plasma: 'lightning', coil: 'lightning', static: 'lightning', drops: 'water', stream: 'water', swirl: 'water', gust: 'wind', vortex: 'wind', slashes: 'wind', shadow2: 'shadow', rime: 'frost', blizzard: 'frost', shards: 'frost' })[spec.aura] || spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1, spec.auraSpeed ?? 1, { crystal: spec.crystal });
     const base = g.userData.tick;
     g.userData.tick = t => { if (base) base(t); auraTick(t); };
   }
