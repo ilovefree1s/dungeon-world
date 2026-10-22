@@ -133,10 +133,12 @@ with sync_playwright() as pw:
         y0 = page.evaluate('__dw.player.yaw')
         page.mouse.move(500, 324); page.mouse.down(); page.mouse.move(560, 324, steps=4); page.mouse.move(620, 324, steps=4); page.mouse.up(); frames(3)
         check(abs(page.evaluate('__dw.player.yaw') - y0) > 0.15, 'cursor: a left-drag turns the camera')
-        page.evaluate("(() => { const p = __dw.player; __dw.monsters.list.slice().forEach(m => __dw.monsters.remove(m)); const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); const m = __dw.monsters.spawn(1, p.pos.x + fx * 8, p.pos.y, p.pos.z + fz * 8); m.atk = 0; m.state = 'wander'; m.k = { ...m.k, see: 0 }; })()"); frames(3)
-        at = page.evaluate("(() => { const m = __dw.monsters.list[0], v = new __dw.THREE.Vector3(m.pos.x, m.pos.y + m.k.h * 0.6, m.pos.z).project(__dw.camera || __dw.scene.children.find(o => o.isCamera)); const c = document.getElementById('gl'); return [(v.x + 1) / 2 * c.clientWidth, (1 - v.y) / 2 * c.clientHeight]; })()")
+        # (no other monsters: the world's own spawning is paused, and the one slime is ours)
+        page.evaluate("(() => { const p = __dw.player; __dw.monsters.spawnT = 1e9; __dw.monsters.list.slice().forEach(m => __dw.monsters.remove(m)); const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); const m = __dw.monsters.spawn(1, p.pos.x + fx * 8, p.pos.y, p.pos.z + fz * 8); m.atk = 0; m.state = 'wander'; m.k = { ...m.k, see: 0 }; window.__slime = m; })()"); frames(3)
+        at = page.evaluate("(() => { const m = window.__slime, v = new __dw.THREE.Vector3(m.pos.x, m.pos.y + m.k.h * 0.6, m.pos.z).project(__dw.camera); const c = document.getElementById('gl'); return [(v.x + 1) / 2 * c.clientWidth, (1 - v.y) / 2 * c.clientHeight, v.z]; })()")
         page.mouse.click(at[0], at[1]); frames(3)
-        check(page.evaluate('__dw.monsters.focus === __dw.monsters.list[0]'), f'cursor: a click on a slime focuses it (at {at[0]:.0f}, {at[1]:.0f})')
+        check(page.evaluate('__dw.monsters.focus === window.__slime'), f'cursor: a click on a slime focuses it (at {at[0]:.0f}, {at[1]:.0f}, z {at[2]:.2f})')
+        page.evaluate('__dw.monsters.spawnT = 1')
         page.evaluate('__dw.monsters.focus = null')
     page.evaluate('__dw.setQuality(1)')
 
@@ -225,7 +227,9 @@ with sync_playwright() as pw:
     if w:
         page.evaluate(f'__dw.sky.t = 0.45; __dw.player.place({w[0]} + 0.5, 60, {w[1]} + 0.5)')
         page.wait_for_function('__dw.world.readyAround(__dw.player.pos.x, __dw.player.pos.z, 32) >= 1', timeout=120000)
-        page.wait_for_function('__dw.player.inWater || __dw.player.onGround', timeout=600000)
+        # (wait for the water itself; 'on the ground' can fire before the chunk under the hero is in)
+        try: page.wait_for_function('__dw.player.inWater', timeout=180000)
+        except Exception: pass
         frames(3)
         st = page.evaluate('({ y: __dw.player.pos.y, w: __dw.player.inWater })')
         check(st['w'], f'the hero swims in a lake (y {st["y"]:.1f})')
