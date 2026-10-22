@@ -58,6 +58,7 @@ const barMats = {
   fill: new THREE.SpriteMaterial({ color: '#5ce65c', transparent: true, opacity: 0.95, depthWrite: false, depthTest: false }),
 };
 const shotGeo = new THREE.SphereGeometry(0.5, 10, 7);
+const camRight = new THREE.Vector3();
 
 export class Monsters {
   constructor(world, player) {
@@ -85,7 +86,7 @@ export class Monsters {
     if (!m.bar) {
       const g = new THREE.Group();
       const back = new THREE.Sprite(barMats.back); back.scale.set(3.8, 0.55, 1);
-      const fill = new THREE.Sprite(barMats.fill.clone()); fill.center.set(0, 0.5); fill.position.x = -1.75; fill.scale.set(3.5, 0.38, 1);
+      const fill = new THREE.Sprite(barMats.fill.clone()); fill.center.set(0, 0.5); fill.scale.set(3.5, 0.38, 1);
       g.add(back, fill); g.userData.fill = fill; scene.add(g); m.bar = g;
     }
     const f = Math.max(0, m.hp / m.maxHp);
@@ -346,7 +347,12 @@ export class Monsters {
       // the health bar over its head
       if (m.bar) {
         if ((m.barT -= dt) <= 0) m.bar.visible = false;
-        else m.bar.position.set(m.pos.x, m.pos.y + k.h * 1.24 + 1.1, m.pos.z);
+        else {
+          m.bar.position.set(m.pos.x, m.pos.y + k.h * 1.24 + 1.1, m.pos.z);
+          // (the fill grows from the bar's left end: offset along the camera's right, so it holds from any angle)
+          camRight.setFromMatrixColumn(camera.matrixWorld, 0);
+          m.bar.userData.fill.position.copy(camRight).multiplyScalar(-1.75);
+        }
       }
       // the look of it
       const hs = Math.hypot(m.vel.x, m.vel.z);
