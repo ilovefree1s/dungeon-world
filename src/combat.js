@@ -377,7 +377,7 @@ export class Monsters {
 const boltGeo = new THREE.SphereGeometry(0.56, 12, 8);
 // an arrow: a wooden shaft, a steel head, feathers at the tail (built once, cloned per shot; +z is the way it flies)
 const arrowMats = {
-  wood: new THREE.MeshLambertMaterial({ color: '#8a6238' }), steel: new THREE.MeshLambertMaterial({ color: '#cfd6de' }),
+  wood: new THREE.MeshLambertMaterial({ color: '#8a6238' }), steel: new THREE.MeshStandardMaterial({ color: '#e4ecf4', metalness: 0.9, roughness: 0.18, emissive: '#9fd8ff', emissiveIntensity: 0.55 }),   // (a shiny tip, with a little glint of its own, so the arrow shows in flight)
   feather: new THREE.MeshLambertMaterial({ color: '#e8e4d8', side: THREE.DoubleSide }), feather2: new THREE.MeshLambertMaterial({ color: '#c8402e', side: THREE.DoubleSide }),
 };
 let arrowProto = null;
@@ -386,6 +386,7 @@ function buildArrow() {
   const g = new THREE.Group(), L = 2.6;
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, L, 6), arrowMats.wood); shaft.rotation.x = Math.PI / 2; g.add(shaft);
   const head = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 4), arrowMats.steel); head.rotation.x = Math.PI / 2; head.position.z = L / 2 + 0.18; g.add(head);
+  const glint = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.soft, color: '#dff4ff', blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8 })); glint.scale.setScalar(1.1); glint.position.z = L / 2 + 0.25; g.add(glint);
   const nock = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.1, 6), arrowMats.steel); nock.rotation.x = Math.PI / 2; nock.position.z = -L / 2; g.add(nock);
   // three vanes, flat quarter-arcs sticking out of the shaft near the tail
   const vane = new THREE.PlaneGeometry(0.42, 0.2); vane.rotateY(Math.PI / 2); vane.translate(0, 0.14, -L / 2 + 0.3);
