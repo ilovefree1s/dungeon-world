@@ -61,12 +61,13 @@ function crossedPlanes(bx, up = 0, side = 0, centered = false) {
   b.rotateY(Math.PI / 2);
   a.translate(cx, cy, cz); b.translate(cx, cy, cz);
   // merge by hand (no addons): 2 planes, 4 verts each
-  const pos = new Float32Array(24), uv = new Float32Array(16), idx = [];
+  const pos = new Float32Array(24), uv = new Float32Array(16), nor = new Float32Array(24), idx = [];
   pos.set(a.attributes.position.array, 0); pos.set(b.attributes.position.array, 12);
   uv.set(a.attributes.uv.array, 0); uv.set(b.attributes.uv.array, 8);
+  nor.set(a.attributes.normal.array, 0); nor.set(b.attributes.normal.array, 12);
   for (const i of a.index.array) idx.push(i); for (const i of b.index.array) idx.push(i + 4);
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx);
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setIndex(idx);
   return g;
 }
 // a flat ring in the xz plane with uv.x running around it
@@ -111,9 +112,12 @@ function crystalGeo() {
 
 // ---------------------------------------------------------------- shader materials
 const VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+// (vFace: 1 when the sheet faces the camera, 0 edge-on; a sheet that fades with it never shows as a line)
+const VS_FACE = `varying vec2 vUv; varying float vFace; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vec3 n = normalize(normalMatrix * normal); vFace = abs(dot(n, normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }`;
+const sheetFaced = (frag, uniforms, blending = THREE.AdditiveBlending) => new THREE.ShaderMaterial({ vertexShader: VS_FACE, fragmentShader: frag, uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending });
 const sheet = (frag, uniforms, blending = THREE.AdditiveBlending) => new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: frag, uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending });
 const FLAME_FS = `
-uniform sampler2D tN; uniform float uT, uPow, uAsp; varying vec2 vUv;
+uniform sampler2D tN; uniform float uT, uPow, uAsp; varying vec2 vUv; varying float vFace;
 void main(){
   // two layers of noise rising at different speeds, pinched toward the blade's center line, thinning upward
   float n1 = texture2D(tN, vec2(vUv.x * 1.3 * uAsp, vUv.y * 0.7 - uT * 0.9)).r;
@@ -122,7 +126,7 @@ void main(){
   float cx = abs(vUv.x * 2.0 - 1.0);
   float body = (1.0 - cx * cx) * (1.0 - vUv.y * 0.55);
   float f = body * 1.35 - 0.55 + (n - 0.5) * 1.6 * (0.4 + vUv.y);
-  float a = smoothstep(0.0, 0.35, f) * (0.55 + 0.45 * uPow) * min(1.0, uPow);
+  float a = smoothstep(0.0, 0.35, f) * (0.55 + 0.45 * uPow) * min(1.0, uPow) * smoothstep(0.05, 0.6, vFace);
   // heat ramp: white core, yellow, orange, deep red at the tips
   vec3 col = mix(vec3(1.0, 0.95, 0.75), vec3(1.0, 0.75, 0.2), smoothstep(0.9, 0.5, f));
   col = mix(col, vec3(1.0, 0.35, 0.05), smoothstep(0.55, 0.15, f));
@@ -262,10 +266,13 @@ const BUILD = {
     const [x0, x1, y0, y1, z0, z1] = bx;
     const up = 0.3 + span * 0.5 * power, side = 0.1 + 0.08 * power;
     const uni = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: (wide + side * 2) / (span + up) } };
-    const fire = new THREE.Mesh(crossedPlanes(bx, up, side), sheet(FLAME_FS, uni)); fire.frustumCulled = false; g.add(fire);
+    const fire = new THREE.Mesh(crossedPlanes(bx, up, side), sheetFaced(FLAME_FS, uni)); fire.frustumCulled = false; g.add(fire);
+    // a body for the fire: soft orange blobs along the blade, facing the camera, so from the tip or edge-on it's a glow and not a cross
+    const NB = Math.max(3, Math.round(span / 0.12)), bodyMat = new THREE.SpriteMaterial({ map: softTex(), color: '#ff7a20', transparent: true, opacity: 0.22 * Math.min(1, power), blending: THREE.AdditiveBlending, depthWrite: false });
+    for (let i = 0; i < NB; i++) { const sp = new THREE.Sprite(bodyMat); sp.position.set(cx, y0 + span * (i + 0.5) / NB, cz); sp.scale.set(wide + 0.25 + 0.1 * power, span / NB * 2.4, 1); sp.frustumCulled = false; g.add(sp); }
     // an inner, hotter, narrower sheet, faster
     const uni2 = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 1.2 }, uAsp: { value: uni.uAsp.value } };
-    const core = new THREE.Mesh(crossedPlanes([x0 + wide * 0.2, x1 - wide * 0.2, y0, y1, z0 + (z1 - z0) * 0.2, z1 - (z1 - z0) * 0.2], up * 0.5, 0.02), sheet(FLAME_FS, uni2)); core.frustumCulled = false; g.add(core);
+    const core = new THREE.Mesh(crossedPlanes([x0 + wide * 0.2, x1 - wide * 0.2, y0, y1, z0 + (z1 - z0) * 0.2, z1 - (z1 - z0) * 0.2], up * 0.5, 0.02), sheetFaced(FLAME_FS, uni2)); core.frustumCulled = false; g.add(core);
     // (no smoke: it was asked off; the fire is cleaner without it)
     const embers = cloud(g, Math.round(28 * power), { size: 0.09, tex: emberTex(), colors: ['#fff2b0', '#ff5a10'] });
     const spawn = i => { inBox(embers, i, bx); embers.max[i] = 0.7 + rnd() * 0.9; embers.life[i] = 0; jitter(embers, i, 0.5); embers.ph[i] = rnd() * 6.28; };
@@ -274,6 +281,7 @@ const BUILD = {
       uni.uT.value = t; uni2.uT.value = t * 1.5 + 3;
       // the sheets flicker a touch
       fire.material.uniforms.uPow.value = power * (0.9 + 0.1 * Math.sin(t * 23) + 0.08 * Math.sin(t * 37));
+      bodyMat.opacity = 0.22 * Math.min(1, power) * (0.85 + 0.15 * Math.sin(t * 19));
       const E = embers;
       for (let i = 0; i < E.N; i++) {
         E.life[i] += dt; if (E.life[i] >= E.max[i]) spawn(i);
