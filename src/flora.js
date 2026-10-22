@@ -20,29 +20,29 @@ const rngOf = seed => { let s = Math.floor(seed * 1e6) >>> 0 || 1; return () => 
 
 // each kind: pieces, and a trunk radius the hero bumps into (0: walk through)
 export const KINDS = [
-  { name: 'oak', r: 0.8, build(rn) { const p = [], h = 6 + rn() * 2.5, g = jitter(C(62, 160, 52), rn), g2 = jitter(C(104, 184, 60), rn);
-      p.push(piece(at(cyl(0.4, 0.6, h, 6), 0, h / 2, 0), C(112, 76, 44)));
+  { name: 'oak', r: 0.4, build(rn) { const p = [], h = 6 + rn() * 2.5, g = jitter(C(62, 160, 52), rn), g2 = jitter(C(104, 184, 60), rn);
+      p.push(piece(at(cyl(0.2, 0.3, h, 6), 0, h / 2, 0), C(112, 76, 44)));
       p.push(piece(at(ico(2.1 + rn() * 0.6, 1), 0, h + 1.2, 0, rn(), rn(), rn()), g));
       p.push(piece(at(ico(1.5 + rn() * 0.5, 1), 1.2, h + 2.0, 0.5, rn(), rn()), g2));
       p.push(piece(at(ico(1.4 + rn() * 0.5, 1), -1.1, h + 1.8, -0.4, rn(), rn()), g)); return p; } },
-  { name: 'birch', r: 0.5, build(rn) { const p = [], h = 7 + rn() * 2, g = jitter(C(120, 196, 70), rn);
-      p.push(piece(at(cyl(0.28, 0.4, h, 6), 0, h / 2, 0), C(226, 222, 212)));
+  { name: 'birch', r: 0.25, build(rn) { const p = [], h = 7 + rn() * 2, g = jitter(C(120, 196, 70), rn);
+      p.push(piece(at(cyl(0.14, 0.2, h, 6), 0, h / 2, 0), C(226, 222, 212)));
       p.push(piece(at(ico(1.7 + rn() * 0.5, 1), 0, h + 1.1, 0, rn(), rn()), g)); p.push(piece(at(ico(1.2, 1), 0.3, h + 2.6, 0.2, rn(), rn()), jitter(g, rn))); return p; } },
-  { name: 'pine', r: 0.7, build(rn) { const p = [], h = 2.5 + rn() * 1.5, dark = jitter(C(40, 100, 66), rn), snow = C(230, 240, 248);
-      p.push(piece(at(cyl(0.35, 0.5, h + 2, 6), 0, (h + 2) / 2, 0), C(96, 64, 40)));
+  { name: 'pine', r: 0.35, build(rn) { const p = [], h = 2.5 + rn() * 1.5, dark = jitter(C(40, 100, 66), rn), snow = C(230, 240, 248);
+      p.push(piece(at(cyl(0.18, 0.25, h + 2, 6), 0, (h + 2) / 2, 0), C(96, 64, 40)));
       for (let i = 0; i < 4; i++) { const y = h + i * 2.1, r = 3.2 - i * 0.62; p.push(piece(at(cone(r, 2.8, 7), 0, y + 1.4, 0, 0, rn()), i % 2 && rn() < 0.6 ? snow : dark)); }
       return p; } },
   { name: 'cactus', r: 0.6, build(rn) { const p = [], h = 3 + rn() * 2.5, g = jitter(C(70, 150, 66), rn);
       p.push(piece(at(cyl(0.6, 0.7, h, 7), 0, h / 2, 0), g)); p.push(piece(at(ico(0.65, 0), 0, h, 0), g));
       if (rn() < 0.8) { const s = rn() < 0.5 ? -1 : 1; p.push(piece(at(cyl(0.4, 0.4, 1.6, 6), s * 1.1, h * 0.5, 0, 0, 0, Math.PI / 2), g)); p.push(piece(at(cyl(0.4, 0.45, 2.2, 6), s * 1.7, h * 0.5 + 1.1, 0), g)); }
       return p; } },
-  { name: 'willow', r: 0.9, build(rn) { const p = [], h = 4.5 + rn() * 2, g = jitter(C(84, 118, 52), rn);
-      p.push(piece(at(cyl(0.5, 0.8, h, 6), 0, h / 2, 0), C(72, 58, 40)));
+  { name: 'willow', r: 0.45, build(rn) { const p = [], h = 4.5 + rn() * 2, g = jitter(C(84, 118, 52), rn);
+      p.push(piece(at(cyl(0.25, 0.4, h, 6), 0, h / 2, 0), C(72, 58, 40)));
       const crown = ico(2.6 + rn() * 0.6, 1); crown.scale(1, 0.7, 1); p.push(piece(at(crown, 0, h + 1.2, 0, 0, rn()), g));
       for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283, r = 2.2 + rn() * 0.6; p.push(piece(at(cone(0.35, 2.6 + rn() * 1.5, 5), Math.cos(a) * r, h - 0.2, Math.sin(a) * r, Math.PI), jitter(g, rn))); }
       return p; } },
-  { name: 'char', r: 0.6, build(rn) { const p = [], h = 3.5 + rn() * 2, d = C(36, 30, 34);
-      p.push(piece(at(cyl(0.3, 0.5, h, 5), 0, h / 2, 0), d));
+  { name: 'char', r: 0.3, build(rn) { const p = [], h = 3.5 + rn() * 2, d = C(36, 30, 34);
+      p.push(piece(at(cyl(0.15, 0.25, h, 5), 0, h / 2, 0), d));
       const s = rn() < 0.5 ? -1 : 1; p.push(piece(at(cyl(0.18, 0.28, 2.4, 5), s * 0.9, h - 0.3, 0, 0, 0, s * 0.9), d)); p.push(piece(at(cyl(0.14, 0.22, 1.8, 5), -s * 0.6, h - 1.2, 0.3, 0.4, 0, -s * 1.1), d));
       if (rn() < 0.6) p.push(piece(at(ico(0.22, 0), s * 1.6, h + 0.5, 0), C(255, 140, 40), true)); return p; } },
   { name: 'spire', r: 0.9, build(rn) { const p = [], h = 5 + rn() * 5; const o = new THREE.OctahedronGeometry(1.2, 0); o.scale(1, h / 2.4, 1);
@@ -50,7 +50,7 @@ export const KINDS = [
   { name: 'crystal', r: 0.8, build(rn) { const p = [], n = 2 + Math.floor(rn() * 3);
       for (let i = 0; i < n; i++) { const h = 2.5 + rn() * 4, o = new THREE.OctahedronGeometry(0.7, 0); o.scale(1, h / 1.4, 1); const a = rn() * 6.283, r = i ? 0.9 + rn() : 0; p.push(piece(at(o, Math.cos(a) * r, h / 2, Math.sin(a) * r, (rn() - 0.5) * 0.5, rn(), (rn() - 0.5) * 0.5), i ? C(196, 120, 255) : C(216, 150, 255), true)); }
       p.push(piece(at(dodeca(1.2), 0, 0.2, 0), C(98, 74, 146))); return p; } },
-  { name: 'pale', r: 0.6, build(rn) { const p = [], h = 4 + rn() * 2; p.push(piece(at(cyl(0.35, 0.5, h, 6), 0, h / 2, 0), C(214, 204, 232)));
+  { name: 'pale', r: 0.3, build(rn) { const p = [], h = 4 + rn() * 2; p.push(piece(at(cyl(0.18, 0.25, h, 6), 0, h / 2, 0), C(214, 204, 232)));
       p.push(piece(at(ico(1.9 + rn() * 0.5, 1), 0, h + 1.2, 0, rn(), rn()), jitter(C(236, 132, 214), rn))); p.push(piece(at(ico(1.1, 1), 0.8, h + 2.2, 0.3), jitter(C(250, 170, 230), rn))); return p; } },
   { name: 'boulder', r: 1.1, build(rn) { const p = []; p.push(piece(at(dodeca(1.5 + rn() * 0.8), 0, 0.6, 0, rn(), rn(), rn()), jitter(C(126, 132, 128), rn))); if (rn() < 0.6) p.push(piece(at(dodeca(0.8 + rn() * 0.5), 1.4, 0.3, 0.6, rn(), rn()), jitter(C(118, 124, 120), rn))); return p; } },
   { name: 'snowrock', r: 1.1, build(rn) { const p = []; p.push(piece(at(dodeca(1.5 + rn() * 0.8), 0, 0.6, 0, rn(), rn(), rn()), jitter(C(140, 150, 160), rn))); p.push(piece(at(ico(1.1, 0), 0, 1.7, 0), C(238, 244, 252))); return p; } },
