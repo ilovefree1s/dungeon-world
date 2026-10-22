@@ -302,11 +302,14 @@ const BUILD = {
     const LEADER = 0.22, STROKE = 0.06, TAIL = 0.3;
     const gap = () => (0.6 + rnd() * 1.2) / (0.5 + 0.5 * Math.min(power, 1)) / (power > 1 ? 1 + (power - 1) * 0.5 : 1);
     const lanes = []; for (let i = 0; i < slots; i++) lanes.push({ strike: null, wait: 0.3 + i * 0.5 + rnd() * 0.5 });
+    // the steel itself takes on a faint blue charge that grows with power and jumps with each stroke
+    const bm = g.userData.bladeMat, e0 = bm && bm.emissive ? bm.emissive.clone() : null, i0 = bm ? bm.emissiveIntensity || 0 : 0, charge = new THREE.Color('#8ec8ff');
     let flash = 0;
     const lines = [];
     return (t, dt) => {
       hazeU.uT.value = t;
       lines.length = 0; let bright = 0;
+      if (e0) { const k = Math.min(1, 0.1 + power * 0.1 + flash * 0.3); bm.emissive.copy(e0).lerp(charge, k); bm.emissiveIntensity = Math.max(i0, 0.05 + power * 0.1 + flash * 0.5); }
       for (const lane of lanes) {
         if (!lane.strike && (lane.wait -= dt) <= 0) {
           lane.strike = { ...genBolt(bx, power), age: 0, steps: [], restrikes: [0.08 + rnd() * 0.08, 0.17 + rnd() * 0.1] };
