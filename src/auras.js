@@ -434,6 +434,13 @@ const BUILD = {
       const u = { uT: { value: 0 }, uPow: { value: power }, uPhase: { value: i / n * 3 }, uCol: { value: new THREE.Color(i % 2 ? '#e8fff6' : '#c8ecff') } };
       const m = new THREE.Mesh(helixGeo(bx, 1.6 + i * 0.3, i / n * Math.PI * 2, 0.05 + 0.015 * power, 72, 1 + i * 0.12), sheet(HELIX_FS, u)); m.frustumCulled = false; g.add(m); streaks.push(m);
     }
+    // and a flock of smaller ones, thinner and quicker: half racing up the blade, half racing down
+    const small = 6 + Math.round(power * 3);
+    for (let i = 0; i < small; i++) {
+      const dir = i % 2 ? -1 : 1;
+      const u = { uT: { value: 0 }, uPow: { value: power * 0.8 }, uPhase: { value: rnd() * 3 }, uCol: { value: new THREE.Color(i % 3 ? '#dffff4' : '#eaf6ff') } };
+      const m = new THREE.Mesh(helixGeo(bx, (1.2 + rnd() * 1.6) * (rnd() < 0.5 ? -1 : 1), rnd() * Math.PI * 2, 0.018 + 0.006 * power, 72, 0.9 + rnd() * 0.5), sheet(HELIX_FS, u)); m.frustumCulled = false; m.userData.dir = dir * (1.3 + rnd() * 0.8); g.add(m); streaks.push(m);
+    }
     // a wider, fainter sleeve of air
     const sleeveU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 0.5 }, uAsp: { value: 1 }, uFlash: { value: 0.3 } };
     const sleeve = new THREE.Mesh(crossedPlanes(bx, 0.15, 0.12), sheet(HAZE_FS, sleeveU)); sleeve.material.uniforms.uFlash.value = 0.25; sleeve.frustumCulled = false; g.add(sleeve);
@@ -442,7 +449,7 @@ const BUILD = {
     for (let i = 0; i < leaves.N; i++) { spawn(i); leaves.life[i] = rnd() * leaves.max[i]; }
     const r0 = wide / 2 + 0.12;
     return (t, dt) => {
-      for (const m of streaks) m.material.uniforms.uT.value = t;
+      for (const m of streaks) m.material.uniforms.uT.value = t * (m.userData.dir || 1);
       sleeveU.uT.value = t * 3;
       const L = leaves;
       for (let i = 0; i < L.N; i++) {
