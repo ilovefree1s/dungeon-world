@@ -63,7 +63,7 @@ const camRight = new THREE.Vector3();
 export class Monsters {
   constructor(world, player) {
     this.world = world; this.player = player; this.list = []; this.spawnT = 2; this.timer = 0;
-    this.hooks = { hurt: null, level: null, dead: null };
+    this.hooks = { hurt: null, level: null, dead: null, fallen: null };
     this.shots = [];                 // what the ranged ones throw
     this.calm = 0; this.regenAcc = 0; // seconds since the hero was last hurt; healing in progress
   }
@@ -136,7 +136,9 @@ export class Monsters {
       sfx('kill');
       stats.kills++;
       gainXp(3 + D.MON_BASE_XP[m.type], this.hooks.level);
-      this.remove(m);
+      // (the body may stay on the ground, with whatever it carried: the fallen hook takes the model)
+      if (this.hooks.fallen && this.hooks.fallen(m)) { if (m.bar) { scene.remove(m.bar); m.bar.userData.fill.material.dispose(); } this.list.splice(this.list.indexOf(m), 1); }
+      else this.remove(m);
       return true;
     }
     return false;

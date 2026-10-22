@@ -122,7 +122,7 @@ function render() {
   $('fLen').value = s.length; $('fHilt').value = s.gripSize ?? s.hilt ?? 1; $('fGuardSize').value = s.guardSize ?? s.hilt ?? 1; $('fPommelSize').value = s.pommelSize ?? s.hilt ?? 1; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1; $('fSize').value = s.auraSize ?? 1; $('fSpeed').value = s.auraSpeed ?? 1;
   $('fPowRow').hidden = !s.aura || s.aura === 'none'; $('fSizeRow').hidden = true; $('fSpeedRow').hidden = s.aura !== 'wind';
   // (the fire's slider runs a narrower range, and its size follows along)
-  const pw = $('fPow'); if (s.aura === 'flame' || s.aura === 'flame2') { pw.min = 0.45; pw.max = 2.95; } else if (s.aura === 'water') { pw.min = 0.05; pw.max = 1.45; } else if (s.aura === 'wind') { pw.min = 0; pw.max = 1.2; } else if (s.aura === 'shadow2') { pw.min = 0.05; pw.max = 2.9; } else { pw.min = 0.05; pw.max = 3; }
+  const pw = $('fPow'); if (s.aura === 'flame' || s.aura === 'flame2') { pw.min = 0.45; pw.max = 2.95; } else if (s.aura === 'water') { pw.min = 0.05; pw.max = 1.45; } else if (s.aura === 'wind') { pw.min = 0; pw.max = 1.2; } else if (s.aura === 'shadow') { pw.min = 0.05; pw.max = 2.9; } else { pw.min = 0.05; pw.max = 3; }
   if (s.auraPower != null) { s.auraPower = Math.max(+pw.min, Math.min(+pw.max, s.auraPower)); pw.value = s.auraPower; }
   for (const id of ['fPow', 'fSize', 'fSpeed', 'fLen', 'fWid', 'fHilt', 'fGuardSize', 'fPommelSize']) if ($(id).__show) $(id).__show();
   $('fName').value = s.name || '';
@@ -220,6 +220,15 @@ function wire() {
     });
     split.addEventListener('pointerup', () => { localStorage.setItem('dw-forge-split', String($('forgeGl').clientHeight)); });
   }
+}
+// a weapon that dropped from a monster: into the saved list (the oldest goes if it's full); wield it too if asked
+export function takeLoot(spec, wield) {
+  const copy = JSON.parse(JSON.stringify(spec));
+  forge.saved.push(copy); if (forge.saved.length > 16) { forge.saved.shift(); for (let k = 0; k < 3; k++) forge.equipped[k] = forge.equipped[k] < 0 ? -1 : forge.equipped[k] - 1; }
+  const c = clsOf(copy);
+  if (wield) { forge.equipped[c] = forge.saved.length - 1; forge.onEquip && forge.onEquip(copy, c); }
+  persist(); if (forge.open) render();
+  return c;
 }
 export function openForge() {
   wire(); initPreview();

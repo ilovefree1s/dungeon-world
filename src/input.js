@@ -7,7 +7,7 @@ export const input = {
   mx: 0, my: 0,          // move: -1..1 (my: -1 is forward)
   lookX: 0, lookY: 0,    // look this frame (radians, from swipes and the mouse)
   lookRX: 0, lookRY: 0,  // look rate (the right stick, the turn keys)
-  jump: false, jumpEdge: false, sprint: false, atk: false, atkEdge: false, abEdge: [false, false, false],
+  jump: false, jumpEdge: false, sprint: false, atk: false, atkEdge: false, useEdge: false, abEdge: [false, false, false],
   menuEdge: [], lastDevice: 'kb', stickX: 0, stickY: 0, stickId: null,
   mouseSpeed: 1, zoom: 0, wantLock: null, onLockChange: null,
 };
@@ -15,7 +15,7 @@ const keys = {};
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyD: 'right',
   ArrowLeft: 'turnL', ArrowRight: 'turnR', Space: 'jump', ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyJ: 'atk', KeyZ: 'atk', Digit1: 'ab0', KeyK: 'ab0', Digit2: 'ab1', KeyQ: 'ab1', KeyL: 'ab1', Digit3: 'ab2', KeyE: 'ab2',
-  Escape: 'pause', KeyP: 'pause', Enter: 'ok', NumpadEnter: 'ok' };
+  Escape: 'pause', KeyP: 'pause', Enter: 'ok', NumpadEnter: 'ok', KeyF: 'use' };
 let onAny = () => { };
 export function onFirstInput(f) { onAny = f; }
 const MENU_KEYS = { up: 'up', down: 'down', left: 'left', right: 'right', turnL: 'left', turnR: 'right', jump: 'ok', ok: 'ok', pause: 'pause' };
@@ -24,7 +24,7 @@ addEventListener('keydown', e => {
   if (!k) return;
   e.preventDefault();
   onAny(); input.lastDevice = 'kb';
-  if (!keys[k]) { keys[k] = 1; if (k === 'jump') input.jumpEdge = true; if (k === 'atk') input.atkEdge = true; if (k.startsWith('ab')) input.abEdge[+k[2]] = true; if (MENU_KEYS[k]) input.menuEdge.push(MENU_KEYS[k]); }
+  if (!keys[k]) { keys[k] = 1; if (k === 'jump') input.jumpEdge = true; if (k === 'atk') input.atkEdge = true; if (k === 'use') input.useEdge = true; if (k.startsWith('ab')) input.abEdge[+k[2]] = true; if (MENU_KEYS[k]) input.menuEdge.push(MENU_KEYS[k]); }
 });
 addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) { keys[k] = 0; e.preventDefault(); } });
 addEventListener('blur', () => { for (const k in keys) keys[k] = 0; input.stickX = input.stickY = 0; });

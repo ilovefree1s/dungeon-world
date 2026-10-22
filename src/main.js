@@ -11,7 +11,8 @@ import { startAudio, sfx, setSfx, setMusic, audioState } from './audio.js';
 import { BIOME_NAME, BIOME_SUB, CH } from './gen.js';
 import { Monsters, Bolts, stats, xpToNext } from './combat.js';
 import { Abilities, KITS } from './abilities.js';
-import { forge, openForge, closeForge, equippedSpec } from './forge.js';
+import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
+import { Bodies, rollDrop } from './loot.js';
 import { burst, ring, stepFx } from './fx.js';
 import { grassUniforms } from './flora.js';
 import { updateAmbience } from './ambience.js';
@@ -58,8 +59,29 @@ let deadT = 0;
 monsters.hooks.dead = () => { sfx('death'); deadT = 2.6; banner('YOU FELL', 'back to the woods...'); player.invT = 9; if (player.model.userData.fade) player.model.userData.fade(0.4); };
 const ctx = { player, world, monsters, bolts, shake: k => { player.shake = Math.max(player.shake || 0, k); } };
 const abilities = new Abilities(ctx);
+// the fallen: bodies stay a while, some with a weapon on them
+const bodies = new Bodies(player);
+monsters.hooks.fallen = m => bodies.fall(m, rollDrop(m, player.cls));
+let lootBody = null;
+function openLoot(b) {
+  lootBody = b; const d = bodies.describe(b.spec);
+  $('lootName').textContent = d.name; $('lootName').style.color = d.rare ? '#9fe0ff' : '';
+  $('lootLine').textContent = d.line;
+  $('lootStats').textContent = `DAMAGE x${d.stats.dmg} · SPEED x${d.stats.spd} · REACH ${d.stats.reach}` + (d.stats.cls !== 0 ? ` · SHOT x${d.stats.shot}` : '');
+  $('lootWield').textContent = d.cls === player.cls ? 'TAKE & WIELD' : `TAKE & WIELD (AS THE ${['WARRIOR', 'MAGE', 'HUNTER'][d.cls]})`;
+  unlockMouse(); UI.state = 'loot'; $('loot').hidden = false; sfx('rare');
+}
+function closeLoot() { UI.state = 'play'; $('loot').hidden = true; lootBody = null; }
+$('lootWield').addEventListener('click', () => { if (!lootBody) return; takeLoot(lootBody.spec, true); bodies.took(lootBody); sfx('legend'); closeLoot(); });
+$('lootTake').addEventListener('click', () => { if (!lootBody) return; takeLoot(lootBody.spec, false); bodies.took(lootBody); sfx('pickup'); closeLoot(); });
+$('lootLeave').addEventListener('click', () => { sfx('nope'); closeLoot(); });
 function heroCombat(dt, inp, frozen) {
   ctx.frozen = frozen;
+  // a body in your sights: a click or F looks at what it dropped instead of swinging
+  bodies.update(dt, monsters.list.some(m => m.state === 'chase' && m.pos.distanceTo(player.pos) < 16));
+  $('lootHint').hidden = !bodies.target;
+  if (bodies.target && (inp.atkEdge || inp.useEdge)) { inp.atkEdge = false; inp.useEdge = false; openLoot(bodies.target); return; }
+  inp.useEdge = false;
   abilities.update(dt, inp);
 }
 function respawn() {
@@ -215,6 +237,8 @@ function menuStep() {
       if (k === 'pause') openMenu();
     } else if (UI.state === 'forge') {
       if (k === 'pause' || k === 'back') closeForge();
+    } else if (UI.state === 'loot') {
+      if (k === 'pause' || k === 'back') closeLoot();
     } else if (UI.state === 'menu') {
       const bs = [...document.querySelectorAll('#menu button')];
       // (the Esc that let the mouse go has already opened this menu: it doesn't close it again)

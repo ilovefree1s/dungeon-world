@@ -151,11 +151,7 @@ export const AURAS = [
   { id: 'water', name: 'WATER', color: '#4aa8ff' },
   { id: 'wind', name: 'WIND', color: '#d8f0e8' },
   { id: 'frost', name: 'FROST', color: '#bfe8ff' },
-  { id: 'rime', name: 'RIME', color: '#dff4ff' },
-  { id: 'blizzard', name: 'BLIZZARD', color: '#eaf6ff' },
-  { id: 'shards', name: 'SHARDS', color: '#cfe8ff' },
   { id: 'shadow', name: 'SHADOW', color: '#7a3cff' },
-  { id: 'shadow2', name: 'SHADOW 2', color: '#7a3cff' },
   { id: 'holy', name: 'HOLY', color: '#ffe08a' },
 ];
 export const ACCENTS = [['#ff3b3b', 'RUBY'], ['#3b8cff', 'SAPPHIRE'], ['#4fd36a', 'EMERALD'], ['#ffd23b', 'TOPAZ'], ['#c25cff', 'AMETHYST'], ['#ffffff', 'DIAMOND'], ['#ff8c2a', 'AMBER'], ['#1b1a1d', 'ONYX']];
@@ -362,7 +358,7 @@ export function buildForged(spec) {
   g.userData.bladeMat = metal;
   // the aura, along the business end
   if (spec.aura && spec.aura !== 'none' && g.userData.auraBox) {
-    const auraTick = attachAura(g, ({ flame2: 'flame', arcs: 'lightning', plasma: 'lightning', coil: 'lightning', static: 'lightning', drops: 'water', stream: 'water', swirl: 'water', gust: 'wind', vortex: 'wind', slashes: 'wind' })[spec.aura] || spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1, spec.auraSpeed ?? 1);
+    const auraTick = attachAura(g, ({ flame2: 'flame', arcs: 'lightning', plasma: 'lightning', coil: 'lightning', static: 'lightning', drops: 'water', stream: 'water', swirl: 'water', gust: 'wind', vortex: 'wind', slashes: 'wind', shadow2: 'shadow', rime: 'frost', blizzard: 'frost', shards: 'frost' })[spec.aura] || spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1, spec.auraSpeed ?? 1);
     const base = g.userData.tick;
     g.userData.tick = t => { if (base) base(t); auraTick(t); };
   }

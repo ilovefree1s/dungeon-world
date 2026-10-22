@@ -50,6 +50,12 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   | Ghost | vanishes and reappears right behind you |
   | Imp, fire sprite, wisp | keep their distance and throw fire, flame and light that you can dodge; they back off if you close in |
   | Hell crab | shakes, then rushes in a straight line, hitting hard; dazed for a moment after |
+- **Loot**: a fallen monster's body stays on the ground a while, and some of them carry a weapon
+  (a gold glint marks one): rolled at random from the Forge's parts, likelier the tougher the
+  monster and the higher your level, more often one your hero can use, glowing materials and
+  auras rare. Look at the body and click (or press F) to see it, then take it into the Forge's
+  saved weapons, wield it on the spot, or leave it. (While a monster is hunting you nearby, a
+  click is a swing, not a look.)
 - Health, damage numbers, XP and levels (each level: more health, harder bolts). A health bar
   shows over a monster you've hurt; left alone for a few seconds, you heal. Falling in a fight
   puts you back at the start of the woods, nothing lost.
@@ -88,6 +94,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 | Look | the mouse (click the world to capture it; Esc lets it go), Q / E, ← → | right stick | swipe the screen |
 | Zoom | the scroll wheel | | |
 | Attack | left click, J | X / ▢ | ATTACK |
+| Look at loot | click or F on a fallen monster | X / ▢ | ATTACK |
 | Abilities 1, 2, 3 | 1, 2, 3 (or right click / K, Q, E) | B / ○, Y / △, LB | the ability bar |
 | Jump | Space | A / ✕ | JUMP |
 | Run | Shift (the stick pushed all the way runs too) | RB, LT or a stick's click | push the stick to its edge |
@@ -116,7 +123,7 @@ boats and mounts.
 - `src/weaponkit.js`: weapons from parts (the model, the name, the numbers); `src/forge.js`:
   the forge screen, with its own small renderer for the turning preview.
 - `src/combat.js`: the monsters (where they live, how they wander, chase and bite), the
-  hero's bolts and aim, health, XP and levels. `src/fx.js`: sparks, rings and damage numbers.
+  hero's bolts and aim, health, XP and levels. `src/loot.js`: the fallen's bodies and what they drop. `src/fx.js`: sparks, rings and damage numbers.
 - `src/engine.js`: the renderer in Dungeon Heart's style (ACES, soft shadows, bloom) and the
   helpers its models use. `src/dh/` holds Dungeon Heart's model files, copied unchanged.
 - `src/input.js`: keyboard, mouse, touch and controllers. `src/audio.js` and
