@@ -109,7 +109,7 @@ boats and mounts.
 - `src/player.js`: the hero's movement and collisions, the camera. `src/sky.js`: day and night.
 - `src/abilities.js`: the three heroes' kits (attacks, abilities, cooldowns, aiming).
   `src/heroanim.js`: their attack animations, keyframed poses of the whole body (wind-up, strike,
-  recovery) laid over Dungeon Heart's walk: alternating slashes, the whirl, the slam and its
+  recovery) laid over Dungeon Heart's walk: a four-swing cycle (slash, backhand, overhead chop, thrust), the whirl, the slam and its
   landing crouch; the staff thrust, the nova fling, the meteor raised to the sky; the archer's
   side-on draw and release, the multishot sweep, the rain aimed upward. The bolt and the arrow
   leave on the strike frame.

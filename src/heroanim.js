@@ -3,7 +3,8 @@
 //  Dungeon Heart's animHero. Each attack is a few keyframed poses of the whole
 //  body (torso twist and lean, both arms, the legs' stance, the head) with a
 //  wind-up, a fast strike and an easing recovery back into whatever the legs
-//  were doing. The warrior alternates a downward slash and a backhand, spins
+//  were doing. The warrior cycles a downward slash, a backhand, an overhead
+//  chop and a thrust, spins
 //  for the whirlwind and tucks for the slam (and lands in a crouch); the mage
 //  thrusts the staff for a bolt, flings both arms wide for the nova and
 //  raises the staff to the sky for the meteor; the hunter draws side-on and
@@ -12,26 +13,28 @@
 const TAU = Math.PI * 2;
 // a pose: body rotation and lift, each arm's rotation, each leg's swing, the head's turn
 //   (arms: x < 0 raises the hand forward, z moves it out to the side: + for the right arm, - for the left)
-const field = (bx, by, bz, dy, ra, la, rl, ll, hy, hx = 0) => ({ bx, by, bz, dy, ra, la, rl, ll, hy, hx });
+//   (wr: the wrist, turning the sword from across the hand to along the arm, for a thrust)
+const field = (bx, by, bz, dy, ra, la, rl, ll, hy, hx = 0, wr = 0) => ({ bx, by, bz, dy, ra, la, rl, ll, hy, hx, wr });
 const ease = { lin: u => u, in: u => u * u, out: u => 1 - (1 - u) * (1 - u), io: u => u * u * (3 - 2 * u), snap: u => 1 - Math.pow(1 - u, 4) };
 const mix = (a, b, u) => a + (b - a) * u;
 function lerpPose(a, b, u) {
   return field(mix(a.bx, b.bx, u), mix(a.by, b.by, u), mix(a.bz, b.bz, u), mix(a.dy, b.dy, u),
     [mix(a.ra[0], b.ra[0], u), mix(a.ra[1], b.ra[1], u), mix(a.ra[2], b.ra[2], u)],
     [mix(a.la[0], b.la[0], u), mix(a.la[1], b.la[1], u), mix(a.la[2], b.la[2], u)],
-    mix(a.rl, b.rl, u), mix(a.ll, b.ll, u), mix(a.hy, b.hy, u), mix(a.hx, b.hx, u));
+    mix(a.rl, b.rl, u), mix(a.ll, b.ll, u), mix(a.hy, b.hy, u), mix(a.hx, b.hx, u), mix(a.wr, b.wr, u));
 }
 // the pose the body is in now (what animHero and the jump left it in): the recovery blends back into it
 function readPose(u) {
   return field(u.body.rotation.x, u.body.rotation.y, u.body.rotation.z, 0,
     [u.arms[1].rotation.x, u.arms[1].rotation.y, u.arms[1].rotation.z], [u.arms[0].rotation.x, u.arms[0].rotation.y, u.arms[0].rotation.z],
-    u.legs[1].rotation.x, u.legs[0].rotation.x, u.head.rotation.y, u.head.rotation.x);
+    u.legs[1].rotation.x, u.legs[0].rotation.x, u.head.rotation.y, u.head.rotation.x, u.sword ? u.sword.rotation.x : 0);
 }
 function applyPose(u, p) {
   u.body.rotation.set(p.bx, p.by, p.bz); u.body.position.y += p.dy;
   u.arms[1].rotation.set(p.ra[0], p.ra[1], p.ra[2]); u.arms[0].rotation.set(p.la[0], p.la[1], p.la[2]);
   u.legs[1].rotation.x = p.rl; u.legs[0].rotation.x = p.ll;
   u.head.rotation.y = p.hy; u.head.rotation.x = p.hx;
+  if (u.sword) u.sword.rotation.x = p.wr;
 }
 // keys: [{ t, e, ...pose }], t rising from 0 to 1, e the easing into that key; a key with pose null is the base pose
 function sample(keys, k, base) {
@@ -62,6 +65,25 @@ const BACKHAND = [
   K(0.68, 'lin', field(0.22, 0.75, 0.08, -0.08, [-1.0, -0.3, 1.5], [-0.9, 0, -0.7], -0.45, 0.5, -0.5)),
   K(1, 'io', null),
 ];
+// an overhead chop: the sword raised straight up over the head, then brought down hard, the body folding after it
+const CHOP = [
+  K(0, 'lin', null),
+  K(0.24, 'out', field(-0.3, 0.1, 0, 0.04, [-3.2, 0, 0.15], [-1.2, 0, -0.4], -0.3, 0.3, 0, -0.5)),
+  K(0.3, 'lin', field(-0.28, 0.1, 0, 0.04, [-3.2, 0, 0.15], [-1.2, 0, -0.4], -0.3, 0.3, 0, -0.5)),
+  K(0.52, 'snap', field(0.45, -0.1, 0, -0.14, [-0.9, 0, 0.1], [-0.4, 0, -0.6], 0.55, -0.6, 0, 0.4)),
+  K(0.7, 'lin', field(0.4, -0.1, 0, -0.12, [-0.85, 0, 0.1], [-0.4, 0, -0.6], 0.55, -0.6, 0, 0.35)),
+  K(1, 'io', null),
+];
+// a thrust: the sword drawn back to the hip, then a lunge, the point driven straight ahead, the back leg stretched
+const THRUST = [
+  K(0, 'lin', null),
+  K(0.24, 'out', field(-0.1, 0.55, 0, 0.02, [0.2, 0, 0.35], [-0.9, 0, -0.5], -0.3, 0.25, -0.4, 0, 1.3)),
+  K(0.3, 'lin', field(-0.08, 0.5, 0, 0.02, [0.2, 0, 0.35], [-0.9, 0, -0.5], -0.3, 0.25, -0.4, 0, 1.4)),
+  K(0.5, 'snap', field(0.3, -0.5, 0, -0.1, [-1.6, 0, -0.15], [0.5, 0, -0.5], 0.85, -0.9, 0.4, 0, 1.57)),
+  K(0.7, 'lin', field(0.28, -0.45, 0, -0.1, [-1.55, 0, -0.15], [0.45, 0, -0.5], 0.85, -0.9, 0.4, 0, 1.57)),
+  K(1, 'io', null),
+];
+const SWINGS = [SLASH, BACKHAND, CHOP, THRUST];
 // the whirlwind: a low stance, both arms out, two full turns
 const WHIRL_ARMS = field(0.15, 0, 0, -0.12, [-0.9, 0, 1.45], [-0.9, 0, -1.45], 0.5, -0.5, 0);
 function whirl(k, base) {
@@ -133,7 +155,7 @@ export function animAttack(root, s) {
   let pose = null;
   if (s.slamAir) pose = SLAM_AIR;
   else if (s.land >= 0 && s.land < 1) pose = sample(LAND, s.land, base);
-  else if (s.swing >= 0) pose = s.whirl ? whirl(s.swing, base) : sample(s.swingN & 1 ? BACKHAND : SLASH, s.swing, base);
+  else if (s.swing >= 0) pose = s.whirl ? whirl(s.swing, base) : sample(SWINGS[(s.swingN | 0) % SWINGS.length], s.swing, base);
   else if (s.cast >= 0) pose = sample(CASTS[s.castKind] || (s.cls === 2 ? SHOT : BOLT), s.cast, base);
   if (pose) applyPose(u, pose);
   return !!pose;
