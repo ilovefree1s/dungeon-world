@@ -237,7 +237,7 @@ function pointCloud(g, N, tex, tipDir) {
   geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1)); geo.setAttribute('aRot', new THREE.BufferAttribute(rot, 1));
   const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tex }, uUpL: { value: tipDir || new THREE.Vector3(0, 1, 0) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
-  return { pos, col, size, alpha, rot, geo, mat, N, flush() { for (const k of ['position', 'aColor', 'aSize', 'aAlpha', 'aRot']) geo.attributes[k].needsUpdate = true; } };
+  return { pos, col, size, alpha, rot, geo, mat, pts, N, flush() { for (const k of ['position', 'aColor', 'aSize', 'aAlpha', 'aRot']) geo.attributes[k].needsUpdate = true; } };
 }
 // ---------------------------------------------------------------- particles (a cloud of points that knows which way is down)
 function cloud(g, N, { size, tex, colors, blending = THREE.AdditiveBlending, opacity = 1 }) {
