@@ -286,22 +286,36 @@ const BUILD = {
   },
   // ---------------------------------------------------------------- LIGHTNING
   lightning(g, bx, power, { span, wide, cx, cz }) {
-    const bolts = makeBolts(g, Math.max(1, Math.round(1 + power * 1.2)), Math.min(1, Math.max(0.3, span / 1.1)));
+    // thin bolts that strike: each one races from its start to its end in a few hundredths of a second
+    // (the forks lighting as the leader passes their joint), holds a beat flickering, then is gone; a pause, the next
+    const bolts = makeBolts(g, Math.max(1, Math.round(1 + power * 1.2)), 0.7 * Math.min(1, Math.max(0.3, span / 1.1)));
     const hazeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: 1 }, uFlash: { value: 0 } };
     const haze = new THREE.Mesh(crossedPlanes(bx, 0.1, 0.1 + 0.08 * power), sheet(HAZE_FS, hazeU)); haze.frustumCulled = false; g.add(haze);
     const sparks = cloud(g, Math.round(9 * power), { size: 0.035 + 0.02 * Math.min(1, span), tex: glintTex(), colors: ['#ffffff', '#8ab8ff'] });
     const spawn = i => { inBox(sparks, i, bx); sparks.max[i] = 0.15 + rnd() * 0.25; sparks.life[i] = 0; jitter(sparks, i, 2.6); };
     for (let i = 0; i < sparks.N; i++) { spawn(i); sparks.life[i] = rnd() * sparks.max[i]; }
-    let flick = 0, flash = 0;
+    let wait = 0.3, strikes = [], flash = 0;
+    const TRAVEL = 0.07, HOLD = 0.12;
+    const lines = [];
     return (t, dt) => {
       hazeU.uT.value = t;
-      if ((flick -= dt) <= 0) {
-        // mostly quiet: one bolt at a time, each held a moment, with a pause between; now and then a burst of all of them
-        const burst = rnd() < 0.12, pause = rnd() < 0.35;
-        flick = pause ? 0.25 + rnd() * 0.4 : 0.14 + rnd() * 0.2;
-        if (pause) bolts.drawLines([], 0); else bolts.draw(burst ? bolts.n : 1, bx, power);
+      if ((wait -= dt) <= 0) {
+        const burst = rnd() < 0.12, n = burst ? bolts.n : 1;
+        for (let i = 0; i < n; i++) strikes.push({ ...genBolt(bx, power), age: -i * 0.03 });
+        wait = burst ? 0.5 + rnd() * 0.5 : 0.18 + rnd() * 0.35;
         if (burst) flash = 1;
       }
+      lines.length = 0;
+      for (let i = strikes.length - 1; i >= 0; i--) {
+        const S = strikes[i]; S.age += dt;
+        if (S.age < 0) continue;
+        if (S.age > TRAVEL + HOLD) { strikes.splice(i, 1); continue; }
+        const k = Math.min(1, S.age / TRAVEL), upto = Math.floor(k * (S.main.length - 1)) + 1;
+        lines.push({ pts: S.main.slice(0, upto + 1), w: 1 });
+        for (const f of S.forks) if (f.at <= upto - 1) lines.push({ pts: f.pts, w: 0.6 });
+      }
+      bolts.drawLines(lines, lines.length ? 0.8 + rnd() * 0.2 : 0);
+      if (lines.length) flash = Math.max(flash, 0.5);
       flash = Math.max(0.15, flash - dt * 6); hazeU.uFlash.value = flash;
       const S = sparks;
       for (let i = 0; i < S.N; i++) {
@@ -630,6 +644,29 @@ function makeBolts(g, n, sc = 1) {
     core.m.geometry.attributes.position.needsUpdate = true; mid.m.geometry.attributes.position.needsUpdate = true; glow.m.geometry.attributes.position.needsUpdate = true;
     core.m.material.opacity = 0.95 * bright; mid.m.material.opacity = 0.55 * bright; glow.m.material.opacity = 0.3 * bright;
   } };
+}
+// one bolt's shape, kept as data: the main line low to high along the head's skin (arcing out now and then)
+// and its forks, each noting which joint it leaves from
+function genBolt(bx, power) {
+  const SEG = 9, [x0, x1, y0, y1, z0, z1] = bx, wx = x1 - x0, wz = z1 - z0, span = y1 - y0;
+  const main = [];
+  const ya = y0 + rnd() * span * 0.4, yb = Math.min(y1 + 0.08, ya + span * (0.35 + rnd() * 0.6));
+  const arcAt = rnd() < 0.6 ? 2 + Math.floor(rnd() * 5) : -1, arcDir = rnd() < 0.5 ? -1 : 1, arcR = 0.14 + rnd() * 0.24 * (0.5 + power * 0.5);
+  for (let i = 0; i <= SEG; i++) {
+    const t = i / SEG;
+    let x = x0 + rnd() * wx, z = z0 + rnd() * wz;
+    if (rnd() < 0.5) x = (rnd() < 0.5 ? x0 - 0.02 : x1 + 0.02); else z = (rnd() < 0.5 ? z0 - 0.02 : z1 + 0.02);
+    if (arcAt >= 0 && Math.abs(i - arcAt) <= 1) { const k = 1 - Math.abs(i - arcAt) * 0.5; x += arcDir * arcR * k; z += (rnd() - 0.5) * 0.12 * k; }
+    main.push(new THREE.Vector3(x, ya + (yb - ya) * t, z));
+  }
+  const forks = [], nf = 1 + Math.floor(rnd() * 3);
+  for (let f = 0; f < nf; f++) {
+    const j = 1 + Math.floor(rnd() * (SEG - 1)); let a = main[j].clone(); const pts = [a];
+    const dx = (rnd() - 0.5) * 0.5, dz = (rnd() - 0.5) * 0.5, dy = (rnd() - 0.3) * 0.3, len = 2 + Math.floor(rnd() * 2);
+    for (let s = 0; s < len; s++) { a = new THREE.Vector3(a.x + dx * (0.4 + rnd() * 0.6) * 0.5, a.y + dy * 0.5 + (rnd() - 0.5) * 0.08, a.z + dz * (0.4 + rnd() * 0.6) * 0.5); pts.push(a); }
+    forks.push({ at: j, pts });
+  }
+  return { main, forks };
 }
 // a point on the surface of the box (the head's skin, not its inside)
 function onSkin(bx, t) {
