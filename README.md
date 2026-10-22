@@ -38,8 +38,20 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 - Monsters from Dungeon Heart roam each land and come for you when they see you: slimes, bats
   and spiders in the woods; skeletons and ghosts in the snow; hell crabs in the dunes; ghosts and
   vampire bats in the bog; imps and fire sprites in the ash; wisps in the crystal lands.
-- Health, damage numbers, XP and levels (each level: more health, harder bolts). Falling in
-  a fight puts you back at the start of the woods, nothing lost.
+  Each kind fights its own way, and every attack is telegraphed (an orange glow and a shiver
+  before it lands, so there's time to step away; a critical hit breaks the wind-up):
+  | | |
+  |---|---|
+  | Skeleton | walks up and winds up a strike; step back and it misses |
+  | Slime | bounces at you in hops; bites when it lands on you |
+  | Bat, vampire bat | circles overhead, then dives through you and climbs back |
+  | Spider | hangs back out of reach, crouches, and leaps the gap |
+  | Ghost | vanishes and reappears right behind you |
+  | Imp, fire sprite, wisp | keep their distance and throw fire, flame and light that you can dodge; they back off if you close in |
+  | Hell crab | shakes, then rushes in a straight line, hitting hard; dazed for a moment after |
+- Health, damage numbers, XP and levels (each level: more health, harder bolts). A health bar
+  shows over a monster you've hurt; left alone for a few seconds, you heal. Falling in a fight
+  puts you back at the start of the woods, nothing lost.
 
 ## Stage 1: the world
 - A low-poly toy-diorama land: a faceted heightfield with vertex colors (grass, dirt paths, sand
@@ -112,7 +124,8 @@ boats and mounts.
   (`--phone` for an iPhone-size touch screen): walks with W, jumps with Space, turns, zooms with
   the wheel, casts bolts at a slime as the mage, blinks, gets bitten, swims,
   `python3 tests/abilities.py` tries every hero's attack and abilities on a flat meadow (`?flat`)
-  against three slimes, and `python3 tests/forge.py` builds all 400 type / head / material
+  against three slimes, `python3 tests/monsters.py` lets one of each monster kind at the hero and
+  checks it fights its own way (and that health bars and healing work), and `python3 tests/forge.py` builds all 400 type / head / material
   combinations, wields one per hero and reloads. It also visits every biome by day and night, opens the menu, and saves
   screenshots to `shots/`. `?debug` shows frame time, chunks and triangles; `?seed=N` picks
   another world, `?fresh` ignores the save.

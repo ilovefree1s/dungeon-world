@@ -1,7 +1,8 @@
 // ============================================================================
 //  DUNGEON WORLD  -  combat: the hero's attacks (the mage's bolts and blink),
-//  the monsters roaming the land (Dungeon Heart's models, picked by biome),
-//  health, damage, XP and levels.
+//  the monsters roaming the land (Dungeon Heart's models, picked by biome,
+//  each kind with its own telegraphed way of fighting), their shots, health
+//  bars, damage, XP, levels and healing.
 // ============================================================================
 import { THREE, scene, camera, TEX, V3 } from './engine.js';
 import { buildMonster } from './dh/models.js';
@@ -24,19 +25,24 @@ export function gainXp(n, onLevel) {
 }
 
 // ---------------------------------------------------------------- monsters
-// per type: speed (blocks a second), the body's radius and height, flying, how it attacks
+// per type: speed (blocks a second), the body's radius and height, flying, how far it sees, and how it
+// fights: melee (walks up, winds up, strikes), hop (slimes bounce at you), swoop (bats dive from the air),
+// pounce (spiders crouch and leap), phase (ghosts blink behind you), shot (imps, sprites and wisps keep
+// their distance and throw), charge (crabs rush in a line)
 const KIND = {
-  [D.M_SLIME]: { spd: 6.4, r: 1.8, h: 2.6, fly: 0, see: 28 },
-  [D.M_BAT]: { spd: 12, r: 1.2, h: 1.6, fly: 1, see: 36 },
-  [D.M_SKEL]: { spd: 8, r: 1.2, h: 4.4, fly: 0, see: 36 },
-  [D.M_SPIDER]: { spd: 10.4, r: 1.8, h: 1.8, fly: 0, see: 30 },
-  [D.M_GHOST]: { spd: 7.2, r: 1.6, h: 4, fly: 1, see: 40 },
-  [D.M_IMP]: { spd: 10, r: 1.2, h: 3, fly: 0, see: 32 },
-  [D.M_FIRESPRITE]: { spd: 9, r: 1.2, h: 2.4, fly: 1, see: 32 },
-  [D.M_WISP]: { spd: 8, r: 1.2, h: 2.4, fly: 1, see: 36 },
-  [D.M_HELLCRAB]: { spd: 6.8, r: 2, h: 2.2, fly: 0, see: 28 },
-  [D.M_VBAT]: { spd: 13, r: 1.4, h: 1.8, fly: 1, see: 40 },
+  [D.M_SLIME]: { spd: 6.4, r: 1.8, h: 2.6, fly: 0, see: 28, atk: 'hop' },
+  [D.M_BAT]: { spd: 12, r: 1.2, h: 1.6, fly: 1, see: 36, atk: 'swoop', hover: 7 },
+  [D.M_SKEL]: { spd: 8, r: 1.2, h: 4.4, fly: 0, see: 36, atk: 'melee' },
+  [D.M_SPIDER]: { spd: 10.4, r: 1.8, h: 1.8, fly: 0, see: 30, atk: 'pounce' },
+  [D.M_GHOST]: { spd: 7.2, r: 1.6, h: 4, fly: 1, see: 40, atk: 'phase', hover: 3.2 },
+  [D.M_IMP]: { spd: 10, r: 1.2, h: 3, fly: 0, see: 32, atk: 'shot', shot: { color: '#ff7a2a', spd: 32, range: 20, cd: 2.4 } },
+  [D.M_FIRESPRITE]: { spd: 9, r: 1.2, h: 2.4, fly: 1, see: 32, atk: 'shot', shot: { color: '#ffb340', spd: 38, range: 16, cd: 1.5 } },
+  [D.M_WISP]: { spd: 8, r: 1.2, h: 2.4, fly: 1, see: 36, atk: 'shot', shot: { color: '#b0f0ff', spd: 46, range: 26, cd: 2.6 } },
+  [D.M_HELLCRAB]: { spd: 6.8, r: 2, h: 2.2, fly: 0, see: 28, atk: 'charge' },
+  [D.M_VBAT]: { spd: 13, r: 1.4, h: 1.8, fly: 1, see: 40, atk: 'swoop', hover: 7 },
 };
+const HERO_MID = 2.6;      // the hero's middle above its feet
+const REGEN_AFTER = 6, REGEN_EVERY = 1.2;   // seconds unhurt before healing starts; seconds per point
 // who lives where: forest, snow, desert, swamp, lava, crystal
 const BY_BIOME = [
   [D.M_SLIME, D.M_SLIME, D.M_BAT, D.M_SPIDER],
@@ -47,11 +53,18 @@ const BY_BIOME = [
   [D.M_WISP, D.M_WISP, D.M_GHOST, D.M_SPIDER],
 ];
 const MAX_NEAR = 10, SPAWN_MIN = 48, SPAWN_MAX = 104, DESPAWN = 192;
+const barMats = {
+  back: new THREE.SpriteMaterial({ color: '#000000', transparent: true, opacity: 0.6, depthWrite: false, depthTest: false }),
+  fill: new THREE.SpriteMaterial({ color: '#5ce65c', transparent: true, opacity: 0.95, depthWrite: false, depthTest: false }),
+};
+const shotGeo = new THREE.SphereGeometry(0.5, 10, 7);
 
 export class Monsters {
   constructor(world, player) {
     this.world = world; this.player = player; this.list = []; this.spawnT = 2; this.timer = 0;
     this.hooks = { hurt: null, level: null, dead: null };
+    this.shots = [];                 // what the ranged ones throw
+    this.calm = 0; this.regenAcc = 0; // seconds since the hero was last hurt; healing in progress
   }
   spawn(type, x, y, z) {
     const root = buildMonster(type, 1 + Math.floor(stats.level / 3));
@@ -60,10 +73,25 @@ export class Monsters {
     scene.add(root);
     const k = KIND[type];
     const m = { type, k, root, pos: new V3(x, y, z), vel: new V3(), home: new V3(x, y, z), face: Math.random() * 6.28, seed: Math.random() * 10,
-      hp: D.MON_BASE_HP[type] * 3 + stats.level * 2, atk: D.MON_BASE_ATK[type] + Math.floor(stats.level / 2), state: 'wander', t: Math.random() * 2, atkCd: 0, flash: 0, frz: 0, kb: new V3(), onGround: false, moving: false, bob: Math.random() * 6 };
+      hp: D.MON_BASE_HP[type] * 3 + stats.level * 2, atk: D.MON_BASE_ATK[type] + Math.floor(stats.level / 2), state: 'wander', t: Math.random() * 2, atkCd: 1 + Math.random(), flash: 0, frz: 0, kb: new V3(), onGround: false, moving: false, bob: Math.random() * 6,
+      wind: 0, act: null, lastAct: null, daze: 0, hopCd: 0, leap: 0, dive: null, rush: null, barT: 0, bar: null, tint: '' };
     m.maxHp = m.hp;
     this.list.push(m);
     return m;
+  }
+  // a health bar over a hurt monster, for a few seconds after each hit
+  showBar(m) {
+    m.barT = 4;
+    if (!m.bar) {
+      const g = new THREE.Group();
+      const back = new THREE.Sprite(barMats.back); back.scale.set(3.8, 0.55, 1);
+      const fill = new THREE.Sprite(barMats.fill.clone()); fill.center.set(0, 0.5); fill.position.x = -1.75; fill.scale.set(3.5, 0.38, 1);
+      g.add(back, fill); g.userData.fill = fill; scene.add(g); m.bar = g;
+    }
+    const f = Math.max(0, m.hp / m.maxHp);
+    m.bar.userData.fill.scale.x = 3.5 * f;
+    m.bar.userData.fill.material.color.set(f > 0.5 ? '#5ce65c' : f > 0.25 ? '#ffc93c' : '#ff4a3c');
+    m.bar.visible = true;
   }
   // a new monster somewhere out of sight, in the biome it stands in
   trySpawn() {
@@ -86,11 +114,17 @@ export class Monsters {
       return;
     }
   }
-  remove(m) { scene.remove(m.root); m.root.traverse(o => o.geometry && o.geometry.dispose()); this.list.splice(this.list.indexOf(m), 1); }
+  remove(m) {
+    scene.remove(m.root); m.root.traverse(o => o.geometry && o.geometry.dispose());
+    if (m.bar) { scene.remove(m.bar); m.bar.userData.fill.material.dispose(); }
+    this.list.splice(this.list.indexOf(m), 1);
+  }
   // the hero's bolt or blade lands on one
   hit(m, dmg, crit, dir) {
     m.hp -= dmg; m.flash = 0.18; m.state = 'chase';
     m.kb.set(dir.x * 14, 0, dir.z * 14);
+    if (crit && m.wind > 0) { m.wind = 0; m.act = null; m.atkCd = Math.max(m.atkCd, 0.8); }   // a critical hit breaks a wind-up
+    if (m.hp > 0) this.showBar(m);
     const c = m.pos.clone(); c.y += m.k.h * 0.6;
     number(c.x, c.y + 1.2, c.z, dmg, crit ? 'crit' : '');
     burst(c.x, c.y, c.z, crit ? '#ffd45a' : '#ffffff', crit ? 10 : 6, 8, 1, true, 0.35);
@@ -106,19 +140,60 @@ export class Monsters {
     }
     return false;
   }
-  // a monster's bite
-  bite(m) {
+  // the hero takes a blow from a point (a bite, a shot, a charge); shove is how hard it throws him
+  hurt(dmg, fx, fz, shove = 18) {
     const p = this.player;
-    if (p.invT > 0 || stats.hp <= 0) return;
-    stats.hp = Math.max(0, stats.hp - m.atk);
+    if (p.invT > 0 || stats.hp <= 0) return false;
+    stats.hp = Math.max(0, stats.hp - dmg);
+    this.calm = 0; this.regenAcc = 0;
     p.invT = 0.7; p.hurtT = 0.4;
-    const dx = p.pos.x - m.pos.x, dz = p.pos.z - m.pos.z, l = Math.hypot(dx, dz) || 1;
-    p.vel.x += dx / l * 18; p.vel.z += dz / l * 18; p.vel.y = Math.max(p.vel.y, 8);
-    number(p.pos.x, p.pos.y + 5.2, p.pos.z, m.atk, 'hurt');
+    const dx = p.pos.x - fx, dz = p.pos.z - fz, l = Math.hypot(dx, dz) || 1;
+    p.vel.x += dx / l * shove; p.vel.z += dz / l * shove; p.vel.y = Math.max(p.vel.y, shove * 0.45);
+    number(p.pos.x, p.pos.y + 5.2, p.pos.z, dmg, 'hurt');
     this.hooks.hurt && this.hooks.hurt();
     if (stats.hp <= 0) this.hooks.dead && this.hooks.dead();
+    return true;
+  }
+  // a monster's bite
+  bite(m, mult = 1, shove = 18) { return this.hurt(Math.round(m.atk * mult), m.pos.x, m.pos.z, shove); }
+  // is the hero within reach of this monster (flat distance, and near enough in height)?
+  inReach(m, d, reach, dy = 6) { return d < m.k.r + reach && Math.abs(m.pos.y - this.player.pos.y) < dy; }
+  // a wind-up: the monster stands still and glows for a moment, then does the act
+  windUp(m, act, secs) { m.wind = secs; m.act = act; m.lunge = 0; burst(m.pos.x, m.pos.y + m.k.h * 0.7, m.pos.z, '#ffb040', 4, 3, 0.8, true, 0.3, 0); }
+  // what a ranged one throws: a glowing ball that flies at where the hero is now
+  throwAt(m) {
+    const p = this.player, s = m.k.shot;
+    const from = new V3(m.pos.x, m.pos.y + m.k.h * 0.7, m.pos.z);
+    const dir = new V3(p.pos.x, p.pos.y + HERO_MID, p.pos.z).sub(from).normalize();
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(shotGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(s.color).lerp(new THREE.Color('#ffffff'), 0.5) })));
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.soft, color: s.color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); glow.scale.setScalar(3.6); g.add(glow);
+    g.position.copy(from); scene.add(g);
+    this.shots.push({ g, pos: from, vel: dir.multiplyScalar(s.spd), t: 0, color: s.color, dmg: m.atk, m });
+    m.lunge = 0.3; sfx('cast');
+  }
+  updateShots(dt) {
+    const p = this.player, w = this.world;
+    for (let i = this.shots.length - 1; i >= 0; i--) {
+      const b = this.shots[i]; b.t += dt;
+      b.pos.addScaledVector(b.vel, dt);
+      const gnd = w.poly ? w.ground(b.pos.x, b.pos.z) : null;
+      const hitGround = w.poly ? (gnd !== null && b.pos.y < gnd) : w.solid(b.pos.x, b.pos.y, b.pos.z);
+      const toHero = Math.hypot(b.pos.x - p.pos.x, (b.pos.y - p.pos.y - HERO_MID) * 0.7, b.pos.z - p.pos.z);
+      let gone = hitGround || b.t > 3 || b.pos.y < 0;
+      if (!gone && toHero < 2.4 && stats.hp > 0) { this.hurt(b.dmg, b.pos.x - b.vel.x, b.pos.z - b.vel.z, 10); gone = true; }
+      if (gone) { burst(b.pos.x, b.pos.y, b.pos.z, b.color, 8, 7, 1.2, true, 0.35); scene.remove(b.g); b.g.traverse(o => o.material && o.material.dispose()); this.shots.splice(i, 1); continue; }
+      b.g.position.copy(b.pos);
+      if (Math.random() < 0.5) burst(b.pos.x, b.pos.y, b.pos.z, b.color, 1, 1, 1, true, 0.25, 0);
+    }
   }
   update(dt) {
+    this.updateShots(dt);
+    // healing, once the fight has been over a while
+    if (stats.hp > 0 && stats.hp < stats.maxHp) {
+      this.calm += dt;
+      if (this.calm > REGEN_AFTER) { this.regenAcc += dt; while (this.regenAcc >= REGEN_EVERY && stats.hp < stats.maxHp) { this.regenAcc -= REGEN_EVERY; stats.hp++; } }
+    }
     const w = this.world, p = this.player, hero = p.pos, t = performance.now() / 1000;
     this.timer += dt * 60;
     this.spawnT -= dt;
@@ -128,7 +203,7 @@ export class Monsters {
       const d = m.pos.distanceTo(hero);
       if (d > DESPAWN) { this.remove(m); continue; }
       if (!w.loaded(m.pos.x, m.pos.z)) continue;
-      m.t -= dt; m.atkCd -= dt;
+      m.t -= dt; m.atkCd -= dt; m.hopCd -= dt; m.daze = Math.max(0, m.daze - dt); m.leap = Math.max(0, m.leap - dt);
       const frozen = m.frz > 0; if (frozen) m.frz -= dt;
       // what it wants
       const alive = stats.hp > 0;
@@ -136,28 +211,93 @@ export class Monsters {
         if (alive && d < k.see) { m.state = 'chase'; }
         else if (m.t <= 0) { m.t = 2 + Math.random() * 3; const a = Math.random() * 6.28, r = Math.random() * 16; m.goal = new V3(m.home.x + Math.cos(a) * r, 0, m.home.z + Math.sin(a) * r); m.rest = Math.random() < 0.4; }
       } else if (m.state === 'chase') {
-        if (!alive || d > k.see * 2.2 || m.pos.distanceTo(m.home) > 120) { m.state = 'wander'; m.t = 0; m.home.copy(m.pos); }
+        if (!alive || d > k.see * 2.2 || m.pos.distanceTo(m.home) > 120) { m.state = 'wander'; m.t = 0; m.home.copy(m.pos); m.wind = 0; m.act = null; }
         m.goal = hero; m.rest = false;
       }
-      // move toward the goal
+      const chasing = m.state === 'chase' && alive && !frozen;
+      const toHero = { x: (hero.x - m.pos.x) / (d || 1), z: (hero.z - m.pos.z) / (d || 1) };
+      // a wind-up ends in the act it was for
+      if (m.wind > 0) {
+        m.wind -= dt;
+        if (m.wind <= 0) {
+          const act = m.act; m.act = null; m.lastAct = act;
+          if (frozen || !alive) { /* nothing: it was stopped */ }
+          else if (act === 'strike') { if (this.inReach(m, d, 3.8)) this.bite(m); m.lunge = 0.3; m.atkCd = 1.3; }
+          else if (act === 'throw') { this.throwAt(m); m.atkCd = k.shot.cd; }
+          else if (act === 'pounce') { const sp = Math.min(30, Math.max(14, d / 0.55)); m.vel.set(toHero.x * sp, 15, toHero.z * sp); m.leap = 0.9; m.onGround = false; m.atkCd = 2.4; sfx('roll'); }
+          else if (act === 'rush') { m.rush = { t: 0.75, x: toHero.x, z: toHero.z, hit: false }; m.atkCd = 3.2; sfx('roar'); }
+          else if (act === 'phase') {
+            // gone, and back again right behind the hero
+            const bx = hero.x + Math.sin(p.yaw) * 4.5, bz = hero.z + Math.cos(p.yaw) * 4.5;
+            burst(m.pos.x, m.pos.y + k.h * 0.5, m.pos.z, '#b08cff', 12, 6, 1.4, true, 0.5, 0);
+            m.pos.x = bx; m.pos.z = bz; m.home.copy(m.pos); m.vel.set(0, 0, 0);
+            burst(bx, m.pos.y + k.h * 0.5, bz, '#b08cff', 12, 6, 1.4, true, 0.5, 0); sfx('blink');
+            m.atkCd = 0.5;
+          }
+        }
+      }
+      // move toward the goal (each kind in its way)
       let gx = 0, gz = 0, want = 0;
       if (m.goal && !m.rest) {
         gx = m.goal.x - m.pos.x; gz = m.goal.z - m.pos.z;
         const l = Math.hypot(gx, gz);
-        const stop = m.state === 'chase' ? k.r + 1.8 : 1.2;
-        if (l > stop) { gx /= l; gz /= l; want = k.spd * (m.state === 'chase' ? 1 : 0.45); } else { gx = gz = 0; if (m.state === 'wander') m.rest = true; }
+        let stop = m.state === 'chase' ? k.r + 1.8 : 1.2;
+        if (k.atk === 'shot' && m.state === 'chase') stop = k.shot.range * 0.62;
+        if (k.atk === 'swoop' && m.state === 'chase') stop = 6;
+        // spiders and crabs hang back out of reach until they're ready to leap or rush
+        if ((k.atk === 'pounce' || k.atk === 'charge') && m.state === 'chase' && m.atkCd > 0.2 && m.leap <= 0 && !m.rush) stop = k.r + 5.5;
+        if (l > stop) { gx /= l; gz /= l; want = k.spd * (m.state === 'chase' ? 1 : 0.45); }
+        else if (k.atk === 'shot' && m.state === 'chase' && l < k.shot.range * 0.35) { gx = -gx / l; gz = -gz / l; want = k.spd * 0.7; }   // too close: back off
+        else { gx = gz = 0; if (m.state === 'wander') m.rest = true; }
       }
-      if (frozen) want = 0;
+      if (frozen || m.wind > 0 || m.daze > 0) want = 0;
+      // choosing an attack
+      if (chasing && m.wind <= 0 && m.atkCd <= 0 && m.daze <= 0) {
+        switch (k.atk) {
+          case 'melee': if (this.inReach(m, d, 3.2)) this.windUp(m, 'strike', 0.4); break;
+          case 'shot': if (d < k.shot.range && d > 3) this.windUp(m, 'throw', 0.5); break;
+          case 'pounce': if (d > 4 && d < 12 && m.onGround && Math.abs(m.pos.y - hero.y) < 4) this.windUp(m, 'pounce', 0.45); break;
+          case 'charge': if (d > 5 && d < 18 && Math.abs(m.pos.y - hero.y) < 4) this.windUp(m, 'rush', 0.55); break;
+          case 'phase': if (d < 24 && d > 6) this.windUp(m, 'phase', 0.35); break;
+          case 'swoop': if (d < 16 && !m.dive) { const tgt = new V3(hero.x, hero.y + HERO_MID, hero.z); m.dive = { t: 1.1, dir: tgt.sub(m.pos).normalize(), hit: false }; m.atkCd = 2.4; } break;
+        }
+      }
+      // slimes only move by hopping
+      if (k.atk === 'hop') {
+        if (want > 0 && m.onGround && m.hopCd <= 0 && !frozen) {
+          const big = m.state === 'chase';
+          m.vel.set(gx * want * (big ? 1.7 : 1), big ? 14 : 9, gz * want * (big ? 1.7 : 1)); m.onGround = false; m.hopCd = big ? 0.75 : 1.2;
+        }
+        want = 0; gx = gz = 0;   // (no walking)
+      }
+      // a crab's rush and a spider's leap carry it on their own
+      if (m.rush) {
+        m.rush.t -= dt; want = 0;
+        m.vel.x = m.rush.x * 26; m.vel.z = m.rush.z * 26;
+        if (!m.rush.hit && this.inReach(m, d, 2.8, 5)) { m.rush.hit = true; if (this.bite(m, 1.5, 26)) { sfx('slam'); } }
+        if (m.rush.t <= 0 || m.rush.hit) { m.rush = null; m.daze = 0.9; m.vel.x *= 0.2; m.vel.z *= 0.2; }
+      }
+      if (m.leap > 0) {
+        want = 0;
+        if (this.inReach(m, d, 2.6, 5) && m.atkCd > 1.5) { m.leap = 0; this.bite(m, 1.3, 20); }
+      }
       const acc = 1 - Math.exp(-8 * dt);
-      m.vel.x += (gx * want + m.kb.x - m.vel.x) * acc; m.vel.z += (gz * want + m.kb.z - m.vel.z) * acc;
+      if (!(k.atk === 'hop' && !m.onGround) && !m.rush && m.leap <= 0) { m.vel.x += (gx * want + m.kb.x - m.vel.x) * acc; m.vel.z += (gz * want + m.kb.z - m.vel.z) * acc; }
       m.kb.multiplyScalar(Math.exp(-9 * dt));
       // ground monsters: step, fall, stay out of the water; flyers hover
       const nx = m.pos.x + m.vel.x * dt, nz = m.pos.z + m.vel.z * dt;
       if (w.poly) {
         // the low-poly land: a height to walk on (or hover over), the sea to keep out of
-        if (k.fly) {
+        if (k.fly && m.dive) {
+          // a bat's dive: straight along its line, then the dive is over and it climbs back
+          m.dive.t -= dt;
+          m.pos.addScaledVector(m.dive.dir, 24 * dt);
+          const g = w.ground(m.pos.x, m.pos.z);
+          if (!m.dive.hit && this.inReach(m, d, 2.4, 3.5)) { m.dive.hit = true; this.bite(m, 1, 14); }
+          if (m.dive.t <= 0 || m.dive.hit || (g !== null && m.pos.y < g + 0.8)) { m.dive = null; m.vel.set(0, 0, 0); }
+        } else if (k.fly) {
           const g = w.ground(nx, nz);
-          if (g !== null) { m.pos.x = nx; m.pos.z = nz; m.pos.y += (g + 5.2 + Math.sin(t * 2 + m.bob) * 0.8 - m.pos.y) * (1 - Math.exp(-3 * dt)); }
+          if (g !== null) { m.pos.x = nx; m.pos.z = nz; m.pos.y += (g + (k.hover || 5.2) + Math.sin(t * 2 + m.bob) * 0.8 - m.pos.y) * (1 - Math.exp(-3 * dt)); }
         } else {
           const g = w.ground(nx, nz);
           if (g !== null && !w.seaAt(nx, nz) && g - m.pos.y < 2.6) { const [cx2, cz2] = w.clearOfTrunks(nx, nz, k.r * 0.6); m.pos.x = cx2; m.pos.z = cz2; }
@@ -168,9 +308,14 @@ export class Monsters {
           if (gh !== null && ny <= gh) { ny = gh; m.vel.y = 0; m.onGround = true; } else m.onGround = false;
           m.pos.y = ny;
         }
+      } else if (k.fly && m.dive) {
+        m.dive.t -= dt;
+        m.pos.addScaledVector(m.dive.dir, 24 * dt);
+        if (!m.dive.hit && this.inReach(m, d, 2.4, 3.5)) { m.dive.hit = true; this.bite(m, 1, 14); }
+        if (m.dive.t <= 0 || m.dive.hit || w.solid(m.pos.x, m.pos.y, m.pos.z)) { m.dive = null; m.vel.set(0, 0, 0); }
       } else if (k.fly) {
         const g = w.groundY(nx, nz, m.pos.y + 12);
-        const hover = g + 5.2 + Math.sin(t * 2 + m.bob) * 0.8;
+        const hover = g + (k.hover || 5.2) + Math.sin(t * 2 + m.bob) * 0.8;
         m.pos.x = nx; m.pos.z = nz;
         m.pos.y += (hover - m.pos.y) * (1 - Math.exp(-3 * dt));
       } else {
@@ -192,12 +337,17 @@ export class Monsters {
       }
       // the warrior's charge runs them down
       if (p.dash && p.dash.onTouch && d < k.r + 2.2 && Math.abs(m.pos.y - hero.y) < 5) p.dash.onTouch(m);
-      // biting
-      if (m.state === 'chase' && alive && !frozen && d < k.r + 3 && m.atkCd <= 0 && Math.abs(m.pos.y - hero.y) < 6) {
-        m.atkCd = 1.1; m.lunge = 0.3;
+      // biting, for the kinds that bite on touch (skeletons wind up a strike, bats bite in the dive)
+      if (chasing && k.atk !== 'melee' && k.atk !== 'swoop' && m.wind <= 0 && !m.rush && m.leap <= 0 && m.atkCd <= 0 && this.inReach(m, d, 3)) {
+        m.atkCd = k.atk === 'hop' ? 0.9 : 1.1; m.lunge = 0.3;
         this.bite(m);
       }
       m.lunge = Math.max(0, (m.lunge || 0) - dt);
+      // the health bar over its head
+      if (m.bar) {
+        if ((m.barT -= dt) <= 0) m.bar.visible = false;
+        else m.bar.position.set(m.pos.x, m.pos.y + k.h * 1.24 + 1.1, m.pos.z);
+      }
       // the look of it
       const hs = Math.hypot(m.vel.x, m.vel.z);
       m.moving = hs > 0.5;
@@ -207,9 +357,18 @@ export class Monsters {
       if (m.lunge > 0) { const a = Math.sin(m.lunge / 0.3 * Math.PI); m.root.position.x += Math.sin(m.face) * a * 1.2; m.root.position.z += Math.cos(m.face) * a * 1.2; }
       m.root.rotation.y = m.face;
       if (!frozen) m.root.userData.anim(t, { moving: m.moving, seed: m.seed, timer: Math.floor(this.timer + m.seed * 20), attack: m.lunge > 0 });
-      // hit: a white flash; frozen: an icy tint
-      if (m.flash > 0) { m.flash -= dt; m.root.userData.flash(m.flash > 0 ? 1 : (frozen ? 0.5 : 0), m.flash > 0 ? '#ffffff' : '#8ad8ff'); m.wasFrz = frozen; }
-      else if (frozen !== !!m.wasFrz) { m.root.userData.flash(frozen ? 0.5 : 0, '#8ad8ff'); m.wasFrz = frozen; }
+      // hit: a white flash; winding up: an orange glow; frozen: an icy tint
+      if (m.flash > 0) m.flash -= dt;
+      const tint = m.flash > 0 ? 'hit' : m.wind > 0 ? 'wind' : frozen ? 'frz' : '';
+      if (tint !== m.tint) {
+        m.tint = tint;
+        if (tint === 'hit') m.root.userData.flash(1, '#ffffff');
+        else if (tint === 'wind') m.root.userData.flash(0.7, '#ffb040');
+        else if (tint === 'frz') m.root.userData.flash(0.5, '#8ad8ff');
+        else m.root.userData.flash(0);
+      }
+      // (a wind-up shivers)
+      if (m.wind > 0) { m.root.position.x += Math.sin(t * 60) * 0.12; m.root.position.z += Math.cos(t * 53) * 0.12; }
     }
   }
 }
