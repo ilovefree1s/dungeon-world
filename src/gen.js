@@ -461,7 +461,8 @@ export function createGen(seed = 1, flat = false) {
   const POLY_TREES = [
     [0.95, ['oak', 'oak', 'oak', 'birch', 'bush', 'bush', 'boulder']], [0.6, ['pine', 'pine', 'pine', 'snowrock']], [0.22, ['cactus', 'cactus', 'mesa_rock', 'deadbush', 'deadbush']],
     [0.6, ['willow', 'willow', 'oak', 'reeds', 'reeds']], [0.28, ['char', 'spire', 'char', 'boulder']], [0.4, ['crystal', 'crystal', 'pale', 'boulder']]];
-  const TREE_ID = { oak: 0, birch: 1, pine: 2, cactus: 3, willow: 4, char: 5, spire: 6, crystal: 7, pale: 8, boulder: 9, snowrock: 10, mesa_rock: 11, bush: 12, deadbush: 13, reeds: 14 };
+  const NOT_TREE = new Set(['boulder', 'snowrock', 'mesa_rock', 'bush', 'deadbush', 'reeds']);
+const TREE_ID = { oak: 0, birch: 1, pine: 2, cactus: 3, willow: 4, char: 5, spire: 6, crystal: 7, pale: 8, boulder: 9, snowrock: 10, mesa_rock: 11, bush: 12, deadbush: 13, reeds: 14 };
   const hfs = new Float32Array(PV * PV), pks = new Uint8Array(PV * PV), bms = new Uint8Array(PV * PV);
   function polyChunk(cx, cz) {
     for (const k in B) { B[k].nv = 0; B[k].ni = 0; }
@@ -521,7 +522,10 @@ export function createGen(seed = 1, flat = false) {
       const hx = column(tx + 3, tz).hf + 1, hz = column(tx, tz + 3).hf + 1;
       if (Math.abs(hx - h) > 3.2 || Math.abs(hz - h) > 3.2) continue;
       const kind = kinds[Math.floor(hash3(i, j, seed, 44) * kinds.length)];
-      trees.push(TREE_ID[kind], tx - ox + 0.5, Math.min(h, hx, hz) - 0.3, tz - oz + 0.5, 0.7 + hash3(i, j, seed, 45) * 0.5, hash3(i, j, seed, 46) * 6.283);
+      // (trees: half as many as the ground would take, and twice the size; rocks and bushes as they are)
+      const tree = !NOT_TREE.has(kind);
+      if (tree && hash3(i, j, seed, 47) < 0.5) continue;
+      trees.push(TREE_ID[kind], tx - ox + 0.5, Math.min(h, hx, hz) - 0.3, tz - oz + 0.5, (0.7 + hash3(i, j, seed, 45) * 0.5) * (tree ? 2 : 1), hash3(i, j, seed, 46) * 6.283);
     }
     // grass: where the ground is grassy and gentle, a spot every other block, each with a number to thin by
     const grass = [];
