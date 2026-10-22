@@ -286,20 +286,20 @@ const BUILD = {
   },
   // ---------------------------------------------------------------- LIGHTNING
   lightning(g, bx, power, { span, wide, cx, cz }) {
-    const bolts = makeBolts(g, Math.max(1, Math.round(1 + power * 2.5)), Math.min(1, Math.max(0.3, span / 1.1)));
+    const bolts = makeBolts(g, Math.max(1, Math.round(1 + power * 1.2)), Math.min(1, Math.max(0.3, span / 1.1)));
     const hazeU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: 1 }, uFlash: { value: 0 } };
     const haze = new THREE.Mesh(crossedPlanes(bx, 0.1, 0.1 + 0.08 * power), sheet(HAZE_FS, hazeU)); haze.frustumCulled = false; g.add(haze);
-    const sparks = cloud(g, Math.round(22 * power), { size: 0.035 + 0.02 * Math.min(1, span), tex: glintTex(), colors: ['#ffffff', '#8ab8ff'] });
+    const sparks = cloud(g, Math.round(9 * power), { size: 0.035 + 0.02 * Math.min(1, span), tex: glintTex(), colors: ['#ffffff', '#8ab8ff'] });
     const spawn = i => { inBox(sparks, i, bx); sparks.max[i] = 0.15 + rnd() * 0.25; sparks.life[i] = 0; jitter(sparks, i, 2.6); };
     for (let i = 0; i < sparks.N; i++) { spawn(i); sparks.life[i] = rnd() * sparks.max[i]; }
     let flick = 0, flash = 0;
     return (t, dt) => {
       hazeU.uT.value = t;
       if ((flick -= dt) <= 0) {
-        // always at least one bolt crawling the blade; now and then a burst of all of them
-        const burst = rnd() < 0.25;
-        flick = 0.09 + rnd() * 0.16;
-        bolts.draw(burst ? bolts.n : 1 + Math.floor(rnd() * Math.max(1, bolts.n - 1)), bx, power);
+        // mostly quiet: one bolt at a time, each held a moment, with a pause between; now and then a burst of all of them
+        const burst = rnd() < 0.12, pause = rnd() < 0.35;
+        flick = pause ? 0.25 + rnd() * 0.4 : 0.14 + rnd() * 0.2;
+        if (pause) bolts.drawLines([], 0); else bolts.draw(burst ? bolts.n : 1, bx, power);
         if (burst) flash = 1;
       }
       flash = Math.max(0.15, flash - dt * 6); hazeU.uFlash.value = flash;
