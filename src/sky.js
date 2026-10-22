@@ -51,36 +51,44 @@ dome.renderOrder = -10; dome.frustumCulled = false;
 scene.add(dome);
 
 // ---------------------------------------------------------------- clouds
+// each cloud is a cluster of flattened low-poly puffs along a long footprint, biggest in the
+// middle, their undersides more or less level; one instanced mesh for all of them
 const NCLOUD = 40, TILE = 1440;
-const cloudMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.88, fog: false });
-const clouds = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cloudMat, NCLOUD * 2);
-clouds.frustumCulled = false;
-const cloudBase = [];
+const cloudMat = new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.5, transparent: true, opacity: 0.92, fog: false, flatShading: true });
+const cloudBase = [], puffs = [];
 {
   let s = 12345; const r = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
   for (let i = 0; i < NCLOUD; i++) {
-    const w = 36 + r() * 92, d = 28 + r() * 68;
-    cloudBase.push({ x: r() * TILE, z: r() * TILE, y: 224 + r() * 36, w, d, h: 8 + r() * 6 });
-    // (a second, smaller box on top of each)
-    cloudBase.push({ x: 0, z: 0, y: 0, w: w * (0.4 + r() * 0.3), d: d * (0.4 + r() * 0.3), h: 6, top: true, ox: (r() - 0.5) * w * 0.4, oz: (r() - 0.5) * d * 0.4 });
+    const w = 36 + r() * 92, d = 24 + r() * 50, h = 10 + r() * 8;
+    const n = 5 + Math.floor(r() * 5);
+    const list = [];
+    for (let k = 0; k < n; k++) {
+      const u = (k + 0.5) / n - 0.5 + (r() - 0.5) * 0.15;          // along the cloud
+      const bulge = 1 - Math.abs(u) * 1.3;                           // fat in the middle, thin at the ends
+      const rx = (0.55 + bulge * 0.6 + r() * 0.3) * h, rz = rx * (0.7 + r() * 0.5), ry = rx * (0.55 + r() * 0.25);
+      list.push({ ox: u * w, oz: (r() - 0.5) * d * 0.6, oy: ry * 0.45 + r() * 2, rx, ry, rz, turn: r() * 6.28 });
+    }
+    // (a couple of small puffs riding on top)
+    for (let k = 0; k < 2; k++) { const rx = h * (0.35 + r() * 0.25); list.push({ ox: (r() - 0.5) * w * 0.5, oz: (r() - 0.5) * d * 0.3, oy: h * 0.9 + rx * 0.3, rx, ry: rx * 0.7, rz: rx * 0.9, turn: r() * 6.28 }); }
+    cloudBase.push({ x: r() * TILE, z: r() * TILE, y: 224 + r() * 36, list });
+    puffs.push(...list);
   }
 }
+const clouds = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), cloudMat, puffs.length);
+clouds.frustumCulled = false;
 scene.add(clouds);
-const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
+const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0);
 function placeClouds(px, pz, t) {
   const drift = t * 4.4;
-  let prev = null;
-  cloudBase.forEach((c, i) => {
-    if (c.top) {
-      pv.set(prev.x + c.ox, prev.y + prev.h / 2 + c.h / 2, prev.z + c.oz);
-    } else {
-      const x = ((c.x + drift - px) % TILE + TILE) % TILE - TILE / 2 + px;
-      const z = ((c.z - pz) % TILE + TILE) % TILE - TILE / 2 + pz;
-      pv.set(x, c.y, z); prev = { x, y: c.y, z, h: c.h };
+  let i = 0;
+  for (const c of cloudBase) {
+    const x = ((c.x + drift - px) % TILE + TILE) % TILE - TILE / 2 + px;
+    const z = ((c.z - pz) % TILE + TILE) % TILE - TILE / 2 + pz;
+    for (const p of c.list) {
+      pv.set(x + p.ox, c.y + p.oy, z + p.oz); sv.set(p.rx, p.ry, p.rz); q0.setFromAxisAngle(yAxis, p.turn);
+      clouds.setMatrixAt(i++, m4.compose(pv, q0, sv));
     }
-    sv.set(c.w, c.h, c.d);
-    clouds.setMatrixAt(i, m4.compose(pv, q0, sv));
-  });
+  }
   clouds.instanceMatrix.needsUpdate = true;
 }
 
@@ -117,7 +125,7 @@ export function updateSky(dt, focus) {
   hemi.color.copy(K.hemiSkyNight).lerp(K.hemiSkyDay, day);
   hemi.groundColor.copy(K.hemiGrNight).lerp(K.hemiGrDay, day);
   hemi.intensity = 0.95 + 0.05 * day;
-  cloudMat.color.copy(tmp2.set('#2a3458').lerp(tmp.set('#ffffff'), day)).lerp(K.duskHor, dusk * 0.4);
+  cloudMat.color.copy(tmp2.set('#2a3458').lerp(tmp.set('#ffffff'), day)).lerp(K.duskHor, dusk * 0.4); cloudMat.emissive.copy(cloudMat.color);
   // light and shadow follow the hero (snapped, so the shadows don't shimmer as you walk)
   const snap = 4;
   const fx = Math.round(focus.x / snap) * snap, fz = Math.round(focus.z / snap) * snap;
