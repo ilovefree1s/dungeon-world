@@ -395,8 +395,9 @@ const BUILD = {
     const [x0, x1, y0, y1, z0, z1] = bx;
     const ribbons = [];
     for (let i = 0; i < 2; i++) {
-      const u = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: 4 } };
-      const m = new THREE.Mesh(helixGeo(bx, 2.2 + i * 0.4, i * Math.PI, 0.07 + 0.03 * power, 96, 1.1 + i * 0.15), sheet(WATER_FS, u)); m.frustumCulled = false; g.add(m); ribbons.push({ m, u });
+      // (lighter: the ribbons run at under half strength, and the second winds the other way and turns the other way)
+      const u = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 0.4 }, uAsp: { value: 4 } };
+      const m = new THREE.Mesh(helixGeo(bx, (2.2 + i * 0.4) * (i ? -1 : 1), i * Math.PI, 0.07 + 0.03 * power, 96, 1.1 + i * 0.15), sheet(WATER_FS, u)); m.frustumCulled = false; m.userData.dir = i ? -1 : 1; g.add(m); ribbons.push({ m, u });
     }
     const pivot = new THREE.Vector3(cx, 0, cz);
     const N = Math.round((30 + span * 60) * Math.min(2, power));
@@ -407,7 +408,7 @@ const BUILD = {
     for (let i = 0; i < 5; i++) { const m = new THREE.Mesh(ringGeo(0.06, 0.03, 20), new THREE.MeshBasicMaterial({ color: '#9fd8ff', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); m.userData.k = 1; m.frustumCulled = false; g.add(m); rings.push(m); }
     const c = new THREE.Color(), pale = new THREE.Color('#e4f6ff'), blue = new THREE.Color('#5ab0ff');
     return (t, dt, up) => {
-      for (const r of ribbons) { r.u.uT.value = t; r.m.position.copy(pivot); r.m.rotation.y = t * 1.2 * power; r.m.position.sub(pivot.clone().applyAxisAngle(upW, r.m.rotation.y)); }
+      for (const r of ribbons) { r.u.uT.value = t; r.m.position.copy(pivot); r.m.rotation.y = t * 1.2 * power * r.m.userData.dir; r.m.position.sub(pivot.clone().applyAxisAngle(upW, r.m.rotation.y)); }
       P.mat.uniforms.uUpL.value.copy(up);   // (a drop's round end is down, its point up)
       for (let i = 0; i < N; i++) {
         life[i] += dt; const k = life[i] / max[i], o = i * 3;
