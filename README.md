@@ -106,6 +106,11 @@ boats and mounts.
   their meshes (three draw calls each: blocks, glowing blocks, water), and block lookups.
 - `src/player.js`: the hero's movement and collisions, the camera. `src/sky.js`: day and night.
 - `src/abilities.js`: the three heroes' kits (attacks, abilities, cooldowns, aiming).
+  `src/heroanim.js`: their attack animations, keyframed poses of the whole body (wind-up, strike,
+  recovery) laid over Dungeon Heart's walk: alternating slashes, the whirl, the slam and its
+  landing crouch; the staff thrust, the nova fling, the meteor raised to the sky; the archer's
+  side-on draw and release, the multishot sweep, the rain aimed upward. The bolt and the arrow
+  leave on the strike frame.
 - `src/weaponkit.js`: weapons from parts (the model, the name, the numbers); `src/forge.js`:
   the forge screen, with its own small renderer for the turning preview.
 - `src/combat.js`: the monsters (where they live, how they wander, chase and bite), the

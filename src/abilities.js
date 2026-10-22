@@ -47,7 +47,7 @@ export const KITS = [
   // ---- warrior
   { name: 'WARRIOR', attack: { name: 'SWING', cd: 0.45, cdOf: p => 0.45 / (p.forged ? p.forged.spd : 1), use(ctx) {
       const p = ctx.player, dir = camFlat(p), f = p.forged;
-      faceTo(p, dir); p.swingT = 0; p.whirl = false;
+      faceTo(p, dir); p.swingT = 0; p.whirl = false; p.swingN = (p.swingN | 0) + 1;
       sfx('swing');
       // (a weapon from the forge sets the swing's damage, speed and reach)
       ctx.later(0.16, () => { const n = hitAll(ctx, around(ctx.monsters, p.pos.x + dir.x * 1.5, p.pos.y + 2, p.pos.z + dir.z * 1.5, f ? f.reach : 4.6, dir, 0.3), 1.5 * (f ? f.dmg : 1), p.pos); if (n) sfx('hit'); });
@@ -82,11 +82,10 @@ export const KITS = [
   // ---- mage
   { name: 'MAGE', attack: { name: 'BOLT', cd: 0.34, cdOf: p => 0.34 / (p.forged ? p.forged.spd : 1), use(ctx) {
       const p = ctx.player, from = p.pos.clone(), f = p.forged; from.y += 3.8;
-      const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0;
-      from.addScaledVector(dir, 1.8);
+      const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0; p.castKind = 'bolt';
       // (a staff from the forge: its gem's color, its damage, how fast the bolt flies)
-      ctx.bolts.fire(from, dir, f ? f.color : BOLT, { speed: 68 * (f ? f.shot : 1), mult: f ? f.dmg : 1 });
-      sfx('cast');
+      // (the bolt leaves the staff as the thrust lands; a monster on the move is re-aimed at then)
+      ctx.later(0.14, () => { const d2 = ctx.aim(from); ctx.bolts.fire(from.clone().addScaledVector(d2, 1.8), d2, f ? f.color : BOLT, { speed: 68 * (f ? f.shot : 1), mult: f ? f.dmg : 1 }); sfx('cast'); });
     } },
     abilities: [
       { name: 'BLINK', glyph: '⟿', cd: 4, use(ctx) {
@@ -96,7 +95,7 @@ export const KITS = [
           sfx('blink');
         } },
       { name: 'NOVA', glyph: '❄', cd: 9, use(ctx) {
-          const p = ctx.player; p.castT = 0;
+          const p = ctx.player; p.castT = 0; p.castKind = 'nova';
           ring(p.pos.x, p.pos.y + 0.3, p.pos.z, FROST, 1, 13, 0.6); burst(p.pos.x, p.pos.y + 2, p.pos.z, '#cfeeff', 30, 14, 1.6, true, 0.7, 2);
           sfx('blink');
           for (const m of around(ctx.monsters, p.pos.x, p.pos.y + 2, p.pos.z, 12)) { m.frz = 3.2; m.vel.set(0, m.vel.y, 0); }
@@ -104,7 +103,7 @@ export const KITS = [
         } },
       { name: 'METEOR', glyph: '☄', cd: 12, use(ctx) {
           const p = ctx.player, from = p.pos.clone(); from.y += 3.8;
-          const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0;
+          const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0; p.castKind = 'meteor';
           const at = ctx.aimAt.clone();
           // it falls from the sky onto the spot, a moment after the sign appears
           ring(at.x, at.y + 0.3, at.z, FIRE, 0.5, 7, 1.0);
@@ -124,10 +123,9 @@ export const KITS = [
   // ---- hunter
   { name: 'HUNTER', attack: { name: 'SHOOT', cd: 0.3, cdOf: p => 0.3 / (p.forged ? p.forged.spd : 1), use(ctx) {
       const p = ctx.player, from = p.pos.clone(), f = p.forged; from.y += 3.6;
-      const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0;
-      from.addScaledVector(dir, 1.8);
-      ctx.bolts.fire(from, dir, ARROW, { speed: 96 * (f ? f.shot : 1), arrow: true, mult: f ? f.dmg : 1 });
-      sfx('shoot');
+      const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0; p.castKind = 'shot';
+      // (the arrow flies when the string is loosed)
+      ctx.later(0.16, () => { const d2 = ctx.aim(from); ctx.bolts.fire(from.clone().addScaledVector(d2, 1.8), d2, ARROW, { speed: 96 * (f ? f.shot : 1), arrow: true, mult: f ? f.dmg : 1 }); sfx('shoot'); });
     } },
     abilities: [
       { name: 'ROLL', glyph: '↻', cd: 3, use(ctx) {
@@ -137,7 +135,7 @@ export const KITS = [
         } },
       { name: 'MULTI', glyph: '⋔', cd: 6, use(ctx) {
           const p = ctx.player, from = p.pos.clone(); from.y += 3.6;
-          const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0;
+          const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0; p.castKind = 'multi';
           from.addScaledVector(dir, 1.8);
           for (let i = -2; i <= 2; i++) {
             const a = i * 0.16, d = new V3(dir.x * Math.cos(a) - dir.z * Math.sin(a), dir.y, dir.x * Math.sin(a) + dir.z * Math.cos(a)).normalize();
@@ -147,7 +145,7 @@ export const KITS = [
         } },
       { name: 'RAIN', glyph: '⇣', cd: 12, use(ctx) {
           const p = ctx.player, from = p.pos.clone(); from.y += 3.6;
-          const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0;
+          const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0; p.castKind = 'rain';
           const at = ctx.aimAt.clone();
           ring(at.x, at.y + 0.3, at.z, ARROW, 0.5, 7, 0.9);
           sfx('shoot');

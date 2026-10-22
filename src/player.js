@@ -5,6 +5,7 @@
 // ============================================================================
 import { THREE, scene, camera, TEX, V3 } from './engine.js';
 import { buildHero, equipHeroWeapon, animHero } from './dh/models.js';
+import { animAttack, bowPull } from './heroanim.js';
 import { buildForged, statsOf, clsOf } from './weaponkit.js';
 import { SEA } from './gen.js';
 const SEA_TOP = SEA + 0.86; // (the sea's surface)
@@ -27,7 +28,7 @@ export class Player {
     this.camPos = new V3(); this.camFocus = new V3();
     this.lastLook = -10; this.visY = 0; this.hurtT = 0; this.coyote = 0; this.jumpBuf = 0;
     this.castT = -1; this.invT = 0; this.aimFace = null;
-    this.swingT = -1; this.whirl = false; this.swingLen = 0.3; this.dash = null; this.slamming = false; this.onLand = null;
+    this.swingT = -1; this.whirl = false; this.swingLen = 0.3; this.dash = null; this.slamming = false; this.onLand = null; this.landT = -1; this.swingN = 0; this.castKind = null;
     this.cls = -1; this.model = null;
     // a soft round shadow under the hero (always there, even with the real shadows off)
     this.blob = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 4.4), new THREE.MeshBasicMaterial({ map: TEX.shadow, transparent: true, depthWrite: false }));
@@ -162,8 +163,9 @@ export class Player {
     // lava: it throws you out
     if (w.lava(p.x, p.y + 0.6, p.z)) { this.vel.y = 30; this.hurtT = 0.6; this.onHurt && this.onHurt(); }
     this.hurtT = Math.max(0, this.hurtT - dt); this.invT = Math.max(0, this.invT - dt);
-    if (this.castT >= 0) { this.castT += dt / 0.38; if (this.castT >= 1) this.castT = -1; }
+    if (this.castT >= 0) { this.castT += dt / (this.castKind === 'nova' || this.castKind === 'meteor' || this.castKind === 'rain' || this.castKind === 'multi' ? 0.6 : 0.38); if (this.castT >= 1) this.castT = -1; }
     if (this.swingT >= 0) { this.swingT += dt / (this.whirl ? this.swingLen : 0.3); if (this.swingT >= 1) { this.swingT = -1; this.whirl = false; } }
+    if (this.landT >= 0) { this.landT += dt / 0.45; if (this.landT >= 1) this.landT = -1; }
     // move, one axis at a time
     const wasGround = this.onGround;
     this.onGround = false; this.stepped = false;
@@ -171,7 +173,7 @@ export class Player {
     this.moveAxis(2, this.vel.z * dt);
     this.moveAxis(1, this.vel.y * dt);
     if (this.onGround) this.jumped = false;
-    if (this.onGround && !wasGround && this.onLand) { const f = this.onLand; this.onLand = null; f(); }
+    if (this.onGround && !wasGround && this.onLand) { const f = this.onLand; this.onLand = null; if (this.slamming) this.landT = 0; f(); }
     // (stay stuck to the ground walking down a single step)
     if (!this.onGround && wasGround && this.vel.y <= 0 && !this.inWater) {
       if (this.hits(p.x, p.y - STEP - 0.05, p.z) && !this.hits(p.x, p.y - 0.02, p.z)) {
@@ -245,8 +247,9 @@ export class Player {
     }
     if (this.lavaAt(p.x, p.y + 0.6, p.z)) { this.vel.y = 30; this.hurtT = 0.6; this.onHurt && this.onHurt(); }
     this.hurtT = Math.max(0, this.hurtT - dt); this.invT = Math.max(0, this.invT - dt);
-    if (this.castT >= 0) { this.castT += dt / 0.38; if (this.castT >= 1) this.castT = -1; }
+    if (this.castT >= 0) { this.castT += dt / (this.castKind === 'nova' || this.castKind === 'meteor' || this.castKind === 'rain' || this.castKind === 'multi' ? 0.6 : 0.38); if (this.castT >= 1) this.castT = -1; }
     if (this.swingT >= 0) { this.swingT += dt / (this.whirl ? this.swingLen : 0.3); if (this.swingT >= 1) { this.swingT = -1; this.whirl = false; } }
+    if (this.landT >= 0) { this.landT += dt / 0.45; if (this.landT >= 1) this.landT = -1; }
     // move: a step that would climb more than STEP blocks is a wall (jump it); trunks push you off
     const wasGround = this.onGround;
     let nx = p.x + this.vel.x * dt, nz = p.z + this.vel.z * dt;
@@ -263,7 +266,7 @@ export class Player {
     this.onGround = false;
     if (g !== null && p.y <= g) { p.y = g; if (this.vel.y < 0) this.vel.y = 0; this.onGround = true; this.stepped = wasGround && g - (g0) > 0.4; }
     if (this.onGround) this.jumped = false;
-    if (this.onGround && !wasGround && this.onLand) { const f = this.onLand; this.onLand = null; f(); }
+    if (this.onGround && !wasGround && this.onLand) { const f = this.onLand; this.onLand = null; if (this.slamming) this.landT = 0; f(); }
     this.aboveGround = g !== null ? p.y - g : 0;
     // face where you walk (or where you aim)
     const hs = Math.hypot(this.vel.x, this.vel.z);
@@ -318,7 +321,6 @@ export class Player {
     const t = performance.now() / 1000;
     const rolling = this.dash && this.dash.roll ? Math.max(0.01, this.dash.t / 0.42) : 0;
     animHero(m, t, { walk: this.walk, move: this.onGround || swimming ? this.move : 0.15, roll: rolling, swing: this.swingT, cast: this.castT, whirl: this.whirl });
-    if (this.slamming && !this.onGround) { const u0 = m.userData; u0.arms[0].rotation.x = -2.8; u0.arms[1].rotation.x = -2.8; u0.body.rotation.x = 0.3; }
     const u = m.userData;
     if (!this.onGround && !swimming && !rolling && !this.slamming) {
       // in the air: knees up, arms out
@@ -327,6 +329,11 @@ export class Player {
       u.arms[0].rotation.z = -0.5; u.arms[1].rotation.z = 0.5 + 0.1;
     } else { u.arms[0].rotation.z = 0; }
     if (swimming) { u.body.rotation.x = 0.5 * this.move; u.arms[0].rotation.x = -2.2 + Math.sin(this.walk) * 0.8; u.arms[1].rotation.x = -2.2 - Math.sin(this.walk) * 0.8; }
+    // the attacks, laid over all that (not while rolling or swimming)
+    else if (!rolling) {
+      animAttack(m, { swing: this.swingT, swingN: this.swingN, whirl: this.whirl, cast: this.castT, castKind: this.castKind, slamAir: this.slamming && !this.onGround, land: this.landT, cls: this.cls });
+      if (u.string) { const pull = this.castT >= 0 ? bowPull(this.castKind, this.castT) : 0; u.arms[1].position.z = -pull * 0.1; u.string.geometry.attributes.position.setZ(1, (u.stringZ ?? -0.1) - pull * 0.35); u.string.geometry.attributes.position.needsUpdate = true; }
+    }
     // the hurt flash
     if (u.flash) u.flash(this.hurtT > 0 ? (Math.sin(t * 40) > 0 ? 0.8 : 0) : 0, '#ff5a2a');
     // the shadow on the ground below
