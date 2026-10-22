@@ -20,7 +20,8 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 - **The Forge** (on the title screen and in the menu): build a weapon from parts, and the hero it's for wields it.
   Ten types: sword, greatsword, dagger, axe, hammer and mace for the warrior; staff and wand
   for the mage; bow and crossbow for the hunter. Four heads each, ten materials (three of them
-  glow), guards, grips, pommels, gem and grip colors, length and width. Each build has its
+  glow), guards, grips, pommels, gem and grip colors, length (the blade or head alone), width,
+  and a hilt size for the grip, guard and pommel together. Each build has its
   numbers: a hammer hits twice as hard and swings half as fast as the plain sword, a dagger the
   other way round, longer reaches farther; a wand casts fast and light, a crossbow shoots hard
   and slow; a staff's gem colors the mage's bolts. Name it (or roll one), save up to sixteen,
