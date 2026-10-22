@@ -363,7 +363,7 @@ export function buildForged(spec) {
   g.userData.bladeMat = metal;
   // the aura, along the business end
   if (spec.aura && spec.aura !== 'none' && g.userData.auraBox) {
-    const auraTick = attachAura(g, spec.aura, g.userData.auraBox, spec.auraPower ?? 1);
+    const auraTick = attachAura(g, spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1);
     const base = g.userData.tick;
     g.userData.tick = t => { if (base) base(t); auraTick(t); };
   }

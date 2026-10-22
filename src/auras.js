@@ -268,14 +268,14 @@ const jitter = (c, i, s) => { c.vel[i * 3] = (rnd() - 0.5) * s; c.vel[i * 3 + 1]
 
 // ---------------------------------------------------------------- the auras
 const upW = new THREE.Vector3(0, 1, 0), qW = new THREE.Quaternion(), upL = new THREE.Vector3();
-export function attachAura(g, kind, bx, power = 1) {
+export function attachAura(g, kind, bx, power = 1, size = 1) {
   power = Math.max(0.05, Math.min(3, power));
   const [x0, x1, y0, y1, z0, z1] = bx, span = Math.max(0.1, y1 - y0), wide = Math.max(x1 - x0, z1 - z0);
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   const build = BUILD[kind];
   if (!build) return () => {};
   const before = new Set(g.children);
-  const parts = build(g, bx, power, { span, wide, cx, cz });
+  const parts = build(g, bx, power, { span, wide, cx, cz, size: Math.max(0.3, Math.min(3, size)) });
   for (const o of g.children) if (!before.has(o)) o.traverse(c => { c.userData.aura = true; });
   let last = -1;
   return t => {
@@ -320,7 +320,7 @@ const BUILD = {
   // ---------------------------------------------------------------- FLAME 2: particles
   // tongues of flame born all over the blade, rising toward the world's up, swelling then shrinking as they cool from
   // white to yellow to orange to a red that fades out; the same from any side, and they rise off a tilted blade
-  flame2(g, bx, power, { span, wide, cx, cz }) {
+  flame2(g, bx, power, { span, wide, cx, cz, size: tongue }) {
     const [x0, x1, y0, y1, z0, z1] = bx;
     const N = Math.round((30 + span * 70) * Math.min(2, power));
     const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), size = new Float32Array(N), alpha = new Float32Array(N), rot = new Float32Array(N);
@@ -338,7 +338,7 @@ const BUILD = {
       if (rnd() < 0.3) pos[o] = rnd() < 0.5 ? x0 - 0.01 : x1 + 0.01;
       max[i] = (0.35 + rnd() * 0.4) * (h / 0.6); life[i] = 0;
       vel[o] = (rnd() - 0.5) * 0.25; vel[o + 1] = 0; vel[o + 2] = (rnd() - 0.5) * 0.25;
-      base[i] = 0.14 + rnd() * 0.12 + 0.03 * Math.min(1, power); ph[i] = rnd() * 6.28; rot[i] = (rnd() - 0.5) * 0.7;
+      base[i] = (0.14 + rnd() * 0.12 + 0.03 * Math.min(1, power)) * tongue; ph[i] = rnd() * 6.28; rot[i] = (rnd() - 0.5) * 0.7;
     };
     for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
     const c = new THREE.Color(), hot = new THREE.Color('#fff6d0'), yel = new THREE.Color('#ffd040'), ora = new THREE.Color('#ff6a10'), red = new THREE.Color('#8a1a04');

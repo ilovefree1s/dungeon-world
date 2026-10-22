@@ -118,8 +118,8 @@ function render() {
   });
   $('fHeadRow').hidden = drawable && !!s.shape;
   if (s.shape) { pad.set(s.shape, shapeMode); $('fMirror').classList.toggle('on', !!s.shape.mirror); $('fPadHint').textContent = shapeMode === 'draw' ? 'TRACE THE SILHOUETTE IN ONE STROKE' : shapeMode === 'erase' ? 'RUB OUT WHATEVER YOU DRAG OVER' : 'DRAG THE CORNERS · CLICK AN EDGE TO ADD ONE · DOUBLE-CLICK ONE TO REMOVE IT'; }
-  $('fLen').value = s.length; $('fHilt').value = s.gripSize ?? s.hilt ?? 1; $('fGuardSize').value = s.guardSize ?? s.hilt ?? 1; $('fPommelSize').value = s.pommelSize ?? s.hilt ?? 1; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1;
-  $('fPowRow').hidden = !s.aura || s.aura === 'none';
+  $('fLen').value = s.length; $('fHilt').value = s.gripSize ?? s.hilt ?? 1; $('fGuardSize').value = s.guardSize ?? s.hilt ?? 1; $('fPommelSize').value = s.pommelSize ?? s.hilt ?? 1; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1; $('fSize').value = s.auraSize ?? 1;
+  $('fPowRow').hidden = !s.aura || s.aura === 'none'; $('fSizeRow').hidden = s.aura !== 'flame2';
   $('fName').value = s.name || '';
   // the saved ones
   const list = $('fSaved'); list.innerHTML = '';
@@ -171,6 +171,7 @@ function wire() {
   $('fPommelSize').addEventListener('input', e => { forge.spec.pommelSize = +e.target.value; rebuild(); });
   $('fWid').addEventListener('input', e => { forge.spec.width = +e.target.value; rebuild(); });
   $('fPow').addEventListener('input', e => { forge.spec.auraPower = +e.target.value; rebuild(); });
+  $('fSize').addEventListener('input', e => { forge.spec.auraSize = +e.target.value; rebuild(); });
   $('fName').addEventListener('input', e => { forge.spec.name = e.target.value.toUpperCase().slice(0, 28); });
   $('fDice').addEventListener('click', () => { forge.spec.name = nameOf(forge.spec); $('fName').value = forge.spec.name; sfx('pickup'); });
   $('fRandom').addEventListener('click', () => { forge.spec = randomSpec(); forge.spec.name = nameOf(forge.spec); sfx('pickup'); render(); });
