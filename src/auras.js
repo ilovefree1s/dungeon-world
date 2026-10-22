@@ -1,6 +1,6 @@
 // the weapon auras: each one its own build, not a recolored cloud of dots.
 //   flame     fire sheets licking up the blade (a noise-shaped shader on crossed planes), embers rising
-//   lightning jagged forking bolts with a hot white core and a violet glow, an ion haze that flashes with them, sparks
+//   lightning jagged forking bolts with a hot white core and a light-blue glow, an ion haze that flashes with them, sparks
 //   arcs / plasma / coil / static: four more takes on lightning (slow writhing arcs; a filament skin; coil rings with
 //             jumps between them; a crackle of tiny sparks)
 //   water     a rippling water sheath wrapped around the blade, drops running off it, falling world-down
@@ -175,7 +175,7 @@ void main(){
   float n = texture2D(tN, vec2(vUv.x * 2.0 * uAsp + uT * 0.4, vUv.y * 1.5 - uT * 0.9)).r;
   float cx = abs(vUv.x * 2.0 - 1.0);
   float a = (1.0 - cx * cx) * smoothstep(0.3, 0.8, n) * (0.15 + 0.55 * uFlash) * (0.4 + 0.6 * uPow) * min(1.0, uPow);
-  gl_FragColor = vec4(vec3(0.55, 0.65, 1.0) * a, a);
+  gl_FragColor = vec4(vec3(0.5, 0.8, 1.0) * a, a);
 }`;
 const PLASMA_FS = `
 uniform sampler2D tN; uniform float uT, uPow, uAsp; varying vec2 vUv;
@@ -577,7 +577,7 @@ function makeBolts(g, n, sc = 1) {
     m.frustumCulled = false; g.add(m);
     return { m, pos, w };
   };
-  const core = make(0.012 * sc, '#ffffff', 1), mid = make(0.026 * sc, '#b8d8ff', 0.5), glow = make(0.06 * sc, '#6a4aff', 0.22);
+  const core = make(0.012 * sc, '#ffffff', 1), mid = make(0.026 * sc, '#c8ecff', 0.5), glow = make(0.06 * sc, '#4aa8ff', 0.22);
   const A = new THREE.Vector3(), B = new THREE.Vector3(), D = new THREE.Vector3(), U = new THREE.Vector3(), V = new THREE.Vector3(), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
   function seg(layer, q, a, b, wk = 1) {
     A.copy(a); B.copy(b); D.subVectors(B, A).normalize();
