@@ -147,11 +147,7 @@ export const POMMELS = ['none', 'ball', 'disc', 'spike', 'gem', 'ring'];
 export const AURAS = [
   { id: 'none', name: 'NONE' },
   { id: 'flame', name: 'FLAME', color: '#ff8a2a' },
-  { id: 'lightning', name: 'BOLTS', color: '#9fe0ff' },
-  { id: 'arcs', name: 'ARCS', color: '#b8d8ff' },
-  { id: 'plasma', name: 'PLASMA', color: '#6ae0ff' },
-  { id: 'coil', name: 'COIL', color: '#c8e8ff' },
-  { id: 'static', name: 'STATIC', color: '#e0f0ff' },
+  { id: 'lightning', name: 'LIGHTNING', color: '#9fe0ff' },
   { id: 'water', name: 'WATER', color: '#4aa8ff' },
   { id: 'wind', name: 'WIND', color: '#d8f0e8' },
   { id: 'frost', name: 'FROST', color: '#bfe8ff' },
@@ -362,7 +358,7 @@ export function buildForged(spec) {
   g.userData.bladeMat = metal;
   // the aura, along the business end
   if (spec.aura && spec.aura !== 'none' && g.userData.auraBox) {
-    const auraTick = attachAura(g, spec.aura === 'flame2' ? 'flame' : spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1);
+    const auraTick = attachAura(g, ({ flame2: 'flame', arcs: 'lightning', plasma: 'lightning', coil: 'lightning', static: 'lightning' })[spec.aura] || spec.aura, g.userData.auraBox, spec.auraPower ?? 1, spec.auraSize ?? 1);
     const base = g.userData.tick;
     g.userData.tick = t => { if (base) base(t); auraTick(t); };
   }

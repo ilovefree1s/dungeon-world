@@ -112,10 +112,11 @@ function render() {
   $('forge').querySelector('.panel').classList.toggle('drawing', drawable && !!s.shape);
   if (renderer) sizePreview();
   if (!drawable) s.shape = null;
-  seg('fShape', [['preset', 'OFF'], ['points', 'DRAG CORNERS'], ['draw', 'FREEHAND'], ['erase', 'ERASER']], s.shape ? shapeMode : 'preset', v => {
+  seg('fShape', [['preset', 'OFF'], ['points', 'DRAG CORNERS'], ['draw', 'FREEHAND']], s.shape ? (shapeMode === 'erase' ? eraseFrom : shapeMode) : 'preset', v => {
     if (v === 'preset') { s.shape = null; }
     else { if (!s.shape) s.shape = presetShape(s); shapeMode = v; }
   });
+  $('fErase').classList.toggle('on', shapeMode === 'erase');
   $('fHeadRow').hidden = drawable && !!s.shape;
   if (s.shape) { pad.set(s.shape, shapeMode); $('fMirror').classList.toggle('on', !!s.shape.mirror); $('fPadHint').textContent = shapeMode === 'draw' ? 'TRACE THE SILHOUETTE IN ONE STROKE' : shapeMode === 'erase' ? 'RUB OUT WHATEVER YOU DRAG OVER' : 'DRAG THE CORNERS · CLICK AN EDGE TO ADD ONE · DOUBLE-CLICK ONE TO REMOVE IT'; }
   $('fLen').value = s.length; $('fHilt').value = s.gripSize ?? s.hilt ?? 1; $('fGuardSize').value = s.guardSize ?? s.hilt ?? 1; $('fPommelSize').value = s.pommelSize ?? s.hilt ?? 1; $('fWid').value = s.width; $('fPow').value = s.auraPower ?? 1; $('fSize').value = s.auraSize ?? 1;
@@ -141,7 +142,7 @@ function render() {
   persist();
   rebuild();
 }
-let wired = false, pad = null, shapeMode = 'points';
+let wired = false, pad = null, shapeMode = 'points', eraseFrom = 'points';
 function wire() {
   if (wired) return; wired = true;
   pad = new ShapePad($('fPad'), (shape, live) => { rebuild(); if (!live) persist(); });
@@ -164,6 +165,8 @@ function wire() {
   $('fShapeReset').addEventListener('click', () => { forge.spec.shape = presetShape(forge.spec); sfx('pickup'); render(); });
   $('fSmooth').addEventListener('click', () => { if (!forge.spec.shape) return; pad.smooth(); sfx('pickup'); });
   $('fBrush').addEventListener('input', e => { pad.brush = +e.target.value; pad.draw(); });
+  // the eraser, by the brush slider: a toggle over whichever drawing mode was on
+  $('fErase').addEventListener('click', () => { if (shapeMode === 'erase') shapeMode = eraseFrom; else { eraseFrom = shapeMode === 'draw' ? 'draw' : 'points'; shapeMode = 'erase'; } render(); });
   $('fMorePts').addEventListener('click', () => { if (shapeMode !== 'points') { shapeMode = 'points'; render(); } pad.addPoints(); sfx('pickup'); });
   $('fSpin').addEventListener('click', () => { spin = spin ? 0 : 1; if (spin) tilt = 0; $('fSpin').classList.toggle('on', !!spin); $('fSpin').textContent = spin ? 'SPINNING' : 'STILL'; });
   $('fLen').addEventListener('input', e => { forge.spec.length = +e.target.value; rebuild(); });

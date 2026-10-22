@@ -53,8 +53,8 @@ with sync_playwright() as pw:
     check(n == 400, f'every type, head and material combination builds ({n})')
     n = page.evaluate("""(async () => { const K = await import('./src/weaponkit.js'); let n = 0;
       for (const a of K.AURAS) for (const t of ['sword', 'staff', 'bow']) { const s = K.defaultSpec(); s.type = t; s.head = K.TYPES.find(x => x.id === t).heads[0]; s.aura = a.id; const g = K.buildForged(s); if (a.id !== 'none' && !g.userData.tick) throw new Error('no aura tick'); if (g.userData.tick) { g.userData.tick(1); g.userData.tick(1.05); } n++; } return n; })()""")
-    check(n == 36, f'every aura builds and ticks on a blade, a staff and a bow ({n})')
-    check(page.evaluate("document.querySelectorAll('#fAura button').length") == 12, 'twelve aura choices')
+    check(n == 24, f'every aura builds and ticks on a blade, a staff and a bow ({n})')
+    check(page.evaluate("document.querySelectorAll('#fAura button').length") == 8, 'eight aura choices')
     # drawing the blade: POINTS (drag a corner) and DRAW (trace a silhouette)
     page.evaluate("[...document.querySelectorAll('#fType button')].find(b => b.dataset.v === 'sword').click()"); frames(2)
     page.evaluate("[...document.querySelectorAll('#fShape button')].find(b => b.dataset.v === 'points').click()"); frames(2)
@@ -76,7 +76,7 @@ with sync_playwright() as pw:
     sh3 = page.evaluate('__dw.forge.spec.shape')
     check(len(sh3['pts']) >= 4 and max(p[0] for p in sh3['pts']) > 0.5, f'a traced silhouette becomes a wide leaf blade ({len(sh3["pts"])} corners, widest {max(p[0] for p in sh3["pts"]):.2f})')
     # the eraser carves a bite out of the edge; SMOOTH rounds the corners
-    page.evaluate("[...document.querySelectorAll('#fShape button')].find(b => b.dataset.v === 'erase').click()"); frames(2)
+    page.evaluate("document.getElementById('fErase').click()"); frames(2)
     ne0 = page.evaluate('__dw.forge.spec.shape.pts.length')
     ex = page.evaluate("(() => { const p = __dw.forge.spec.shape.pts, r = document.getElementById('fPad').getBoundingClientRect(); const q = p[Math.floor(p.length / 2)]; return [r.left + r.width / 2 + q[0] * r.width * 0.36, r.top + r.height - 28 - q[1] * (r.height - 56)]; })()")
     page.mouse.move(ex[0] + 10, ex[1]); page.mouse.down(); page.mouse.move(ex[0] - 10, ex[1] - 20, steps=5); page.mouse.up(); frames(2)
