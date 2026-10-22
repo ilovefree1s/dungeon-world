@@ -648,6 +648,58 @@ const BUILD = {
       Mo.flush();
     };
   },
+  // ---------------------------------------------------------------- SHADOW 2: tongues
+  // like the fire's tongues, rising off the blade: half of them black (darkening what's behind), half violet, with
+  // the wisps and motes of the first shadow
+  shadow2(g, bx, power, { span, wide, cx, cz, size: tongue }) {
+    const [x0, x1, y0, y1, z0, z1] = bx;
+    const mk = (N, black) => {
+      const P = pointCloud(g, N, tongueTex()), life = new Float32Array(N), max = new Float32Array(N), vel = new Float32Array(N * 3), base = new Float32Array(N), rot = new Float32Array(N);
+      if (black) { P.mat.blending = THREE.NormalBlending; P.mat.fragmentShader = `uniform sampler2D tM; varying vec3 vCol; varying float vA, vR;
+void main(){ vec2 c = gl_PointCoord - 0.5; float cs = cos(vR), sn = sin(vR); vec2 q = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs) + 0.5; float m = texture2D(tM, q).a; gl_FragColor = vec4(vCol, m * vA); }`; P.mat.needsUpdate = true; P.pts.renderOrder = 1; }
+      const spawn = i => { const o = i * 3; P.pos[o] = x0 + rnd() * (x1 - x0); P.pos[o + 1] = y0 + rnd() * (y1 - y0); P.pos[o + 2] = rnd() < 0.5 ? z0 - 0.01 : z1 + 0.01; if (rnd() < 0.3) P.pos[o] = rnd() < 0.5 ? x0 - 0.01 : x1 + 0.01; max[i] = 0.5 + rnd() * 0.6; life[i] = 0; vel[o] = (rnd() - 0.5) * 0.25; vel[o + 1] = 0; vel[o + 2] = (rnd() - 0.5) * 0.25; base[i] = (0.14 + rnd() * 0.12) * tongue; rot[i] = (rnd() - 0.5) * 0.7; };
+      for (let i = 0; i < N; i++) { spawn(i); life[i] = rnd() * max[i]; }
+      return { P, life, max, vel, base, rot, N, black };
+    };
+    const n = Math.round((20 + span * 40) * Math.min(2, power));
+    const clouds = [mk(n, true), mk(n, false)];
+    const c = new THREE.Color(), ink = new THREE.Color('#06030c'), ink2 = new THREE.Color('#1a0a2e'), vio = new THREE.Color('#c070ff'), vio2 = new THREE.Color('#4a1090');
+    const rise = 0.7 + power * 0.4;
+    // the wisps and motes
+    const wisps = [];
+    for (let i = 0; i < 3; i++) {
+      const u = { uT: { value: 0 }, uPow: { value: power }, uPhase: { value: i }, uCol: { value: new THREE.Color('#b060ff') } };
+      const m = new THREE.Mesh(helixGeo(bx, 1.2 + i * 0.4, i * 2.1, 0.03, 64, 1.1 + i * 0.15), sheet(HELIX_FS, u)); m.frustumCulled = false; g.add(m); wisps.push(m);
+    }
+    const motes = cloud(g, Math.round(24 * power), { size: 0.07, tex: softTex(), colors: ['#d08cff', '#5a1aa0'] });
+    const spawnM = i => { inBox(motes, i, bx); motes.max[i] = 0.8 + rnd() * 1; motes.life[i] = 0; jitter(motes, i, 0.3); motes.ph[i] = rnd() * 6.28; };
+    for (let i = 0; i < motes.N; i++) { spawnM(i); motes.life[i] = rnd() * motes.max[i]; }
+    return (t, dt, up) => {
+      for (const m of wisps) m.material.uniforms.uT.value = -t * 0.6;
+      for (const C of clouds) {
+        const { P, life, max, vel, base, rot, N, black } = C;
+        P.mat.uniforms.uUpL.value.copy(up);
+        for (let i = 0; i < N; i++) {
+          life[i] += dt; if (life[i] >= max[i]) { const o = i * 3; P.pos[o] = x0 + rnd() * (x1 - x0); P.pos[o + 1] = y0 + rnd() * (y1 - y0); P.pos[o + 2] = rnd() < 0.5 ? z0 - 0.01 : z1 + 0.01; life[i] = 0; max[i] = 0.5 + rnd() * 0.6; vel[o] = (rnd() - 0.5) * 0.25; vel[o + 2] = (rnd() - 0.5) * 0.25; base[i] = (0.14 + rnd() * 0.12) * tongue; }
+          const k = life[i] / max[i], o = i * 3, sw = Math.sin(t * 6 + i) * 0.15, v = rise * (0.6 + k * 0.8);
+          P.pos[o] += (vel[o] + up.x * v + sw * (1 - Math.abs(up.x))) * dt; P.pos[o + 1] += up.y * v * dt; P.pos[o + 2] += (vel[o + 2] + up.z * v + sw * 0.5 * (1 - Math.abs(up.z))) * dt;
+          P.size[i] = base[i] * (0.5 + 1.4 * Math.sin(Math.min(1, k * 1.15) * Math.PI)) * (k > 0.6 ? 1 - (k - 0.6) * 1.5 : 1) * Math.max(0, 1 - Math.max(0, k - 0.85) * 6.6);
+          if (black) c.copy(ink).lerp(ink2, k); else c.copy(vio).lerp(vio2, k);
+          P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b;
+          P.alpha[i] = Math.min(1, k * 6) * (1 - k * k) * (black ? 0.85 : 0.7 + 0.3 * Math.min(1, power)); P.rot[i] = rot[i];
+        }
+        P.flush();
+      }
+      const Mo = motes;
+      for (let i = 0; i < Mo.N; i++) {
+        Mo.life[i] += dt; if (Mo.life[i] >= Mo.max[i]) spawnM(i);
+        const k = Mo.life[i] / Mo.max[i], o = i * 3, sw = Math.sin(t * 3 + Mo.ph[i]) * 0.3;
+        Mo.pos[o] += (Mo.vel[o] * 0.4 - up.x * 0.35 * k + sw * 0.2) * dt; Mo.pos[o + 1] += (Mo.vel[o + 1] * 0.4 - up.y * 0.35 * k) * dt; Mo.pos[o + 2] += (Mo.vel[o + 2] * 0.4 - up.z * 0.35 * k + sw * 0.2) * dt;
+        Mo.paint(i, k, Math.sin(k * Math.PI) * 0.9);
+      }
+      Mo.flush();
+    };
+  },
   // ---------------------------------------------------------------- HOLY
   holy(g, bx, power, { span, wide, cx, cz }) {
     const [x0, x1, y0, y1, z0, z1] = bx;

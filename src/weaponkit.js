@@ -155,6 +155,7 @@ export const AURAS = [
   { id: 'blizzard', name: 'BLIZZARD', color: '#eaf6ff' },
   { id: 'shards', name: 'SHARDS', color: '#cfe8ff' },
   { id: 'shadow', name: 'SHADOW', color: '#7a3cff' },
+  { id: 'shadow2', name: 'SHADOW 2', color: '#7a3cff' },
   { id: 'holy', name: 'HOLY', color: '#ffe08a' },
 ];
 export const ACCENTS = [['#ff3b3b', 'RUBY'], ['#3b8cff', 'SAPPHIRE'], ['#4fd36a', 'EMERALD'], ['#ffd23b', 'TOPAZ'], ['#c25cff', 'AMETHYST'], ['#ffffff', 'DIAMOND'], ['#ff8c2a', 'AMBER'], ['#1b1a1d', 'ONYX']];
