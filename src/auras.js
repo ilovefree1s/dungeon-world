@@ -1,6 +1,8 @@
 // the weapon auras: each one its own build, not a recolored cloud of dots.
 //   flame     fire sheets licking up the blade (a noise-shaped shader on crossed planes), embers rising
 //   lightning jagged forking bolts with a hot white core and a violet glow, an ion haze that flashes with them, sparks
+//   arcs / plasma / coil / static: four more takes on lightning (slow writhing arcs; a filament skin; coil rings with
+//             jumps between them; a crackle of tiny sparks)
 //   water     a rippling water sheath wrapped around the blade, drops running off it, falling world-down
 //   wind      helix streaks racing around the blade, with leaves caught in the gust
 //   frost     ice crystals (real six-pointed ones) grown on the blade that grow and shatter, snow, glints
@@ -175,6 +177,30 @@ void main(){
   float a = (1.0 - cx * cx) * smoothstep(0.3, 0.8, n) * (0.15 + 0.55 * uFlash) * (0.4 + 0.6 * uPow) * min(1.0, uPow);
   gl_FragColor = vec4(vec3(0.55, 0.65, 1.0) * a, a);
 }`;
+const PLASMA_FS = `
+uniform sampler2D tN; uniform float uT, uPow, uAsp; varying vec2 vUv;
+void main(){
+  // two drifting noise fields; where they nearly agree, a thin bright filament: a plasma skin
+  float n1 = texture2D(tN, vec2(vUv.x * 1.5 * uAsp + uT * 0.35, vUv.y * 2.2 - uT * 0.5)).r;
+  float n2 = texture2D(tN, vec2(vUv.x * 2.3 * uAsp - uT * 0.27, vUv.y * 1.4 + uT * 0.33)).r;
+  float d = abs(n1 - n2);
+  float fil = 1.0 - smoothstep(0.0, 0.045 + 0.02 * uPow, d);
+  float cx = abs(vUv.x * 2.0 - 1.0);
+  float edge = 1.0 - cx * cx * cx;
+  float a = (fil * 0.9 + smoothstep(0.55, 0.9, n1) * 0.18) * edge * (0.5 + 0.5 * uPow) * min(1.0, uPow);
+  vec3 col = mix(vec3(0.25, 0.75, 1.0), vec3(1.0), fil * 0.8);
+  gl_FragColor = vec4(col * a, a);
+}`;
+const DASH_FS = `
+uniform float uT, uPow, uPhase; uniform vec3 uCol; varying vec2 vUv;
+void main(){
+  // a coil: bright dashes chasing around the ring, with a soft gap between
+  float p = fract(vUv.x * 2.0 + uT * 0.9 + uPhase);
+  float dash = smoothstep(0.0, 0.12, p) * smoothstep(0.6, 0.3, p);
+  float ey = 1.0 - abs(vUv.y * 2.0 - 1.0);
+  float a = (0.25 + 0.75 * dash) * ey * (0.5 + 0.5 * uPow) * min(1.0, uPow);
+  gl_FragColor = vec4(uCol * a, a);
+}`;
 const HELIX_FS = `
 uniform float uT, uPow, uPhase; uniform vec3 uCol; varying vec2 vUv;
 void main(){
@@ -285,6 +311,90 @@ const BUILD = {
         S.paint(i, k, (1 - k) * (1 - k) * (0.5 + flash * 0.8));
       }
       S.flush();
+    };
+  },
+  // ---------------------------------------------------------------- LIGHTNING, four more ways
+  // ARCS: two or three long arcs that writhe slowly up the blade (their joints drift toward new spots instead of flickering)
+  arcs(g, bx, power, { span, wide, cx, cz }) {
+    const n = Math.max(1, Math.round(1 + power * 1.2)), J = 10;
+    const bolts = makeBolts(g, n + 2, Math.min(1, Math.max(0.3, span / 1.1)));
+    const arcs = [];
+    for (let a = 0; a < n; a++) { const pts = [], tgt = []; for (let i = 0; i <= J; i++) { const p = onSkin(bx, i / J); pts.push(p); tgt.push(p.clone()); } arcs.push({ pts, tgt, next: rnd() * 0.4 }); }
+    const haze = new THREE.Mesh(crossedPlanes(bx, 0.08, 0.08 + 0.05 * power), sheet(HAZE_FS, { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 0.7 }, uAsp: { value: 1 }, uFlash: { value: 0.35 } })); haze.frustumCulled = false; g.add(haze);
+    const lines = arcs.map(a => ({ pts: a.pts, w: 1 }));
+    return (t, dt) => {
+      haze.material.uniforms.uT.value = t;
+      for (const a of arcs) {
+        if ((a.next -= dt) <= 0) { a.next = 0.25 + rnd() * 0.35; for (let i = 0; i <= J; i++) if (rnd() < 0.5) a.tgt[i].copy(onSkin(bx, i / J)); }
+        const k = 1 - Math.exp(-7 * dt);
+        for (let i = 0; i <= J; i++) a.pts[i].lerp(a.tgt[i], k);
+      }
+      bolts.drawLines(lines, 0.8 + 0.2 * Math.sin(t * 17));
+    };
+  },
+  // PLASMA: no bolts; a skin of cyan filaments shimmering over the blade, a rim that flares now and then
+  plasma(g, bx, power, { span, wide, cx, cz }) {
+    const side = 0.06 + 0.05 * power;
+    const u = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power }, uAsp: { value: (wide + side * 2) / (span + 0.1) } };
+    const skin = new THREE.Mesh(crossedPlanes(bx, 0.1, side), sheet(PLASMA_FS, u)); skin.frustumCulled = false; g.add(skin);
+    const sparks = cloud(g, Math.round(8 * power), { size: 0.03, tex: glintTex(), colors: ['#ffffff', '#6ae0ff'] });
+    for (let i = 0; i < sparks.N; i++) { inBox(sparks, i, bx); sparks.max[i] = 0.2 + rnd() * 0.3; sparks.life[i] = rnd() * sparks.max[i]; jitter(sparks, i, 1.2); }
+    let flare = 0;
+    return (t, dt) => {
+      if (rnd() < dt * 1.5) flare = 1; flare = Math.max(0, flare - dt * 5);
+      u.uT.value = t; u.uPow.value = power * (1 + flare * 0.8);
+      const S = sparks;
+      for (let i = 0; i < S.N; i++) { S.life[i] += dt; if (S.life[i] >= S.max[i]) { inBox(S, i, bx); S.life[i] = 0; jitter(S, i, 1.2); } const k = S.life[i] / S.max[i], o = i * 3; S.pos[o] += S.vel[o] * dt; S.pos[o + 1] += S.vel[o + 1] * dt; S.pos[o + 2] += S.vel[o + 2] * dt; S.paint(i, k, (1 - k) * 0.7); }
+      S.flush();
+    };
+  },
+  // COIL: glowing rings spaced up the blade with dashes chasing around them, and short bolts jumping ring to ring
+  coil(g, bx, power, { span, wide, cx, cz }) {
+    const [x0, x1, y0, y1, z0, z1] = bx, n = Math.max(2, Math.round(2 + span * 2.5)), r = wide / 2 + 0.05 + 0.03 * power;
+    const rings = [], ys = [];
+    for (let i = 0; i < n; i++) {
+      const y = y0 + 0.05 + (span - 0.1) * i / (n - 1); ys.push(y);
+      const m = new THREE.Mesh(ringGeo(r, 0.035 + 0.015 * power, 40), sheet(DASH_FS, { uT: { value: 0 }, uPow: { value: power }, uPhase: { value: i * 0.37 }, uCol: { value: new THREE.Color(i % 2 ? '#9fd0ff' : '#e0f4ff') } }));
+      m.position.set(cx, y, cz); m.frustumCulled = false; m.userData.dir = i % 2 ? -1 : 1; g.add(m); rings.push(m);
+    }
+    const bolts = makeBolts(g, 3, 0.7);
+    let flick = 0; const lines = [];
+    return (t, dt) => {
+      for (const m of rings) m.material.uniforms.uT.value = t * (m.userData.dir || 1);
+      if ((flick -= dt) <= 0) {
+        flick = 0.12 + rnd() * 0.2; lines.length = 0;
+        const jumps = 1 + Math.floor(rnd() * Math.min(3, n - 1));
+        for (let j = 0; j < jumps; j++) {
+          const i = Math.floor(rnd() * (n - 1)), a = rnd() * 6.28, b = a + (rnd() - 0.5) * 1.2, pts = [];
+          for (let k = 0; k <= 4; k++) { const u = k / 4, ang = a + (b - a) * u, rr = r + (k && k < 4 ? (rnd() - 0.5) * 0.08 : 0); pts.push(new THREE.Vector3(cx + Math.cos(ang) * rr, ys[i] + (ys[i + 1] - ys[i]) * u + (k && k < 4 ? (rnd() - 0.5) * 0.04 : 0), cz + Math.sin(ang) * rr)); }
+          lines.push({ pts, w: 0.8 });
+        }
+        bolts.drawLines(lines, 0.6 + rnd() * 0.4);
+      }
+    };
+  },
+  // STATIC: a crackle of many tiny sparks popping all over the blade's skin, sporadic, with a faint charge haze
+  static(g, bx, power, { span, wide, cx, cz }) {
+    const N = Math.max(3, Math.round(6 + power * 10));
+    const bolts = makeBolts(g, Math.ceil(N / 3), 0.5);
+    const haze = new THREE.Mesh(crossedPlanes(bx, 0.06, 0.06 + 0.04 * power), sheet(HAZE_FS, { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 0.5 }, uAsp: { value: 1 }, uFlash: { value: 0.2 } })); haze.frustumCulled = false; g.add(haze);
+    const sparks = [];
+    for (let i = 0; i < N; i++) sparks.push({ pts: [], w: 0.7, life: 0 });
+    const lines = [];
+    let flick = 0;
+    return (t, dt) => {
+      haze.material.uniforms.uT.value = t;
+      if ((flick -= dt) <= 0) {
+        flick = 0.05 + rnd() * 0.05; lines.length = 0;
+        for (const sp of sparks) {
+          if ((sp.life -= flick) <= 0) {
+            if (rnd() < 0.45) { sp.life = 0.06 + rnd() * 0.1; const o = onSkin(bx, rnd()); sp.pts = [o]; let p = o; const len = 2 + Math.floor(rnd() * 2); for (let k = 0; k < len; k++) { p = p.clone(); p.x += (rnd() - 0.5) * 0.09; p.y += (rnd() - 0.5) * 0.09; p.z += (rnd() - 0.5) * 0.06; sp.pts.push(p); } }
+            else { sp.life = 0.03; sp.pts = []; }
+          }
+          if (sp.pts.length > 1) lines.push(sp);
+        }
+        bolts.drawLines(lines, 0.9);
+      }
     };
   },
   // ---------------------------------------------------------------- WATER
@@ -457,7 +567,7 @@ const BUILD = {
 // n jagged paths of up to 9 segments plus forks branching off them; each segment two crossed quads;
 // a thin hot core, a violet glow around it
 function makeBolts(g, n, sc = 1) {
-  const SEG = 9, FORK = 4, Q = n * (SEG + FORK * 3) * 2;
+  const SEG = 9, FORK = 4, Q = n * (SEG + FORK * 3) * 2;   // (quads: two per segment, one for each crossed strip)
   const make = (w, color, opacity) => {
     const geo = new THREE.BufferGeometry();
     const pos = new Float32Array(Q * 4 * 3), idx = new Uint16Array(Q * 6);
@@ -511,5 +621,20 @@ function makeBolts(g, n, sc = 1) {
     core.m.geometry.attributes.position.needsUpdate = true; mid.m.geometry.attributes.position.needsUpdate = true; glow.m.geometry.attributes.position.needsUpdate = true;
     const k = Math.min(1, 0.5 + power * 0.5);
     core.m.material.opacity = (0.7 + rnd() * 0.3) * k; mid.m.material.opacity = (0.4 + rnd() * 0.3) * k; glow.m.material.opacity = (0.25 + rnd() * 0.2) * k;
+  },
+  // any polylines at all: [{ pts: [Vector3...], w }] (w scales the width), drawn on the same three layers
+  drawLines(lines, bright = 1) {
+    core.pos.fill(0); mid.pos.fill(0); glow.pos.fill(0);
+    let q = 0;
+    for (const L of lines) for (let i = 0; i + 1 < L.pts.length && q + 2 <= Q; i++) { seg(core, q, L.pts[i], L.pts[i + 1], L.w || 1); seg(mid, q, L.pts[i], L.pts[i + 1], L.w || 1); seg(glow, q, L.pts[i], L.pts[i + 1], L.w || 1); q += 2; }
+    core.m.geometry.attributes.position.needsUpdate = true; mid.m.geometry.attributes.position.needsUpdate = true; glow.m.geometry.attributes.position.needsUpdate = true;
+    core.m.material.opacity = 0.95 * bright; mid.m.material.opacity = 0.55 * bright; glow.m.material.opacity = 0.3 * bright;
   } };
+}
+// a point on the surface of the box (the head's skin, not its inside)
+function onSkin(bx, t) {
+  const [x0, x1, y0, y1, z0, z1] = bx;
+  let x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0);
+  if (rnd() < 0.5) x = rnd() < 0.5 ? x0 - 0.02 : x1 + 0.02; else z = rnd() < 0.5 ? z0 - 0.02 : z1 + 0.02;
+  return new THREE.Vector3(x, y0 + (y1 - y0) * t, z);
 }
