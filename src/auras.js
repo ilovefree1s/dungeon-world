@@ -82,11 +82,13 @@ function ringGeo(r, w, segs = 48) {
   return g;
 }
 // a ribbon along a helix around the box, uv.x along it
-function helixGeo(bx, turns, phase, w, segs = 64, rScale = 1) {
-  const [x0, x1, y0, y1, z0, z1] = bx, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, r = (Math.max(x1 - x0, z1 - z0) / 2 + 0.07) * rScale;
+// (wild: { amp, freq, ph } lets the radius swell and shrink along the way, so a streak swings out from the blade and back)
+function helixGeo(bx, turns, phase, w, segs = 64, rScale = 1, wild = null) {
+  const [x0, x1, y0, y1, z0, z1] = bx, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, r0 = (Math.max(x1 - x0, z1 - z0) / 2 + 0.07) * rScale;
   const pos = [], uv = [], idx = [];
   for (let i = 0; i <= segs; i++) {
     const t = i / segs, a = phase + t * turns * Math.PI * 2, y = y0 - 0.05 + t * (y1 - y0 + 0.1);
+    const r = wild ? r0 * (1 + wild.amp * Math.max(0, Math.sin(t * wild.freq * Math.PI * 2 + wild.ph))) : r0;
     const c = Math.cos(a), s = Math.sin(a);
     pos.push(cx + c * r, y - w / 2, cz + s * r, cx + c * r, y + w / 2, cz + s * r);
     uv.push(t, 0, t, 1);
@@ -433,14 +435,16 @@ const BUILD = {
     const n = Math.max(1, Math.round(power * 3.33));
     for (let i = 0; i < n; i++) {
       const u = { uT: { value: 0 }, uPow: { value: power }, uPhase: { value: i / n * 3 }, uCol: { value: new THREE.Color(i % 2 ? '#e8fff6' : '#c8ecff') } };
-      const m = new THREE.Mesh(helixGeo(bx, 1.6 + i * 0.3, i / n * Math.PI * 2, 0.05 + 0.015 * power, 72, 1 + i * 0.12), sheet(HELIX_FS, u)); m.frustumCulled = false; g.add(m); streaks.push(m);
+      const wild = i % 2 ? { amp: 0.8 + rnd() * 1.2, freq: 0.5 + rnd() * 0.7, ph: rnd() * 6.28 } : null;
+      const m = new THREE.Mesh(helixGeo(bx, 1.6 + i * 0.3, i / n * Math.PI * 2, (0.05 + 0.015 * power) * 0.7, 72, 1 + i * 0.12, wild), sheet(HELIX_FS, u)); m.frustumCulled = false; g.add(m); streaks.push(m);
     }
     // and a flock of smaller ones, thinner and quicker: half racing up the blade, half racing down
     const small = Math.round(power * 8.3);
     for (let i = 0; i < small; i++) {
       const dir = i % 2 ? -1 : 1;
       const u = { uT: { value: 0 }, uPow: { value: power * 0.8 }, uPhase: { value: rnd() * 3 }, uCol: { value: new THREE.Color(i % 3 ? '#dffff4' : '#eaf6ff') } };
-      const m = new THREE.Mesh(helixGeo(bx, (1.2 + rnd() * 1.6) * (rnd() < 0.5 ? -1 : 1), rnd() * Math.PI * 2, 0.018 + 0.006 * power, 72, 0.9 + rnd() * 0.5), sheet(HELIX_FS, u)); m.frustumCulled = false; m.userData.dir = dir * (1.3 + rnd() * 0.8); g.add(m); streaks.push(m);
+      const wild = rnd() < 0.7 ? { amp: 0.6 + rnd() * 2.4, freq: 0.4 + rnd() * 1.2, ph: rnd() * 6.28 } : null;
+      const m = new THREE.Mesh(helixGeo(bx, (1.2 + rnd() * 1.6) * (rnd() < 0.5 ? -1 : 1), rnd() * Math.PI * 2, (0.018 + 0.006 * power) * 0.7, 72, 0.9 + rnd() * 0.5, wild), sheet(HELIX_FS, u)); m.frustumCulled = false; m.userData.dir = dir * (1.3 + rnd() * 0.8); g.add(m); streaks.push(m);
     }
     // a wider, fainter sleeve of air
     const sleeveU = { tN: { value: noiseTex() }, uT: { value: 0 }, uPow: { value: power * 0.5 }, uAsp: { value: 1 }, uFlash: { value: 0.3 } };
