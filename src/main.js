@@ -16,6 +16,7 @@ import { Bodies, rollDrop } from './loot.js';
 import { statsOf } from './weaponkit.js';
 import { Turntable } from './turntable.js';
 import { AURA_VIEW } from './auras.js';
+import { VERSION } from './version.js';
 import { burst, ring, stepFx } from './fx.js';
 import { grassUniforms } from './flora.js';
 import { updateAmbience } from './ambience.js';
@@ -383,6 +384,7 @@ function adapt(dt, ms) {
 addEventListener('resize', resize);
 addEventListener('orientationchange', () => setTimeout(resize, 200));
 initTouch($('gl'));
+$('ver').textContent = VERSION;
 onFirstInput(startAudio);
 resize();
 requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });
