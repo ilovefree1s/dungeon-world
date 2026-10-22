@@ -579,7 +579,7 @@ const BUILD = {
         ang[i] += w[i] * dt; y[i] += (Math.sin(t * 1.7 + ph[i]) * 0.3 - up.y * 0.15) * dt; if (y[i] < y0 - 0.15) y[i] = y1 + 0.15; if (y[i] > y1 + 0.2) y[i] = y0 - 0.1;
         const r = rad[i] + 0.06 * Math.sin(t * 3 + ph[i]);
         P.pos[o] = cx + Math.cos(ang[i]) * r; P.pos[o + 1] = y[i]; P.pos[o + 2] = cz + Math.sin(ang[i]) * r;
-        P.size[i] = big[i] ? 0.12 : 0.05 + 0.02 * Math.sin(t * 5 + ph[i]);
+        P.size[i] = big[i] ? 0.06 : 0.025 + 0.01 * Math.sin(t * 5 + ph[i]);
         c.copy(white).lerp(blue, big[i] ? 0.1 : 0.5); P.col[o] = c.r; P.col[o + 1] = c.g; P.col[o + 2] = c.b;
         P.alpha[i] = (0.4 + 0.4 * Math.sin(ang[i] * 3 + ph[i])) * (0.5 + 0.5 * Math.min(1, power)); P.rot[i] = 0;
       }
