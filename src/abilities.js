@@ -6,6 +6,7 @@
 // ============================================================================
 import { THREE, scene, camera, TEX, V3 } from './engine.js';
 import { heroDamage, aimPoint, stats } from './combat.js';
+import { PLAIN_TIME } from './weaponkit.js';
 import { burst, ring } from './fx.js';
 import { sfx } from './audio.js';
 
@@ -46,7 +47,7 @@ const hitAll = (ctx, list, mult, from, stun = 0) => {
 // ---------------------------------------------------------------- the kits
 export const KITS = [
   // ---- warrior
-  { name: 'WARRIOR', attack: { name: 'SWING', cd: 0.55, cdOf: p => 0.55 / (p.forged ? p.forged.spd : 1), use(ctx) {
+  { name: 'WARRIOR', attack: { name: 'SWING', cd: 1.5, cdOf: p => p.forged ? p.forged.time : PLAIN_TIME[0], use(ctx) {
       const p = ctx.player, dir = camFlat(p), f = p.forged;
       faceTo(p, dir); p.swingT = 0; p.whirl = false; p.swingN = (p.swingN | 0) + 1;
       sfx('swing');
@@ -81,7 +82,7 @@ export const KITS = [
         } },
     ] },
   // ---- mage
-  { name: 'MAGE', attack: { name: 'BOLT', cd: 0.34, cdOf: p => 0.34 / (p.forged ? p.forged.spd : 1), use(ctx) {
+  { name: 'MAGE', attack: { name: 'BOLT', cd: 1.8, cdOf: p => p.forged ? p.forged.time : PLAIN_TIME[1], use(ctx) {
       const p = ctx.player, from = p.pos.clone(), f = p.forged; from.y += 3.8;
       const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0; p.castKind = 'bolt';
       // (a staff from the forge: its gem's color, its damage, how fast the bolt flies)
@@ -122,7 +123,7 @@ export const KITS = [
         } },
     ] },
   // ---- hunter
-  { name: 'HUNTER', attack: { name: 'SHOOT', cd: 0.3, cdOf: p => 0.3 / (p.forged ? p.forged.spd : 1), use(ctx) {
+  { name: 'HUNTER', attack: { name: 'SHOOT', cd: 1.6, cdOf: p => p.forged ? p.forged.time : PLAIN_TIME[2], use(ctx) {
       const p = ctx.player, from = p.pos.clone(), f = p.forged; from.y += 3.6;
       const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0; p.castKind = 'shot';
       // (the arrow flies when the string is loosed)
@@ -186,6 +187,8 @@ export class Abilities {
     }
   }
   // for the HUD: each slot's name, key and how much of its cooldown is left (0..1)
+  // the swing timer: how far the basic attack's time between swings has run (0 ready .. 1 just swung), and the time itself
+  swing() { const kit = this.kit(), p = this.ctx.player, t = kit.attack.cdOf ? kit.attack.cdOf(p) : kit.attack.cd; return { left: Math.max(0, this.atkCd / t), time: t }; }
   slots() { const kit = this.kit(); return kit.abilities.map((a, i) => ({ name: a.name, glyph: a.glyph, left: Math.max(0, this.cd[i] / a.cd) })); }
   reset() { this.cd.fill(0); this.atkCd = 0; this.timers.length = 0; }
 }

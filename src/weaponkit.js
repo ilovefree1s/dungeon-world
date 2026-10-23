@@ -122,16 +122,16 @@ export function shapeMass(shape) {
 // ---------------------------------------------------------------- the parts on offer
 // cls: who wields it (0 warrior, 1 mage, 2 hunter)
 export const TYPES = [
-  { id: 'sword', name: 'SWORD', cls: 0, heads: ['straight', 'leaf', 'curved', 'serrated'], dmg: 1, spd: 1, reach: 1 },
-  { id: 'greatsword', name: 'GREATSWORD', cls: 0, heads: ['straight', 'leaf', 'flamberge', 'cleaver'], dmg: 1.45, spd: 0.7, reach: 1.25 },
-  { id: 'dagger', name: 'DAGGER', cls: 0, heads: ['straight', 'curved', 'kris', 'needle'], dmg: 0.6, spd: 1.6, reach: 0.7 },
-  { id: 'axe', name: 'AXE', cls: 0, heads: ['single', 'double', 'bearded', 'crescent'], dmg: 1.3, spd: 0.8, reach: 1 },
-  { id: 'hammer', name: 'HAMMER', cls: 0, heads: ['block', 'maul', 'spiked', 'anvil'], dmg: 1.6, spd: 0.6, reach: 1.05 },
-  { id: 'mace', name: 'MACE', cls: 0, heads: ['flanged', 'ball', 'star', 'lantern'], dmg: 1.2, spd: 0.85, reach: 0.95 },
-  { id: 'staff', name: 'STAFF', cls: 1, heads: ['orb', 'crescent', 'claw', 'lantern'], dmg: 1, spd: 1, reach: 1 },
-  { id: 'wand', name: 'WAND', cls: 1, heads: ['gem', 'star', 'twist', 'skull'], dmg: 0.7, spd: 1.5, reach: 0.9 },
-  { id: 'bow', name: 'BOW', cls: 2, heads: ['recurve', 'longbow', 'flat', 'horned'], dmg: 1, spd: 1, reach: 1 },
-  { id: 'crossbow', name: 'CROSSBOW', cls: 2, heads: ['light', 'heavy', 'repeater', 'siege'], dmg: 1.5, spd: 0.6, reach: 1.2 },
+  { id: 'sword', name: 'SWORD', cls: 0, heads: ['straight', 'leaf', 'curved', 'serrated'], dmg: 1, spd: 1, reach: 1, time: 1.5 },
+  { id: 'greatsword', name: 'GREATSWORD', cls: 0, heads: ['straight', 'leaf', 'flamberge', 'cleaver'], dmg: 1.45, spd: 0.7, reach: 1.25, time: 2.9 },
+  { id: 'dagger', name: 'DAGGER', cls: 0, heads: ['straight', 'curved', 'kris', 'needle'], dmg: 0.6, spd: 1.6, reach: 0.7, time: 1.0 },
+  { id: 'axe', name: 'AXE', cls: 0, heads: ['single', 'double', 'bearded', 'crescent'], dmg: 1.3, spd: 0.8, reach: 1, time: 2.1 },
+  { id: 'hammer', name: 'HAMMER', cls: 0, heads: ['block', 'maul', 'spiked', 'anvil'], dmg: 1.6, spd: 0.6, reach: 1.05, time: 3.4 },
+  { id: 'mace', name: 'MACE', cls: 0, heads: ['flanged', 'ball', 'star', 'lantern'], dmg: 1.2, spd: 0.85, reach: 0.95, time: 1.9 },
+  { id: 'staff', name: 'STAFF', cls: 1, heads: ['orb', 'crescent', 'claw', 'lantern'], dmg: 1, spd: 1, reach: 1, time: 1.8 },
+  { id: 'wand', name: 'WAND', cls: 1, heads: ['gem', 'star', 'twist', 'skull'], dmg: 0.7, spd: 1.5, reach: 0.9, time: 1.1 },
+  { id: 'bow', name: 'BOW', cls: 2, heads: ['recurve', 'longbow', 'flat', 'horned'], dmg: 1, spd: 1, reach: 1, time: 1.6 },
+  { id: 'crossbow', name: 'CROSSBOW', cls: 2, heads: ['light', 'heavy', 'repeater', 'siege'], dmg: 1.5, spd: 0.6, reach: 1.2, time: 2.6 },
 ];
 export const HERO_NAME = ['WARRIOR', 'MAGE', 'HUNTER'];
 export const typeOf = spec => TYPES.find(x => x.id === spec.type) || TYPES[0];
@@ -198,6 +198,8 @@ export const RARITIES = [
   { id: 'legendary', name: 'LEGENDARY', color: '#ffb020', mult: 1.5 },
 ];
 export const rarityOf = spec => RARITIES.find(r => r.id === spec.rarity) || RARITIES[0];
+// the plain weapons' attack times (a sword, a staff, a bow): what a forged one's damage is measured against
+export const PLAIN_TIME = [1.5, 1.8, 1.6];
 // ---------------------------------------------------------------- numbers
 // damage and speed as multipliers of the warrior's plain swing, reach in blocks
 export function statsOf(spec) {
@@ -210,7 +212,12 @@ export function statsOf(spec) {
   // (for staffs and bows the reach is how fast the shot flies)
   const shot = t.reach * (0.8 + spec.length * 0.2) * (1 + (rr - 1) * 0.3);
   const aura = AURAS.find(a => a.id === spec.aura);
-  return { dmg: +dmg.toFixed(2), spd: +spd.toFixed(2), reach: +reach.toFixed(1), shot: +shot.toFixed(2), glow: !!m.glow, cls: t.cls, color: aura && aura.color ? aura.color : ACCENTS[spec.accent % ACCENTS.length][0], aura: spec.aura || 'none' };
+  // the time between swings or shots, in seconds (1.0 light and quick .. 3.5 the heaviest two-handers): the type's
+  // own, slowed by length, width and a fat drawn blade, quickened by rarity; the plain weapon of each hero is its type's.
+  // a hit's damage scales with that time, so a slow weapon lands hard and a quick one nicks
+  const time = +Math.max(1, Math.min(3.5, t.time / (spd / t.spd))).toFixed(2);
+  const base = PLAIN_TIME[t.cls];
+  return { dmg: +(dmg * time / base).toFixed(2), spd: +spd.toFixed(2), time, reach: +reach.toFixed(1), shot: +shot.toFixed(2), glow: !!m.glow, cls: t.cls, color: aura && aura.color ? aura.color : ACCENTS[spec.accent % ACCENTS.length][0], aura: spec.aura || 'none' };
 }
 
 // ---------------------------------------------------------------- the model

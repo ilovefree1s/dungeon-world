@@ -13,7 +13,7 @@ import { Monsters, Bolts, stats, xpToNext, pickMonster } from './combat.js';
 import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollDrop } from './loot.js';
-import { statsOf } from './weaponkit.js';
+import { statsOf, PLAIN_TIME } from './weaponkit.js';
 import { Turntable } from './turntable.js';
 import { AURA_VIEW } from './auras.js';
 import { VERSION } from './version.js';
@@ -82,9 +82,10 @@ function openLoot(b) {
   $('loot').hidden = false; lootView.show(b.spec);
   $('lootLine').textContent = d.line;
   // each number beside what the hero of that class wields now (the plain weapon if nothing's forged): up in green, down in red
-  const have = equippedSpec(d.cls), cur = have ? statsOf(have) : { dmg: 1, spd: 1, reach: 4.6, shot: 1 };
-  const row = (label, a, b, pre = 'x') => { const dlt = +(a - b).toFixed(2); const col = dlt > 0 ? '#5ce65c' : dlt < 0 ? '#ff6a55' : 'var(--dim)'; const arrow = dlt > 0 ? '▲' : dlt < 0 ? '▼' : '='; return `<div><span style="display:inline-block;width:72px;text-align:left">${label}</span> ${pre}${a} <b style="color:${col}">${arrow} ${dlt > 0 ? '+' : ''}${dlt || ''}</b> <span style="color:var(--dim);font-weight:700">(now ${pre}${b})</span></div>`; };
-  $('lootStats').innerHTML = row('DAMAGE', d.stats.dmg, cur.dmg) + row('SPEED', d.stats.spd, cur.spd) + row('REACH', d.stats.reach, cur.reach, '') + (d.stats.cls !== 0 ? row('SHOT', d.stats.shot, cur.shot) : '')
+  const have = equippedSpec(d.cls), cur = have ? statsOf(have) : { dmg: 1, spd: 1, time: PLAIN_TIME[d.cls], reach: 4.6, shot: 1 };
+  // (less is better for the time between swings: its arrow goes the other way)
+  const row = (label, a, b, pre = 'x', post = '', lessIsBetter = false) => { const dlt = +(a - b).toFixed(2), good = lessIsBetter ? -dlt : dlt; const col = good > 0 ? '#5ce65c' : good < 0 ? '#ff6a55' : 'var(--dim)'; const arrow = good > 0 ? '▲' : good < 0 ? '▼' : '='; return `<div><span style="display:inline-block;width:72px;text-align:left">${label}</span> ${pre}${a}${post} <b style="color:${col}">${arrow} ${dlt > 0 ? '+' : ''}${dlt || ''}</b> <span style="color:var(--dim);font-weight:700">(now ${pre}${b}${post})</span></div>`; };
+  $('lootStats').innerHTML = row('DAMAGE', d.stats.dmg, cur.dmg) + row(d.stats.cls === 0 ? 'SWING' : 'SHOT', d.stats.time, cur.time, '', 's', true) + row('REACH', d.stats.reach, cur.reach, '') + (d.stats.cls !== 0 ? row('SHOT SPD', d.stats.shot, cur.shot) : '')
     + `<div class="small" style="margin-top:6px">${have ? 'AGAINST ' + (have.name || 'YOUR FORGED WEAPON') : 'AGAINST THE PLAIN ONE'}</div>`;
   $('lootWield').textContent = d.cls === player.cls ? 'TAKE & WIELD' : `TAKE & WIELD (AS THE ${['WARRIOR', 'MAGE', 'HUNTER'][d.cls]})`;
   unlockMouse(); UI.state = 'loot'; sfx(d.rarity.id === 'legendary' ? 'legend' : d.rarity.id === 'common' ? 'pickup' : 'rare');
@@ -182,6 +183,8 @@ function updateHud(dt) {
   $('hpfill').style.width = (stats.hp / stats.maxHp * 100) + '%'; $('hpT').textContent = `${stats.hp}/${stats.maxHp}`;
   $('xpfill').style.width = (stats.xp / xpToNext() * 100) + '%'; $('lvT').textContent = 'LV ' + stats.level;
   $('clockT').textContent = clock();
+  // the swing timer shows while it's running or auto-attack is on
+  { const sw = abilities.swing(); const el = $('swing'); el.classList.toggle('on', sw.left > 0 || input.autoAtk); el.firstElementChild.style.width = (sw.left * 100) + '%'; el.lastElementChild.textContent = (input.autoAtk ? 'AUTO · ' : '') + sw.time.toFixed(1) + 's'; }
   abilities.slots().forEach((sl, i) => { const el = abSlots[i]; if (el.dataset.n !== sl.name) { el.dataset.n = sl.name; el.querySelector('.n').textContent = sl.name; el.querySelector('.g').textContent = sl.glyph; } el.querySelector('.cd').style.height = (sl.left * 100) + '%'; el.classList.toggle('ready', sl.left <= 0); });
   $('sunIcon').textContent = sky.night > 0.5 ? '☾' : '☀';
   // the biome you're in: its name in the corner, a banner the first time each visit

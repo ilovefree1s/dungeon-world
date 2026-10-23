@@ -121,7 +121,7 @@ with sync_playwright() as pw:
     held = page.evaluate("(() => { const u = __dw.player.model.userData; return u.sword.children.length && !!u.sword.children[0].userData.spec; })()")
     check(held, 'SAVE & WIELD puts it in the warrior\'s hand')
     st = page.evaluate('__dw.player.forged')
-    check(st and st['dmg'] > 1.2 and st['spd'] < 0.9, f'a hammer hits harder and slower ({st})')
+    check(st and st['dmg'] > 1.2 and st['time'] > 2.5 and st['time'] <= 3.5, f'a hammer hits harder and swings slower, 1 to 3.5 seconds between ({st})')
     check(page.evaluate("document.querySelectorAll('#fSaved .fchip').length") == 1 and page.evaluate("document.querySelector('#fSaved .fchip').classList.contains('eq')"), 'it shows in the saved list as wielded')
     page.evaluate("document.getElementById('fSave').click()"); frames(1)
     check(page.evaluate("document.querySelectorAll('#fSaved .fchip').length") == 2, 'SAVE adds another')

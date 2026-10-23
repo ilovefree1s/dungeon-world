@@ -68,7 +68,7 @@ function rebuild() {
   camera.position.set(0, 0.1, span * 1.75 + 0.6); camera.lookAt(0, 0, 0);
   const st = statsOf(forge.spec);
   const rr = rarityOf(forge.spec);
-  $('forgeStats').innerHTML = (rr.id !== 'common' ? `<b style="color:${rr.color}">${rr.name}</b> ` : '') + (st.aura !== 'none' ? `<b>AURA</b> ${st.aura.toUpperCase()} ` : '') + `<b>FOR THE</b> ${HERO_NAME[st.cls]} <b>DAMAGE</b> ${Math.round(st.dmg * 100)}% <b>SPEED</b> ${Math.round(st.spd * 100)}% ` + (st.cls === 0 ? `<b>REACH</b> ${st.reach} blocks` : `<b>SHOT</b> ${Math.round(st.shot * 100)}%`) + (st.glow ? ' <b>GLOWS</b>' : '');
+  $('forgeStats').innerHTML = (rr.id !== 'common' ? `<b style="color:${rr.color}">${rr.name}</b> ` : '') + (st.aura !== 'none' ? `<b>AURA</b> ${st.aura.toUpperCase()} ` : '') + `<b>FOR THE</b> ${HERO_NAME[st.cls]} <b>DAMAGE</b> ${Math.round(st.dmg * 100)}% <b>${st.cls === 0 ? 'SWING' : 'SHOT'} EVERY</b> ${st.time.toFixed(2)}s ` + (st.cls === 0 ? `<b>REACH</b> ${st.reach} blocks` : `<b>SHOT</b> ${Math.round(st.shot * 100)}%`) + (st.glow ? ' <b>GLOWS</b>' : '');
 }
 function frame(now) {
   if (!forge.open) return;

@@ -64,6 +64,12 @@ html.locked #cross{display:block}
 #banner p{margin:4px 0 0;font-weight:900;letter-spacing:.3em;font-size:clamp(11px,2.3vw,15px);color:var(--text);text-shadow:0 2px 0 #000;text-transform:uppercase}
 #hint{position:absolute;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);font-weight:900;font-size:13px;letter-spacing:.12em;color:var(--dim);
   text-shadow:0 2px 0 #000;transition:opacity .6s;white-space:nowrap;pointer-events:none;text-transform:uppercase}
+/* the swing timer: the time between swings running down under the ability bar, lit while auto-attacking */
+#swing{position:absolute;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:190px;height:7px;border-radius:999px;background:rgba(0,0,0,.5);box-shadow:inset 0 0 0 1px var(--line);opacity:0;transition:opacity .25s;pointer-events:none}
+#swing i{position:absolute;inset:0 auto 0 0;width:0;border-radius:inherit;background:linear-gradient(90deg,#ff8a5c,#ffd45a)}
+#swing b{position:absolute;right:0;top:-15px;font-family:var(--display);font-weight:400;font-size:10px;color:var(--dim);text-shadow:0 1px 0 #000;letter-spacing:.06em}
+#swing.on{opacity:1}
+html.touchy #swing{left:auto;right:calc(16px + env(safe-area-inset-right,0px));transform:none;width:58px;bottom:calc(200px + env(safe-area-inset-bottom,0px))}
 /* the ability bar: three slots, their cooldowns sweeping down */
 #abil{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto}
 #abil .slot{position:relative;width:58px;height:58px;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);overflow:hidden;display:grid;place-items:center;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none}
@@ -190,6 +196,7 @@ html.touchy .keys{display:none}
       <button class="hbtn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="#f6eee2" stroke-width="2.6" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     </div>
     <div id="banner"><h1 id="bannerT"></h1><p id="bannerS"></p></div>
+    <div id="swing"><i></i><b></b></div>
     <div id="abil"><div class="slot"><b class="g"></b><span class="n"></span><em class="k">1</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">2</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">3</em><i class="cd"></i></div></div>
     <div id="lootHint" class="chip" style="position:absolute;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(90,60,10,.8);color:var(--gold)" hidden>IT DROPPED SOMETHING · CLICK OR F TO LOOK</div>
     <div id="hint"><span class="t">Swipe the screen to look around</span><span class="k kc">Drag to look around (right-drag turns you, both buttons walk) · WASD to move · Space to jump · left click targets a monster or loots a fallen one · right click attacks (on a monster: auto-attack) · 1, 2, 3 (or Q, E) for your abilities · Esc for the menu</span><span class="k kl">Click the world to look around · WASD to move · Space to jump · left click attacks · 1, 2, 3 (or right click, Q, E) for your abilities · Esc for the menu</span></div>

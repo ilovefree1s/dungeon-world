@@ -22,8 +22,10 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   for the mage; bow and crossbow for the hunter. Four heads each, ten materials (three of them
   glow), guards, grips, pommels, gem and grip colors, length (the blade or head alone), width,
   and sizes for the grip, the guard and the pommel, each its own. Each build has its
-  numbers: a hammer hits twice as hard and swings half as fast as the plain sword, a dagger the
-  other way round, longer reaches farther; a wand casts fast and light, a crossbow shoots hard
+  numbers: every weapon has a time between swings or shots, 1.0 s for a dagger up to 3.5 s for the
+  heaviest two-handers (length, width and a fat drawn blade slow it, rarity quickens it), and a hit's
+  damage grows with that time, so a hammer lands hard and seldom and a dagger nicks fast; longer
+  reaches farther; a wand casts fast and light, a crossbow shoots hard
   and slow; a staff's gem colors the mage's bolts. Name it (or roll one), save up to sixteen,
   wield one per hero; they stay in hand across reloads.
   **Draw the shape yourself** (DRAW IT: DRAG CORNERS or FREEHAND, on blades, on axe, hammer
@@ -98,7 +100,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 | Look | drag with the mouse (left-drag orbits the camera, right-drag turns you with it, both buttons held walk you forward), Q / E, ← → | right stick | swipe the screen |
 | Zoom | the scroll wheel | | |
 | Target | left click a monster (your attacks aim at it until it falls; a click on the ground lets it go) | | |
-| Attack | right click a monster: auto-attack until it falls (right click again stops); right click elsewhere or J swings where you look | X / ▢ | ATTACK |
+| Attack | right click a monster: auto-attack on the weapon's swing timer until it falls (right click again stops); right click elsewhere or J swings where you look | X / ▢ | ATTACK |
 | Look at loot | left click a fallen monster, or F near one | X / ▢ | ATTACK |
 | Abilities 1, 2, 3 | 1, 2, 3 (or K, Q, E; right click too with the captured mouse) | B / ○, Y / △, LB | the ability bar |
 | Jump | Space | A / ✕ | JUMP |
