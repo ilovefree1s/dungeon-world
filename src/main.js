@@ -190,7 +190,9 @@ function updateHud(dt) {
   const p = player.pos;
   place(cspans[8], (Math.atan2(-p.x, p.z) * 180 / Math.PI + 360) % 360);
   $('hpfill').style.width = (stats.hp / stats.maxHp * 100) + '%'; $('hpT').textContent = `${stats.hp}/${stats.maxHp}`;
-  $('xpfill').style.width = (stats.xp / xpToNext() * 100) + '%'; $('lvT').textContent = 'LV ' + stats.level;
+  $('xpfill').style.width = (stats.xp / xpToNext() * 100) + '%'; $('lvT').textContent = 'LV ' + stats.level; $('pName').textContent = ['WARRIOR', 'MAGE', 'HUNTER'][player.cls];
+  // the target's frame: the focused monster's name, level and health, lit AUTO while auto-attacking
+  { const m = monsters.focus; $('tframe').hidden = !m; if (m) { $('tName').textContent = m.name; $('tLv').textContent = 'LV ' + m.lvl; $('thpfill').style.width = Math.max(0, m.hp / m.maxHp * 100) + '%'; $('thpT').textContent = `${Math.max(0, Math.ceil(m.hp))}/${m.maxHp}`; $('tAuto').hidden = !input.autoAtk; } }
   $('clockT').textContent = clock();
   // the swing timer shows while it's running or auto-attack is on
   { const sw = abilities.swing(); const el = $('swing'); el.classList.toggle('on', sw.left > 0 || input.autoAtk); el.firstElementChild.style.width = (sw.left * 100) + '%'; el.lastElementChild.textContent = (input.autoAtk ? 'AUTO · ' : '') + sw.time.toFixed(1) + 's'; }

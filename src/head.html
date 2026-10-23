@@ -34,6 +34,19 @@ button{font:inherit;color:inherit}
 .num.crit{color:var(--gold);font-size:34px}.num.hurt{color:#ff6a55}
 #cross{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,255,255,.85);box-shadow:0 0 0 2px rgba(0,0,0,.45);display:none;pointer-events:none}
 html.locked #cross{display:block}
+/* the unit frames, the MMO way: yours at the top left, your target's beside it */
+#frames{position:absolute;left:calc(12px + env(safe-area-inset-left,0px));top:calc(54px + env(safe-area-inset-top,0px));display:flex;gap:10px;align-items:flex-start}
+.uframe{width:min(230px,40vw);padding:6px 8px 7px;border-radius:12px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);display:flex;flex-direction:column;gap:4px}
+.uframe.tgt{box-shadow:inset 0 0 0 1px rgba(255,106,85,.5)}
+.uname{display:flex;align-items:baseline;gap:8px;font-family:var(--display);font-size:13px;letter-spacing:.04em;text-shadow:0 2px 0 #000;white-space:nowrap}
+.uname b{font-weight:400;color:var(--gold);overflow:hidden;text-overflow:ellipsis}
+.uframe.tgt .uname b{color:#ff8a7a}
+.uname span{font-size:11px;color:var(--dim)}
+#tAuto{color:#ffd45a;margin-left:auto}
+.uframe .bar{height:13px}
+.uframe .bar.xp{height:5px}
+.uframe .bar em{position:absolute;inset:0;display:grid;place-items:center;font:900 10px var(--body);font-style:normal;color:#fff;text-shadow:0 1px 0 #000,0 0 3px #000;letter-spacing:.04em}
+#thpfill{background:linear-gradient(90deg,#c82a2a,#ff5a48)}
 #bars{position:absolute;left:calc(12px + env(safe-area-inset-left,0px));top:calc(54px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:6px;width:min(260px,44vw)}
 .bar{position:relative;height:12px;border-radius:999px;background:rgba(0,0,0,.55);box-shadow:inset 0 0 0 2px rgba(255,255,255,.1);overflow:hidden}
 .bar i{position:absolute;inset:0 auto 0 0;width:100%;border-radius:inherit;transition:width .15s}
@@ -92,7 +105,7 @@ html.touchy #abil .slot .k{display:none}
 #tJump{right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(40px + env(safe-area-inset-bottom,0px));width:84px;height:84px;font-size:17px;background:linear-gradient(#ffd85a,#ffb31f);box-shadow:0 6px 0 #a3600a,0 12px 24px rgba(0,0,0,.4)}
 #tAtk{right:calc(112px + env(safe-area-inset-right,0px));bottom:calc(36px + env(safe-area-inset-bottom,0px));width:76px;height:76px;font-size:15px;background:linear-gradient(#ffd85a,#ffb31f);box-shadow:0 6px 0 #a3600a,0 12px 24px rgba(0,0,0,.4)}
 #tJump{width:70px;height:70px;font-size:14px;background:linear-gradient(#b8f08a,#6cc244);box-shadow:0 5px 0 #2e6a1a,0 10px 20px rgba(0,0,0,.4)}
-@media (max-width:640px){#compass{top:calc(58px + env(safe-area-inset-top,0px));width:min(260px,70vw)}#where{max-width:56vw}#bars{top:calc(96px + env(safe-area-inset-top,0px))}}
+@media (max-width:640px){#compass{top:calc(58px + env(safe-area-inset-top,0px));width:min(260px,70vw)}#where{max-width:56vw}#bars,#frames{top:calc(96px + env(safe-area-inset-top,0px))}#frames{flex-direction:column}}
 @media (pointer:fine){html:not(.touchy) #touch{display:none}}
 html:not(.touchy) #hint .t{display:none}
 html.cursor #hint .kl{display:none}html:not(.cursor) #hint .kc{display:none}
@@ -222,7 +235,10 @@ html.touchy .keys{display:none}
   <div id="hud" hidden>
     <div id="nums"></div>
     <div id="cross"></div>
-    <div id="bars"><div class="brow"><b id="hpT">30/30</b><div class="bar"><i id="hpfill"></i></div></div><div class="brow"><b id="lvT">LV 1</b><div class="bar"><i id="xpfill"></i></div></div></div>
+    <div id="frames">
+      <div class="uframe" id="pframe"><div class="uname"><b id="pName">WARRIOR</b><span id="lvT">LV 1</span></div><div class="bar hp"><i id="hpfill"></i><em id="hpT">30/30</em></div><div class="bar xp"><i id="xpfill"></i></div></div>
+      <div class="uframe tgt" id="tframe" hidden><div class="uname"><b id="tName">SLIME</b><span id="tLv">LV 1</span><span id="tAuto" hidden>AUTO</span></div><div class="bar hp"><i id="thpfill"></i><em id="thpT">10/10</em></div></div>
+    </div>
     <div id="where" class="chip"><i id="whereDot"></i><span id="whereName">WHISPERWOOD</span></div>
     <div id="compass"></div>
     <div id="tr">

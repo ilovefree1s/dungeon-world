@@ -91,7 +91,7 @@ export class Monsters {
     root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
     scene.add(root);
     const k = KIND[type];
-    const m = { type, k, root, pos: new V3(x, y, z), vel: new V3(), home: new V3(x, y, z), face: Math.random() * 6.28, seed: Math.random() * 10,
+    const m = { type, k, root, name: D.MON_NAME[type] || 'MONSTER', lvl: 1 + Math.floor(stats.level / 3), pos: new V3(x, y, z), vel: new V3(), home: new V3(x, y, z), face: Math.random() * 6.28, seed: Math.random() * 10,
       hp: D.MON_BASE_HP[type] * 3 + stats.level * 2, atk: D.MON_BASE_ATK[type] + Math.floor(stats.level / 2), state: 'wander', t: Math.random() * 2, atkCd: 1 + Math.random(), flash: 0, frz: 0, kb: new V3(), onGround: false, moving: false, bob: Math.random() * 6,
       wind: 0, act: null, lastAct: null, daze: 0, hopCd: 0, leap: 0, dive: null, rush: null, barT: 0, bar: null, tint: '' };
     m.maxHp = m.hp;
