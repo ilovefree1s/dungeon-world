@@ -113,7 +113,8 @@ function heroCombat(dt, inp, frozen) {
     // the right button turns the hero with the camera
     if (inp.turnWith) { player.aimFace = player.yaw + Math.PI; inp.turnWith = false; }
     // what's under the cursor shapes it: a sword over a monster, a hand over loot
-    if (inp.cursor.in) { const m = pickMonster(monsters, inp.cursor.x, inp.cursor.y, w, h); const b = m ? null : bodies.pickAt(inp.cursor.x, inp.cursor.y, w, h); gl.style.cursor = m ? 'crosshair' : b ? 'pointer' : 'default'; }
+    if (inp.dragging) gl.style.cursor = 'none';   // (looking around: no cursor in the way)
+    else if (inp.cursor.in) { const m = pickMonster(monsters, inp.cursor.x, inp.cursor.y, w, h); const b = m ? null : bodies.pickAt(inp.cursor.x, inp.cursor.y, w, h); gl.style.cursor = m ? 'crosshair' : b ? 'pointer' : 'default'; }
     // the left click targets: a monster is focused (attacks aim at it), a body with loot is looked at, the ground clears the focus
     if (inp.clickAt) {
       const c = inp.clickAt; inp.clickAt = null;

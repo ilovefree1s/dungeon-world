@@ -10,7 +10,7 @@ export const input = {
   jump: false, jumpEdge: false, sprint: false, atk: false, atkEdge: false, useEdge: false, abEdge: [false, false, false],
   menuEdge: [], lastDevice: 'kb', stickX: 0, stickY: 0, stickId: null,
   mouseSpeed: 1, zoom: 0, wantLock: null, onLockChange: null,
-  cursorMode: false, cursor: { x: 0, y: 0, in: false }, clickAt: null, rclickAt: null, bothHeld: false, turnWith: false, autoAtk: false,
+  cursorMode: false, cursor: { x: 0, y: 0, in: false }, clickAt: null, rclickAt: null, bothHeld: false, turnWith: false, autoAtk: false, dragging: false,
 };
 const keys = {};
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyD: 'right',
@@ -87,7 +87,7 @@ export function initTouch(canvas) {
     if (!l || mouseLocked()) return;
     // (a finger turns a little faster than a mouse: the screen is small)
     const k = l.touch ? 0.0085 : 0.0055 * input.mouseSpeed;
-    if (l.moved !== undefined) l.moved += Math.abs(e.clientX - l.x) + Math.abs(e.clientY - l.y);
+    if (l.moved !== undefined) { l.moved += Math.abs(e.clientX - l.x) + Math.abs(e.clientY - l.y); if (l.moved > 6) input.dragging = true; }   // (a real drag: the cursor hides while it lasts)
     input.lookX += (e.clientX - l.x) * k; input.lookY += (e.clientY - l.y) * k;
     if (l.turn) input.turnWith = true;   // (the right button: the hero turns with the camera)
     l.x = e.clientX; l.y = e.clientY;
@@ -96,7 +96,7 @@ export function initTouch(canvas) {
   const lend = e => {
     const l = looks.get(e.pointerId); looks.delete(e.pointerId);
     if (e.pointerType === 'mouse' && input.cursorMode) {
-      mouseButtons &= ~(1 << e.button); input.bothHeld = (mouseButtons & 3) === 3;
+      mouseButtons &= ~(1 << e.button); input.bothHeld = (mouseButtons & 3) === 3; if (!mouseButtons) input.dragging = false;
       // a click that didn't drag: pick what's under the cursor (left), or the first ability (right)
       // a click that didn't drag: the left picks what's under the cursor (a target, loot); the right attacks it (auto-attack)
       if (l && l.moved !== undefined && l.moved < 6 && performance.now() - l.t0 < 400) { if (l.button === 0) input.clickAt = { x: e.clientX, y: e.clientY }; else if (l.button === 2) input.rclickAt = { x: e.clientX, y: e.clientY }; }
