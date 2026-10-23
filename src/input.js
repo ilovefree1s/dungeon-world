@@ -63,7 +63,7 @@ export function initTouch(canvas) {
   // or a cursor (the pointer stays: left-drag orbits the camera, right-drag turns you with it, both buttons held
   // walk you forward, and a plain click picks what's under it: a monster to fight, a body to loot)
   const looks = new Map();
-  let mouseButtons = 0;
+  let mouseButtons = 0, dragLock = false;
   canvas.addEventListener('pointerdown', e => {
     onAny();
     if (e.pointerType === 'mouse') {
@@ -87,16 +87,24 @@ export function initTouch(canvas) {
     if (!l || mouseLocked()) return;
     // (a finger turns a little faster than a mouse: the screen is small)
     const k = l.touch ? 0.0085 : 0.0055 * input.mouseSpeed;
-    if (l.moved !== undefined) { l.moved += Math.abs(e.clientX - l.x) + Math.abs(e.clientY - l.y); if (l.moved > 6) input.dragging = true; }   // (a real drag: the cursor hides while it lasts)
+    if (l.moved !== undefined) {
+      l.moved += Math.abs(e.clientX - l.x) + Math.abs(e.clientY - l.y);
+      // a real drag: the pointer is locked for as long as it lasts, so the cursor hides and stays where it was
+      // (let go and it's back on the same spot); while locked, the movement comes through mousemove below
+      if (l.moved > 6 && !input.dragging) { input.dragging = true; dragLock = true; lockMouse(canvas); }
+    }
     input.lookX += (e.clientX - l.x) * k; input.lookY += (e.clientY - l.y) * k;
     if (l.turn) input.turnWith = true;   // (the right button: the hero turns with the camera)
     l.x = e.clientX; l.y = e.clientY;
   });
   canvas.addEventListener('pointerleave', () => { input.cursor.in = false; });
   const lend = e => {
+    // (taking the pointer lock can drop the pointer capture: that's not the drag ending)
+    if (e.type === 'lostpointercapture' && dragLock) return;
     const l = looks.get(e.pointerId); looks.delete(e.pointerId);
     if (e.pointerType === 'mouse' && input.cursorMode) {
-      mouseButtons &= ~(1 << e.button); input.bothHeld = (mouseButtons & 3) === 3; if (!mouseButtons) input.dragging = false;
+      mouseButtons &= ~(1 << e.button); input.bothHeld = (mouseButtons & 3) === 3;
+      if (!mouseButtons) { input.dragging = false; if (dragLock) { dragLock = false; unlockMouse(); } }
       // a click that didn't drag: pick what's under the cursor (left), or the first ability (right)
       // a click that didn't drag: the left picks what's under the cursor (a target, loot); the right attacks it (auto-attack)
       if (l && l.moved !== undefined && l.moved < 6 && performance.now() - l.t0 < 400) { if (l.button === 0) input.clickAt = { x: e.clientX, y: e.clientY }; else if (l.button === 2) input.rclickAt = { x: e.clientX, y: e.clientY }; }
@@ -110,9 +118,13 @@ export function initTouch(canvas) {
   document.addEventListener('mousemove', e => {
     if (!mouseLocked() || input.lookOff) return; // (lookOff: a menu is open)
     input.lastDevice = 'kb';
-    input.lookX += e.movementX * 0.0024 * input.mouseSpeed;
-    input.lookY += e.movementY * 0.0024 * input.mouseSpeed;
+    const k = dragLock ? 0.0055 : 0.0024;
+    input.lookX += e.movementX * k * input.mouseSpeed;
+    input.lookY += e.movementY * k * input.mouseSpeed;
+    if (dragLock && (mouseButtons & 4)) input.turnWith = true;
   });
+  // (a button let go while locked: the drag ends even if the pointerup went astray)
+  document.addEventListener('mouseup', e => { if (!dragLock) return; mouseButtons &= ~(1 << e.button); input.bothHeld = (mouseButtons & 3) === 3; if (!mouseButtons) { input.dragging = false; dragLock = false; looks.clear(); unlockMouse(); } });
   // the scroll wheel brings the camera nearer or farther
   canvas.addEventListener('wheel', e => { e.preventDefault(); input.zoom += Math.sign(e.deltaY); }, { passive: false });
   document.addEventListener('pointerlockchange', () => { input.onLockChange && input.onLockChange(mouseLocked()); });

@@ -269,7 +269,8 @@ $('menuBtn').addEventListener('click', openMenu);
 $('resume').addEventListener('click', () => { closeMenu(); if (!IS_TOUCH) lockMouse(); });
 // the mouse: captured by a click in the world while you play; letting it go (Esc) opens the menu
 input.wantLock = () => UI.state === 'play' && !mouseLocked() && !input.cursorMode;
-input.onLockChange = locked => { document.documentElement.classList.toggle('locked', locked); if (!locked && UI.state === 'play') openMenu(); };
+// (the cursor scheme locks the pointer only while you drag the camera: letting go isn't a reason for the menu)
+input.onLockChange = locked => { document.documentElement.classList.toggle('locked', locked && !input.cursorMode); if (!locked && UI.state === 'play' && !input.cursorMode) openMenu(); };
 function syncMenu() {
   const on = (seg, v) => [...$(seg).children].forEach(b => b.classList.toggle('on', +b.dataset.v === v));
   on('segHero', UI.cls); on('segQ', UI.autoQ ? -1 : UI.quality); on('segM', audioState.music > 0 ? 1 : 0); on('segS', audioState.sfx > 0 ? 1 : 0); on('segMouse', input.mouseSpeed); on('segCursor', input.cursorMode ? 1 : 0);
