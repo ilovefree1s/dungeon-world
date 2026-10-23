@@ -10,6 +10,8 @@ import { TYPES, MATERIALS, GUARDS, GRIPS, POMMELS, ACCENTS, GRIP_COLORS, AURAS, 
 import { ShapePad } from './shapepad.js';
 import { sfx } from './audio.js';
 import { AURA_VIEW } from './auras.js';
+import { stats as heroStats } from './combat.js';
+import { dpsOf } from './weaponkit.js';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dungeonworld.forge.v1';
@@ -68,7 +70,7 @@ function rebuild() {
   camera.position.set(0, 0.1, span * 1.75 + 0.6); camera.lookAt(0, 0, 0);
   const st = statsOf(forge.spec);
   const rr = rarityOf(forge.spec);
-  $('forgeStats').innerHTML = (rr.id !== 'common' ? `<b style="color:${rr.color}">${rr.name}</b> ` : '') + (st.aura !== 'none' ? `<b>AURA</b> ${st.aura.toUpperCase()} ` : '') + `<b>FOR THE</b> ${HERO_NAME[st.cls]} <b>DAMAGE</b> ${Math.round(st.dmg * 100)}% <b>${st.cls === 0 ? 'SWING' : 'SHOT'} EVERY</b> ${st.time.toFixed(2)}s ` + (st.cls === 0 ? `<b>REACH</b> ${st.reach} blocks` : `<b>SHOT</b> ${Math.round(st.shot * 100)}%`) + (st.glow ? ' <b>GLOWS</b>' : '');
+  $('forgeStats').innerHTML = (rr.id !== 'common' ? `<b style="color:${rr.color}">${rr.name}</b> ` : '') + (st.aura !== 'none' ? `<b>AURA</b> ${st.aura.toUpperCase()} ` : '') + `<b>FOR THE</b> ${HERO_NAME[st.cls]} <b>DPS</b> ${dpsOf(st, st.cls, heroStats.level)} <b>DAMAGE</b> ${Math.round(st.dmg * 100)}% <b>${st.cls === 0 ? 'SWING' : 'SHOT'} EVERY</b> ${st.time.toFixed(2)}s ` + (st.cls === 0 ? '' : `<b>SHOT</b> ${Math.round(st.shot * 100)}%`) + (st.glow ? ' <b>GLOWS</b>' : '');
 }
 function frame(now) {
   if (!forge.open) return;
@@ -140,10 +142,9 @@ function render() {
     const wr = rarityOf(w);
     chip.innerHTML = `<button type="button" class="load"${wr.id !== 'common' ? ` style="color:${wr.color}"` : ''}><i>${HERO_NAME[c][0]}</i>${w.name || 'UNNAMED'}</button><button type="button" class="eqb">${eq ? 'WIELDED' : 'WIELD'}</button><button type="button" class="del" aria-label="Delete">×</button>`;
     chip.querySelector('.load').addEventListener('click', () => { forge.spec = JSON.parse(JSON.stringify(w)); sfx('pickup'); render(); });
-    chip.querySelector('.eqb').addEventListener('click', () => { forge.equipped[c] = i; persist(); sfx('rare'); forge.onEquip && forge.onEquip(w, c); render(); });
+    chip.querySelector('.eqb').addEventListener('click', () => { wieldSaved(i); sfx('rare'); render(); });
     chip.querySelector('.del').addEventListener('click', () => {
-      forge.saved.splice(i, 1);
-      for (let k = 0; k < 3; k++) { if (forge.equipped[k] === i) { forge.equipped[k] = -1; forge.onEquip && forge.onEquip(null, k); } else if (forge.equipped[k] > i) forge.equipped[k]--; }
+      deleteSaved(i);
       persist(); sfx('nope'); render();
     });
     list.appendChild(chip);
@@ -227,6 +228,16 @@ function wire() {
     split.addEventListener('pointerup', () => { localStorage.setItem('dw-forge-split', String($('forgeGl').clientHeight)); });
   }
 }
+// the saved weapons, from anywhere (the forge, the bags): wield one, drop one, take one back to the anvil
+export function wieldSaved(i) { const w = forge.saved[i]; if (!w) return; const c = clsOf(w); forge.equipped[c] = i; persist(); forge.onEquip && forge.onEquip(w, c); }
+export function unwield(c) { forge.equipped[c] = -1; persist(); forge.onEquip && forge.onEquip(null, c); }
+export function deleteSaved(i) {
+  if (!forge.saved[i]) return;
+  forge.saved.splice(i, 1);
+  for (let k = 0; k < 3; k++) { if (forge.equipped[k] === i) { forge.equipped[k] = -1; forge.onEquip && forge.onEquip(null, k); } else if (forge.equipped[k] > i) forge.equipped[k]--; }
+  persist(); if (forge.open) render();
+}
+export function loadSaved(i) { const w = forge.saved[i]; if (w) forge.spec = JSON.parse(JSON.stringify(w)); }
 // a weapon that dropped from a monster: into the saved list (the oldest goes if it's full); wield it too if asked
 export function takeLoot(spec, wield) {
   const copy = JSON.parse(JSON.stringify(spec));

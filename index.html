@@ -130,6 +130,40 @@ h2{margin:0 0 12px;font-family:var(--display);font-weight:400;font-size:30px;col
 .big.focus{outline:3px solid #fff;outline-offset:2px}
 .keys{margin-top:14px;font-size:12px;color:var(--dim);font-weight:800;line-height:1.6}
 html.touchy .keys{display:none}
+/* ---------- the character sheet and the bags, framed the MMO way: gold-edged dark panels, tabs along the top */
+.panel.wow{width:min(820px,96vw);padding:0;text-align:left;overflow:hidden;background:linear-gradient(180deg,rgba(28,22,18,.97),rgba(16,12,10,.97));box-shadow:inset 0 0 0 2px #7a5a22,inset 0 0 0 4px rgba(255,201,60,.18),0 24px 60px rgba(0,0,0,.6)}
+.wtabs{display:flex;gap:4px;padding:10px 12px 0;border-bottom:2px solid #7a5a22;background:rgba(0,0,0,.25)}
+.wtabs button{border:0;border-radius:10px 10px 0 0;padding:9px 16px;background:rgba(255,255,255,.05);font-family:var(--display);font-size:14px;letter-spacing:.06em;color:var(--dim);cursor:pointer}
+.wtabs button em{font-style:normal;font-size:10px;color:var(--gold);margin-left:6px;opacity:.8}
+.wtabs button.on{background:rgba(255,201,60,.16);color:var(--gold)}
+.wtabs .x{margin-left:auto;border-radius:10px;font-size:18px;padding:4px 12px}
+.cshead{display:flex;align-items:baseline;justify-content:space-between;padding:12px 18px 0}
+.cshead b{font-family:var(--display);font-weight:400;font-size:26px;color:var(--gold);text-shadow:0 3px 0 #5a2c08;letter-spacing:.04em}
+.cshead span{font-weight:900;font-size:12px;letter-spacing:.14em;color:var(--dim)}
+.csmain{display:grid;grid-template-columns:200px 1fr;gap:12px;padding:12px 18px}
+.csside{display:flex;flex-direction:column;gap:6px}
+.cslot{border-radius:10px;padding:6px 10px;background:rgba(0,0,0,.4);box-shadow:inset 0 0 0 1px var(--line);min-height:40px}
+.cslot .l{display:block;font-size:9px;font-weight:900;letter-spacing:.14em;color:var(--dim)}
+.cslot .v{display:block;font-family:var(--display);font-size:12px;letter-spacing:.04em;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cslot .v.empty{color:rgba(255,255,255,.18)}
+#csGl{width:100%;height:420px;display:block;border-radius:14px;background:radial-gradient(ellipse at 50% 35%,rgba(255,220,170,.12),rgba(0,0,0,.4));box-shadow:inset 0 0 0 1px var(--line)}
+.csstats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 14px;padding:0 18px 16px;font-size:11px;font-weight:900;letter-spacing:.08em;color:var(--dim)}
+.csstats.two{grid-template-columns:1fr;padding:8px 0 0}
+.csstats div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding:4px 0}
+.csstats b{font-family:var(--display);font-weight:400;color:var(--gold);font-size:12px;letter-spacing:.04em;text-align:right}
+.csstats em{font-style:normal;font-family:var(--display);font-size:11px;margin-left:6px}
+.bagmain{display:grid;grid-template-columns:1fr 280px;gap:14px;padding:12px 18px 16px}
+.baggrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-content:start}
+.bslot{aspect-ratio:1;border:0;border-radius:12px;background:rgba(0,0,0,.45);box-shadow:inset 0 0 0 1px var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;position:relative;color:var(--text);padding:4px}
+.bslot.empty{background:rgba(255,255,255,.03);cursor:default}
+.bslot .g{font-size:26px;line-height:1}
+.bslot .n{font-family:var(--display);font-size:9px;letter-spacing:.04em;text-align:center;line-height:1.1;max-width:100%;overflow:hidden}
+.bslot .eq{position:absolute;left:4px;top:4px;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.08em;color:#3a1c00;background:var(--gold);border-radius:6px;padding:1px 5px}
+.bslot.on{outline:2px solid #fff;outline-offset:2px}
+.bagdetail{border-radius:14px;background:rgba(0,0,0,.3);box-shadow:inset 0 0 0 1px var(--line);padding:10px}
+#bagGl{width:100%;height:170px;display:block;border-radius:10px;background:radial-gradient(ellipse at 50% 40%,rgba(255,220,170,.14),rgba(0,0,0,.35))}
+.bagdetail .fbtns button{flex:1 1 45%}
+@media (max-width:700px){.csmain{grid-template-columns:1fr}.csside{flex-direction:row;flex-wrap:wrap}.cslot{flex:1 1 44%}#csGl{height:300px}.csstats{grid-template-columns:repeat(2,1fr)}.bagmain{grid-template-columns:1fr}}
 /* ---------- the forge */
 #forge .panel{width:min(1040px,96vw);max-height:94vh;padding:16px 18px 14px;text-align:left}
 .fwrap{display:grid;grid-template-columns:360px 1fr;gap:16px}
@@ -193,6 +227,8 @@ html.touchy .keys{display:none}
     <div id="compass"></div>
     <div id="tr">
       <div id="clock" class="chip"><b id="sunIcon">☀</b><span id="clockT">08:00</span></div>
+      <button class="hbtn" id="charBtn" aria-label="Character" title="Character (C)"><svg viewBox="0 0 24 24" fill="none" stroke="#f6eee2" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></button>
+      <button class="hbtn" id="bagsBtn" aria-label="Bags" title="Bags (B)"><svg viewBox="0 0 24 24" fill="none" stroke="#f6eee2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14l-1 11H6z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg></button>
       <button class="hbtn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="#f6eee2" stroke-width="2.6" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     </div>
     <div id="banner"><h1 id="bannerT"></h1><p id="bannerS"></p></div>
@@ -276,6 +312,32 @@ html.touchy .keys{display:none}
       <button class="big" id="lootWield">TAKE &amp; WIELD</button>
       <button class="big" id="lootTake" style="background:rgba(255,255,255,.1);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)">TAKE (INTO THE FORGE)</button>
       <button class="big" id="lootLeave" style="background:rgba(255,255,255,.06);color:var(--dim);box-shadow:inset 0 0 0 1px var(--line);margin-top:8px">LEAVE IT</button>
+    </div>
+  </div>
+  <div id="char" class="scrim" hidden>
+    <div class="panel wow">
+      <div class="wtabs"><button type="button" id="tabChar" class="on">CHARACTER <em>C</em></button><button type="button" id="tabBags">BAGS <em>B</em></button><button type="button" id="csClose" class="x" aria-label="Close">×</button></div>
+      <div id="csBody">
+        <div class="cshead"><b id="csName">WARRIOR</b><span id="csLevel">LEVEL 1</span></div>
+        <div class="csmain">
+          <div class="csside" id="csSlots"></div>
+          <canvas id="csGl"></canvas>
+        </div>
+        <div class="csstats" id="csStats"></div>
+      </div>
+      <div id="bagBody" hidden>
+        <div class="cshead"><b>BAGS</b><span id="bagCount">0 / 16</span></div>
+        <div class="bagmain">
+          <div class="baggrid" id="bagGrid"></div>
+          <div class="bagdetail" id="bagDetail" hidden>
+            <canvas id="bagGl"></canvas>
+            <p class="logo" id="bagName" style="font-size:22px;margin:6px 0 2px"></p>
+            <p class="small" id="bagLine"></p>
+            <div class="csstats two" id="bagStats"></div>
+            <div class="fbtns"><button type="button" class="gold" id="bagWield">WIELD</button><button type="button" id="bagUnwield">UNWIELD</button><button type="button" id="bagForge">TO THE FORGE</button><button type="button" id="bagDrop">DROP</button></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   <div id="menu" class="scrim" hidden>

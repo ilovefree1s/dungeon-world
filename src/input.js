@@ -16,10 +16,10 @@ const keys = {};
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyD: 'right',
   ArrowLeft: 'turnL', ArrowRight: 'turnR', Space: 'jump', ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyJ: 'atk', KeyZ: 'atk', Digit1: 'ab0', KeyK: 'ab0', Digit2: 'ab1', KeyQ: 'ab1', KeyL: 'ab1', Digit3: 'ab2', KeyE: 'ab2',
-  Escape: 'pause', KeyP: 'pause', Enter: 'ok', NumpadEnter: 'ok', KeyF: 'use' };
+  Escape: 'pause', KeyP: 'pause', Enter: 'ok', NumpadEnter: 'ok', KeyF: 'use', KeyC: 'char', KeyB: 'bags', KeyI: 'bags' };
 let onAny = () => { };
 export function onFirstInput(f) { onAny = f; }
-const MENU_KEYS = { up: 'up', down: 'down', left: 'left', right: 'right', turnL: 'left', turnR: 'right', jump: 'ok', ok: 'ok', pause: 'pause' };
+const MENU_KEYS = { up: 'up', down: 'down', left: 'left', right: 'right', turnL: 'left', turnR: 'right', jump: 'ok', ok: 'ok', pause: 'pause', char: 'char', bags: 'bags' };
 addEventListener('keydown', e => {
   const k = KEYMAP[e.code];
   if (!k) return;

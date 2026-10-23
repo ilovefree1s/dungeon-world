@@ -93,6 +93,13 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 - A compass with a marker for the tower at the world's middle (a later stage), the biome's
   name as you enter it, a menu for hero, graphics, music and sounds. Your place is saved.
 
+- **Character sheet and bags** (C and B, or the two buttons by the menu's): the sheet shows your
+  hero turning on a stand with what's in hand, the gear slots (gear itself is a later stage; the
+  hands hold what the Forge gave), and the numbers: health, experience, kills, DPS (what the
+  auto-attack does a second), the hit, the time between swings, the aura. The bags are sixteen
+  slots holding the weapons you've forged or found, each bordered in its rarity; click one for its
+  picture and numbers against what you wield, then wield it, take it to the Forge, or drop it.
+
 ## Controls
 | | Keyboard and mouse | Controller | Phone |
 |---|---|---|---|
@@ -106,6 +113,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 | Jump | Space | A / ✕ | JUMP |
 | Run | Shift (the stick pushed all the way runs too) | RB, LT or a stick's click | push the stick to its edge |
 | Menu | Esc, P | Start | the ☰ button |
+| Character sheet, bags | C, B | | the buttons by the ☰ |
 
 Mouse speed (slow, normal, fast) is in the menu, and so is the mouse's way of working: **Cursor** (the
 above, the default on a PC) or **Captured** (click the world to capture the mouse and every movement
@@ -132,7 +140,8 @@ boats and mounts.
 - `src/weaponkit.js`: weapons from parts (the model, the name, the numbers); `src/forge.js`:
   the forge screen, with its own small renderer for the turning preview.
 - `src/combat.js`: the monsters (where they live, how they wander, chase and bite), the
-  hero's bolts and aim, health, XP and levels. `src/loot.js`: the fallen's bodies and what they drop; `src/turntable.js`: the loot panel's turning picture. `src/fx.js`: sparks, rings and damage numbers.
+  hero's bolts and aim, health, XP and levels. `src/loot.js`: the fallen's bodies and what they drop; `src/charsheet.js`: the character sheet and the bags;
+  `src/turntable.js`: the turning pictures (a weapon, the hero). `src/fx.js`: sparks, rings and damage numbers.
 - `src/engine.js`: the renderer in Dungeon Heart's style (ACES, soft shadows, bloom) and the
   helpers its models use. `src/dh/` holds Dungeon Heart's model files, copied unchanged.
 - `src/input.js`: keyboard, mouse, touch and controllers. `src/audio.js` and

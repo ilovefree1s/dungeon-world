@@ -13,10 +13,11 @@ import { Monsters, Bolts, stats, xpToNext, pickMonster } from './combat.js';
 import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollDrop } from './loot.js';
-import { statsOf, PLAIN_TIME } from './weaponkit.js';
+import { statsOf, plainStats, dpsOf, hitOf } from './weaponkit.js';
 import { Turntable } from './turntable.js';
 import { AURA_VIEW } from './auras.js';
 import { VERSION } from './version.js';
+import { CharSheet } from './charsheet.js';
 import { burst, ring, stepFx } from './fx.js';
 import { grassUniforms } from './flora.js';
 import { updateAmbience } from './ambience.js';
@@ -82,14 +83,21 @@ function openLoot(b) {
   $('loot').hidden = false; lootView.show(b.spec);
   $('lootLine').textContent = d.line;
   // each number beside what the hero of that class wields now (the plain weapon if nothing's forged): up in green, down in red
-  const have = equippedSpec(d.cls), cur = have ? statsOf(have) : { dmg: 1, spd: 1, time: PLAIN_TIME[d.cls], reach: 4.6, shot: 1 };
+  const have = equippedSpec(d.cls), cur = have ? statsOf(have) : plainStats(d.cls);
   // (less is better for the time between swings: its arrow goes the other way)
   const row = (label, a, b, pre = 'x', post = '', lessIsBetter = false) => { const dlt = +(a - b).toFixed(2), good = lessIsBetter ? -dlt : dlt; const col = good > 0 ? '#5ce65c' : good < 0 ? '#ff6a55' : 'var(--dim)'; const arrow = good > 0 ? '▲' : good < 0 ? '▼' : '='; return `<div><span style="display:inline-block;width:72px;text-align:left">${label}</span> ${pre}${a}${post} <b style="color:${col}">${arrow} ${dlt > 0 ? '+' : ''}${dlt || ''}</b> <span style="color:var(--dim);font-weight:700">(now ${pre}${b}${post})</span></div>`; };
-  $('lootStats').innerHTML = row('DAMAGE', d.stats.dmg, cur.dmg) + row(d.stats.cls === 0 ? 'SWING' : 'SHOT', d.stats.time, cur.time, '', 's', true) + row('REACH', d.stats.reach, cur.reach, '') + (d.stats.cls !== 0 ? row('SHOT SPD', d.stats.shot, cur.shot) : '')
+  $('lootStats').innerHTML = row('DPS', dpsOf(d.stats, d.cls, stats.level), dpsOf(cur, d.cls, stats.level), '') + row('HIT', Math.round(hitOf(d.stats, d.cls, stats.level)), Math.round(hitOf(cur, d.cls, stats.level)), '') + row(d.stats.cls === 0 ? 'SWING' : 'SHOT', d.stats.time, cur.time, '', 's', true) + (d.stats.cls !== 0 ? row('SHOT SPD', d.stats.shot, cur.shot) : '')
     + `<div class="small" style="margin-top:6px">${have ? 'AGAINST ' + (have.name || 'YOUR FORGED WEAPON') : 'AGAINST THE PLAIN ONE'}</div>`;
   $('lootWield').textContent = d.cls === player.cls ? 'TAKE & WIELD' : `TAKE & WIELD (AS THE ${['WARRIOR', 'MAGE', 'HUNTER'][d.cls]})`;
   unlockMouse(); UI.state = 'loot'; sfx(d.rarity.id === 'legendary' ? 'legend' : d.rarity.id === 'common' ? 'pickup' : 'rare');
 }
+// the character sheet and the bags (C and B, or the buttons by the menu's)
+const sheet = new CharSheet(player);
+function openSheet(tab) { if (UI.state !== 'play') return; unlockMouse(); UI.state = 'char'; sheet.show(tab); }
+sheet.onClose = () => { if (UI.state === 'char') UI.state = 'play'; };
+sheet.onForge = () => { sheet.close(); forgeFrom = 'play'; UI.state = 'forge'; openForge(); };
+$('charBtn').addEventListener('click', () => openSheet('char'));
+$('bagsBtn').addEventListener('click', () => openSheet('bags'));
 function closeLoot() { UI.state = 'play'; $('loot').hidden = true; lootBody = null; lootView.stop(); }
 $('lootWield').addEventListener('click', () => { if (!lootBody) return; takeLoot(lootBody.spec, true); bodies.took(lootBody); sfx('legend'); closeLoot(); });
 $('lootTake').addEventListener('click', () => { if (!lootBody) return; takeLoot(lootBody.spec, false); bodies.took(lootBody); sfx('pickup'); closeLoot(); });
@@ -250,7 +258,7 @@ function closeMenu() { UI.state = 'play'; $('menu').hidden = true; writeSave(); 
 let forgeFrom = 'menu';
 $('forgeBtn').addEventListener('click', () => { forgeFrom = 'menu'; UI.state = 'forge'; $('menu').hidden = true; openForge(); });
 $('forgeBtnTitle').addEventListener('click', () => { startAudio(); forgeFrom = 'title'; UI.state = 'forge'; $('title').hidden = true; openForge(); });
-forge.onClose = () => { if (forgeFrom === 'title') { UI.state = 'title'; $('title').hidden = false; } else { UI.state = 'menu'; $('menu').hidden = false; syncMenu(); } };
+forge.onClose = () => { if (forgeFrom === 'title') { UI.state = 'title'; $('title').hidden = false; } else if (forgeFrom === 'play') { UI.state = 'play'; } else { UI.state = 'menu'; $('menu').hidden = false; syncMenu(); } };
 // (wielding something made for another hero switches to that hero, so you see it in hand)
 forge.onEquip = (spec, cls) => { player.equipForged(spec, cls); if (spec && player.cls !== cls) { player.setClass(cls); UI.cls = cls; abilities.reset(); focusHero(cls); } };
 for (let c = 0; c < 3; c++) player.equipForged(equippedSpec(c), c);
@@ -284,6 +292,10 @@ function menuStep() {
       else if (k === 'ok') pickHero(focusI);
     } else if (UI.state === 'play') {
       if (k === 'pause') openMenu();
+      else if (k === 'char') openSheet('char');
+      else if (k === 'bags') openSheet('bags');
+    } else if (UI.state === 'char') {
+      if (k === 'pause' || k === 'back' || k === 'char' || k === 'bags') sheet.close();
     } else if (UI.state === 'forge') {
       if (k === 'pause' || k === 'back') closeForge();
     } else if (UI.state === 'loot') {
@@ -407,7 +419,7 @@ document.getElementById('boot')?.remove();
 
 // a hook for testing
 window.__dw = {
-  world, player, sky, UI, input, view, renderer, scene, camera, THREE, monsters, bolts, hero: stats, abilities, forge, bodies, openLoot, closeLoot,
+  world, player, sky, UI, input, view, renderer, scene, camera, THREE, monsters, bolts, hero: stats, abilities, forge, bodies, openLoot, closeLoot, sheet, openSheet,
   start(cls = 0) { pickHero(cls); },
   teleport(x, z) { player.place(x + 0.5, 90, z + 0.5); placed = false; },
   setQuality(q) { UI.autoQ = false; UI.quality = q; setQuality(q); },

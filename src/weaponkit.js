@@ -200,6 +200,11 @@ export const RARITIES = [
 export const rarityOf = spec => RARITIES.find(r => r.id === spec.rarity) || RARITIES[0];
 // the plain weapons' attack times (a sword, a staff, a bow): what a forged one's damage is measured against
 export const PLAIN_TIME = [1.5, 1.8, 1.6];
+// what the auto-attack does a second with a weapon's numbers, at a level: a hit (the hero's base, the weapon's
+// damage, the warrior's swing lands half again as hard) over the time between hits
+export const hitOf = (st, cls, level) => (5 + level * 1.5) * st.dmg * (cls === 0 ? 1.5 : 1);
+export const dpsOf = (st, cls, level) => +(hitOf(st, cls, level) / st.time).toFixed(1);
+export const plainStats = cls => ({ dmg: 1, spd: 1, time: PLAIN_TIME[cls], reach: 4.6, shot: 1, aura: 'none' });
 // ---------------------------------------------------------------- numbers
 // damage and speed as multipliers of the warrior's plain swing, reach in blocks
 export function statsOf(spec) {

@@ -25,10 +25,12 @@ export class Turntable {
     const rim = new THREE.DirectionalLight('#9fd8ff', 0.8); rim.position.set(-3, 1, -2); s.add(rim);
     this.camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
   }
-  show(spec) {
+  show(spec) { return this.showModel(buildForged(spec)); }
+  // any model; tick(t) runs each frame (a hero's idle); turning is slow and only a little by default
+  showModel(model, tick = null, opts = {}) {
     this.init();
     this.clear();
-    const m = this.model = buildForged(spec);
+    const m = this.model = model; this.tick = tick; this.opts = opts;
     const bb = new THREE.Box3(), tb = new THREE.Box3();
     m.updateMatrixWorld(true);
     m.traverse(o => { if (o.isMesh && !o.userData.aura && !o.isPoints && !o.isSprite && o.geometry) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); tb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); bb.union(tb); } });
@@ -36,14 +38,16 @@ export class Turntable {
     m.position.set(-c.x, -c.y, -c.z);
     this.scene.add(m);
     const span = Math.max(size.y, size.z * 1.2, size.x * 1.2);
-    this.camera.position.set(0, 0.1, span * 1.75 + 0.6); this.camera.lookAt(0, 0, 0);
+    this.camera.position.set(0, 0.1, span * (opts.dist ?? 1.75) + 0.6); this.camera.lookAt(0, 0, 0);
     this.size();
     cancelAnimationFrame(this.raf); this.last = 0;
     const frame = now => {
       const dt = this.last ? Math.min(0.05, (now - this.last) / 1000) : 0.016; this.last = now;
-      this.turn += dt * 0.8;
-      m.rotation.set(0.15, this.turn, Math.sin(now / 1000 * 0.5) * 0.08);
+      this.turn += dt * (this.opts.spin ?? 0.8);
+      if (this.opts.sway === false) m.rotation.set(0, (this.opts.face || 0) + Math.sin(this.turn) * (this.opts.wobble ?? 0), 0);
+      else m.rotation.set(0.15, this.turn, Math.sin(now / 1000 * 0.5) * 0.08);
       AURA_VIEW.h = this.renderer.domElement.height;
+      if (this.tick) this.tick(now / 1000);
       if (m.userData.tick) m.userData.tick(now / 1000);
       this.renderer.render(this.scene, this.camera);
       this.raf = requestAnimationFrame(frame);
