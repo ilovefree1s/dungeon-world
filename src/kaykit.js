@@ -10,13 +10,15 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import rangerGlb from '../assets/kaykit/Ranger.glb';
 import generalGlb from '../assets/kaykit/Rig_Medium_General.glb';
 import moveGlb from '../assets/kaykit/Rig_Medium_MovementBasic.glb';
-import bowGltf from '../assets/kaykit/bow_withString.gltf';
-import arrowGltf from '../assets/kaykit/arrow_bow.gltf';
+import bowGltf from '../assets/kaykit/bow_withString.glb';
+import arrowGltf from '../assets/kaykit/arrow_bow.glb';
 import rangedGlb from '../assets/kaykit/Rig_Medium_CombatRanged.glb';
 import moveAdvGlb from '../assets/kaykit/Rig_Medium_MovementAdvanced.glb';
 
 const V3 = THREE.Vector3;
-const parse = data => new Promise((ok, no) => new GLTFLoader().parse(data instanceof Uint8Array ? data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) : data, '', ok, no));
+// (the page may not fetch anything, not even the model's own embedded pictures: with no createImageBitmap the loader
+// reads them through an <img> instead of a fetch)
+const parse = data => new Promise((ok, no) => { const cib = self.createImageBitmap; try { self.createImageBitmap = undefined; } catch (e) { } new GLTFLoader().parse(data instanceof Uint8Array ? data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) : data, '', ok, no); try { self.createImageBitmap = cib; } catch (e) { } });
 let loaded = null;
 export function loadKayKit() {
   if (loaded) return loaded;

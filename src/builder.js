@@ -37,7 +37,9 @@ function rebuild() {
   if (hero && hero !== (kay && kay.root)) { scene.remove(hero); hero.traverse(o => o.geometry && o.geometry.dispose()); } else if (hero) scene.remove(hero);
   if (state.look === 'kaykit') {
     hero = null; renderUI(); save();
-    loadKayKit().then(K => { kay = K; if (state.look !== 'kaykit') return; if (hero) scene.remove(hero); hero = K.root; scene.add(hero); });
+    $('lookBlurb').textContent = 'Loading the ranger…';
+    loadKayKit().then(K => { kay = K; if (state.look !== 'kaykit') return; renderUI(); if (hero) scene.remove(hero); hero = K.root; scene.add(hero); })
+      .catch(e => { $('lookBlurb').textContent = 'The ranger could not load here: ' + (e && e.message || e); });
     return;
   }
   hero = buildHunterLook(state.look, state.pal); setInk(hero, state.ink);
