@@ -237,8 +237,8 @@ void main(){
 // (a point's size on screen is its world size in true perspective: the projection's focal length times the
 // render's height in pixels, over its distance. whoever renders tells the auras the height: AURA_VIEW.h)
 export const AURA_VIEW = { h: 600 };
-const FIRE_PTS_VS = `attribute float aSize, aAlpha, aRot; attribute vec3 aColor; uniform vec3 uUpL; uniform float uH; varying vec3 vCol; varying float vA, vR;
-void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * projectionMatrix[1][1] * uH * 0.5 / max(0.5, -mv.z);
+const FIRE_PTS_VS = `attribute float aSize, aAlpha, aRot; attribute vec3 aColor; uniform vec3 uUpL; uniform float uH, uK; varying vec3 vCol; varying float vA, vR;
+void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * uK * projectionMatrix[1][1] * uH * 0.5 / max(0.5, -mv.z);
   vec3 uv3 = normalize(mat3(modelViewMatrix) * uUpL); float fl = clamp(length(uv3.xy) * 2.0, 0.0, 1.0);
   vCol = aColor; vA = aAlpha; vR = atan(-uv3.x, uv3.y) * fl + aRot; gl_Position = projectionMatrix * mv; }`;
 // (each tongue leans its own way: the texture lookup is turned by the point's angle)
@@ -268,7 +268,7 @@ function pointCloud(g, N, tex, tipDir) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
   geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1)); geo.setAttribute('aRot', new THREE.BufferAttribute(rot, 1));
-  const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tex }, uUpL: { value: tipDir || new THREE.Vector3(0, 1, 0) }, uH: { value: AURA_VIEW.h } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tex }, uUpL: { value: tipDir || new THREE.Vector3(0, 1, 0) }, uH: { value: AURA_VIEW.h }, uK: { value: 1 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   mat.userData.auraPts = true;
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
   return { pos, col, size, alpha, rot, geo, mat, pts, N, flush() { for (const k of ['position', 'aColor', 'aSize', 'aAlpha', 'aRot']) geo.attributes[k].needsUpdate = true; } };
@@ -324,7 +324,7 @@ const BUILD = {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
     geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1)); geo.setAttribute('aRot', new THREE.BufferAttribute(rot, 1));
-    const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tongueTex() }, uUpL: { value: new THREE.Vector3(0, 1, 0) }, uH: { value: AURA_VIEW.h } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    const mat = new THREE.ShaderMaterial({ vertexShader: FIRE_PTS_VS, fragmentShader: FIRE_PTS_FS, uniforms: { tM: { value: tongueTex() }, uUpL: { value: new THREE.Vector3(0, 1, 0) }, uH: { value: AURA_VIEW.h }, uK: { value: 1 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     mat.userData.auraPts = true;
     const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; g.add(pts);
     const rise = 0.9 + power * 0.5, h = 0.25 + span * 0.35 * Math.min(1.5, power);

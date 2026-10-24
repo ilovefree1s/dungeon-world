@@ -59,7 +59,7 @@ const BY_BIOME = [
   [D.M_IMP, D.M_IMP, D.M_FIRESPRITE, D.M_HELLCRAB],
   [D.M_WISP, D.M_WISP, D.M_GHOST, D.M_SPIDER],
 ];
-const MAX_NEAR = 7, SPAWN_MIN = 48, SPAWN_MAX = 104, DESPAWN = 192;
+const MAX_NEAR = 9, SPAWN_MIN = 48, SPAWN_MAX = 104, DESPAWN = 192;
 const barMats = {
   back: new THREE.SpriteMaterial({ color: '#000000', transparent: true, opacity: 0.6, depthWrite: false, depthTest: false }),
   fill: new THREE.SpriteMaterial({ color: '#5ce65c', transparent: true, opacity: 0.95, depthWrite: false, depthTest: false }),
@@ -124,7 +124,7 @@ export class Monsters {
   // a new monster somewhere out of sight, in the biome it stands in
   trySpawn() {
     const p = this.player.pos, w = this.world;
-    let near = 0; for (const m of this.list) if (m.pos.distanceTo(p) < 140) near++;
+    let near = 0; for (const m of this.list) if (m.pos.distanceTo(p) < 100) near++;
     if (near >= MAX_NEAR) return;
     for (let tries = 0; tries < 6; tries++) {
       const a = Math.random() * Math.PI * 2, d = SPAWN_MIN + Math.random() * (SPAWN_MAX - SPAWN_MIN);
@@ -132,7 +132,7 @@ export class Monsters {
       if (!w.loaded(x, z)) continue;
       // (not in front of the camera: they appear behind you and off to the sides)
       const fx = -Math.sin(this.player.yaw), fz = -Math.cos(this.player.yaw);
-      if (((x - p.x) * fx + (z - p.z) * fz) / d > 0.3 && d < 80) continue;
+      if (((x - p.x) * fx + (z - p.z) * fz) / d > 0.3 && d < 60) continue;
       let gy;
       if (w.poly) { const g = w.ground(x, z); if (g === null || w.seaAt(x, z)) continue; gy = g; }
       else { const g = w.groundY(x, z); if (g < 0 || w.water(x, g + 1, z) || w.lava(x, g + 1, z) || w.lava(x, g, z)) continue; gy = g + 1; }
@@ -159,7 +159,7 @@ export class Monsters {
     burst(c.x, c.y, c.z, crit ? '#ffd45a' : '#ffffff', crit ? 10 : 6, 8, 1, true, 0.35);
     sfx(crit ? 'crit' : 'hit');
     if (m.hp <= 0) {
-      this.spawnT = Math.max(this.spawnT, 25);
+      this.spawnT = Math.max(this.spawnT, 10);
       burst(c.x, c.y, c.z, '#ffffff', 14, 12, 1.8, false, 0.6);
       ring(m.pos.x, m.pos.y + 0.1, m.pos.z, '#ffe08a', 0.8, 5, 0.4);
       sfx('kill');
@@ -236,8 +236,8 @@ export class Monsters {
     const w = this.world, p = this.player, hero = p.pos, t = performance.now() / 1000;
     this.timer += dt * 60;
     this.spawnT -= dt;
-    // new ones wander in slowly (one every 8 s or so), never while you're in a fight, and a kill buys 25 s of quiet
-    if (this.spawnT <= 0 && !this.world.flat) { this.spawnT = 8; if (!this.list.some(m => m.state === 'chase')) this.trySpawn(); }
+    // new ones wander in (one every 3.5 s or so, ahead of you too once they're far enough), never while you're in a fight, and a kill buys 10 s of quiet
+    if (this.spawnT <= 0 && !this.world.flat) { this.spawnT = 3.5; if (!this.list.some(m => m.state === 'chase')) this.trySpawn(); }
     for (let i = this.list.length - 1; i >= 0; i--) {
       const m = this.list[i], k = m.k;
       const d = m.pos.distanceTo(hero);

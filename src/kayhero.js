@@ -76,6 +76,7 @@ export function makeKayHero(height, cls = 2) {
 export function holdForged(root, w, spec) {
   const u = root.userData, h = u.hold;
   for (const c of [...h.children]) h.remove(c);
+  u.wtick = w ? w.userData.tick : null;   // (a forged weapon's aura and glow run on its tick)
   if (!w) { h.add(u.own()); return; }
   const len = o => { const s = new THREE.Box3().setFromObject(o).getSize(new V3()); return Math.max(s.x, s.y, s.z); };
   const type = spec && spec.type, g = new THREE.Group(), refLen = len(u.own());
@@ -85,6 +86,11 @@ export function holdForged(root, w, spec) {
   else if (type === 'wand') w.position.y = -(bb.min.y + 0.12 * hgt);
   g.scale.setScalar(refLen / len(w) * (type === 'wand' ? 0.6 : 1));
   g.add(w); h.add(g);
+  // (an aura's sparks are sized in the world, not by the weapon's scale: sized here to how much bigger or smaller the
+  // weapon is in this hand than in the old heroes', 2.56 times its own size)
+  root.updateMatrixWorld(true);
+  const k = w.getWorldScale(new V3()).x / root.getWorldScale(new V3()).x / 2.56;
+  w.traverse(o => { if (o.material && o.material.uniforms && o.material.uniforms.uK) o.material.uniforms.uK.value = k; });
 }
 // each frame: which motion, crossfaded; one-shots (a shot, a dodge) over it; then the proportions
 export function animKay(root, dt, s) {
@@ -109,6 +115,7 @@ export function animKay(root, dt, s) {
   if (A.run) A.run.timeScale = Math.max(0.8, s.speed * 1.05);
   for (const [b, q] of u.rest) b.quaternion.copy(q);
   u.mixer.update(dt);
+  if (u.wtick) u.wtick(performance.now() / 1000);
   u.arrow.visible = u.cls === 2 && !!u.one && (u.one === 'shoot' || u.one === 'up') && u.oneT > 0.3;
   const B = u.B, k = SHAPE.leg, t = SHAPE.thick;
   for (let i = 0; i < 2; i++) { B.ul[i].scale.set(t, k, t); B.ft[i].scale.set(1 / t, 1 / k, 1 / t); }

@@ -56,15 +56,15 @@ with sync_playwright() as pw:
     def frames(n): page.evaluate('window.__f0 = __fc'); page.wait_for_function(f'__fc - __f0 >= {n}')
     from PIL import Image
     ims = []
-    for cls, typ in [(2, 'bow'), (0, 'sword'), (1, 'staff'), (1, 'wand')]:
-        page.evaluate(f"() => {{ const p = __dw.player; p.setClass({cls}); const s = __dw.randomSpec(); s.type = '{typ}'; s.ilvl = 5; p.equipForged(s, {cls}); p.face = p.yaw + Math.PI * 0.5; }}")
+    for cls, typ in [(2, 'bow'), (0, 'sword'), (1, 'staff'), (0, 'greatsword')]:
+        page.evaluate(f"() => {{ const p = __dw.player; p.setClass({cls}); const s = __dw.randomSpec(); s.type = '{typ}'; s.ilvl = 5; s.aura = {{0: 'flame', 1: 'frost', 2: 'lightning'}}[{cls}]; p.equipForged(s, {cls}); p.face = p.yaw + Math.PI * 0.5; }}")
         frames(10)
         page.evaluate("__dw.player.face = __dw.player.yaw + Math.PI * 0.5")
         print(typ, page.evaluate('''() => { const u = __dw.player.model.userData, T = __dw.THREE, f = o => { o.updateMatrixWorld(true); const b = new T.Box3().setFromObject(o); return [b.min.toArray().map(v=>+v.toFixed(2)), b.max.toArray().map(v=>+v.toFixed(2))]; };
           const own = u.own(); const w = u.hold.children[0].children[0]; const ww = w.clone(); ww.position.set(0,0,0); ww.rotation.set(0,0,0); ww.scale.set(1,1,1); return { own: f(own), forged: f(ww) }; }'''))
-        frames(4); page.screenshot(path=SP + 'h.png'); ims.append(Image.open(SP + 'h.png').crop((376, 160, 776, 600)))
-    o = Image.new('RGB', (1600, 440))
-    for i, im in enumerate(ims): o.paste(im, (400 * i, 0))
+        frames(4); page.screenshot(path=SP + 'h.png'); ims.append(Image.open(SP + 'h.png').crop((326, 120, 826, 620)))
+    o = Image.new('RGB', (2000, 500))
+    for i, im in enumerate(ims): o.paste(im, (500 * i, 0))
     o.save(SP + 'held.png')
     page.evaluate("() => { const p = __dw.player; p.setClass(2); const M = __dw.monsters; M.list.slice().forEach(m => M.remove(m)); const m = M.spawn(1, p.pos.x + 6, p.pos.y, p.pos.z); __dw.pet.tame(m); }")
     frames(10); page.screenshot(path=SP + 'pet.png', clip={'x': 0, 'y': 0, 'width': 560, 'height': 240})
