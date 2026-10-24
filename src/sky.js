@@ -1,5 +1,5 @@
 // ============================================================================
-//  DUNGEON WORLD  -  sky: day and night. A square sun and moon, stars, blocky
+//  DUNGEON WORLD  -  sky: day and night. A round sun and moon, stars, blocky
 //  clouds, and the light, fog and sky colors through the day.
 // ============================================================================
 import { THREE, scene, camera, hemi, sun, view } from './engine.js';
@@ -10,38 +10,70 @@ export const sky = { t: 0.32, speed: 1, day: 1, night: 0, sunDir: new THREE.Vect
 const C = c => new THREE.Color(c);
 const uni = {
   topCol: { value: C('#3a8ee6') }, horCol: { value: C('#b7dcff') }, groundCol: { value: C('#6a7f96') },
-  sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: C('#fff2c8') }, night: { value: 0 }, dusk: { value: 0 },
+  sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: C('#fff2c8') }, night: { value: 0 }, dusk: { value: 0 }, time: { value: 0 }, phase: { value: 0.5 },
 };
 const dome = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), new THREE.ShaderMaterial({
   uniforms: uni, side: THREE.BackSide, depthWrite: false, fog: false,
   vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w; }`,
   fragmentShader: `
-    uniform vec3 topCol, horCol, groundCol, sunDir, sunCol; uniform float night, dusk; varying vec3 vDir;
-    // a square disc facing you: the blocky sun and moon
-    float squareDisc(vec3 d, vec3 c, float size){
+    uniform vec3 topCol, horCol, groundCol, sunDir, sunCol; uniform float night, dusk, time, phase; varying vec3 vDir;
+    // where on a disc around the direction c the view direction d falls: (x, y) on the disc, in units of its size
+    vec2 onDisc(vec3 d, vec3 c, float size, out float front){
       vec3 up = abs(c.y) < 0.99 ? vec3(0.0,1.0,0.0) : vec3(1.0,0.0,0.0);
       vec3 u = normalize(cross(up, c)), v = cross(c, u);
-      float f = dot(d, c); if (f <= 0.0) return 0.0;
-      vec2 q = vec2(dot(d,u), dot(d,v)) / f;
-      return step(max(abs(q.x), abs(q.y)), size);
+      float f = dot(d, c); front = step(0.0, f);
+      return vec2(dot(d,u), dot(d,v)) / max(f, 1e-4) / size;
     }
+    float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(h21(i), h21(i + vec2(1,0)), f.x), mix(h21(i + vec2(0,1)), h21(i + vec2(1,1)), f.x), f.y); }
+    float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 4; i++){ s += a * vnoise(p); p = p * 2.03 + 7.1; a *= 0.5; } return s; }
     void main(){
       vec3 d = normalize(vDir);
       float h = d.y;
       vec3 col = mix(horCol, topCol, pow(clamp(h, 0.0, 1.0), 0.55));
       col = mix(col, groundCol, clamp(-h * 3.0, 0.0, 1.0));
       float sd = max(dot(d, sunDir), 0.0);
-      // (a soft warmth around the sun, and a disc no brighter than white: anything brighter would bloom
-      // into a glare across the screen whenever the sun is ahead of you)
+      // (a soft warmth around the sun, wide and low at dusk)
       col += sunCol * (pow(sd, 12.0) * 0.16 * (1.0 - night) + pow(sd, 3.0) * 0.14 * dusk);
-      col = mix(col, vec3(0.84, 0.81, 0.72), squareDisc(d, sunDir, 0.05) * (1.0 - night * 0.9));
-      col = mix(col, vec3(0.72, 0.76, 0.84), squareDisc(d, -sunDir, 0.04) * night);
-      // (nothing in the sky brighter than this: the bloom pass picks up anything over 0.9 and smears it
-      // into a glare across the screen, which is what the sun and the moon used to do)
+      // (nothing in the sky but the discs brighter than this: the bloom pass picks up anything over 0.9 and smears it)
       col = min(col, vec3(0.82));
       vec3 s = floor(d * 240.0);
       float r = fract(sin(dot(s, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-      col += vec3(step(0.9972, r) * night * clamp(h * 4.0, 0.0, 1.0) * (0.45 + 0.3 * fract(r * 91.0)));
+      float stars = step(0.9972, r) * night * clamp(h * 4.0, 0.0, 1.0) * (0.45 + 0.3 * fract(r * 91.0));
+      stars *= 0.65 + 0.35 * sin(time * (1.5 + fract(r * 57.0) * 3.0) + r * 40.0);   // (they twinkle)
+      col += vec3(stars);
+      // ---- the sun: a round disc, darker toward its rim, a corona and slow rays around it; bigger and redder low down
+      float fs; float R = 0.045 * (1.0 + 0.3 * dusk);
+      vec2 qs = onDisc(d, sunDir, R, fs); float rs = length(qs);
+      float vis = fs * smoothstep(-0.06, 0.02, sunDir.y);   // (it sets below the land, not into the night)
+      vec3 sunC = mix(vec3(1.0, 0.9, 0.62), vec3(1.0, 0.5, 0.22), dusk);
+      float ang = atan(qs.y, qs.x);
+      float rays = (0.5 + 0.5 * sin(ang * 9.0 + time * 0.15)) * (0.5 + 0.5 * sin(ang * 14.0 - time * 0.11));
+      float corona = exp(-max(rs - 1.0, 0.0) * 1.1) * 0.22 + exp(-max(rs - 1.0, 0.0) * 0.25) * 0.08 + rays * exp(-max(rs - 1.0, 0.0) * 0.55) * 0.07;
+      col = min(col + sunC * corona * vis * step(1.0, rs), vec3(0.88));
+      float sdisc = 1.0 - smoothstep(0.95, 1.02, rs);
+      vec3 face = sunC * (0.86 + 0.1 * (1.0 - rs * rs)) * (1.0 - 0.06 * fbm(qs * 3.0 + time * 0.05));
+      // (the disc alone is let past the cap: small enough that the bloom only rings it)
+      col = mix(col, face * 2.2, sdisc * vis);
+      // ---- the moon: a round disc with its seas and craters, lit from one side by its phase, a cool halo
+      float fm; vec2 qm = onDisc(d, -sunDir, 0.042, fm); float rm = length(qm);
+      float mvis = fm * night;
+      col += vec3(0.55, 0.62, 0.8) * (exp(-max(rm - 1.0, 0.0) * 1.3) * 0.12 + exp(-max(rm - 1.0, 0.0) * 0.3) * 0.05) * mvis * step(1.0, rm);
+      if (rm < 1.03) {
+        vec3 n = vec3(qm, sqrt(max(0.0, 1.0 - rm * rm)));
+        float pa = phase * 6.2832; vec3 L = vec3(sin(pa), 0.15, -cos(pa));
+        float lit = smoothstep(-0.08, 0.12, dot(n, normalize(L)));
+        float seas = smoothstep(0.42, 0.7, fbm(qm * 1.6 + 3.0));
+        float crater = 0.0;
+        for (int i = 0; i < 7; i++) { vec2 c = vec2(h21(vec2(float(i), 1.0)), h21(vec2(float(i), 2.0))) * 1.5 - 0.75; float cr = 0.08 + 0.12 * h21(vec2(float(i), 3.0));
+          float dd = length(qm - c) / cr; crater += (smoothstep(0.75, 1.0, dd) - smoothstep(1.0, 1.15, dd)) * 0.5 - (1.0 - smoothstep(0.0, 0.85, dd)) * 0.18; }
+        float alb = 0.86 - seas * 0.22 + crater * 0.25 + (fbm(qm * 9.0) - 0.5) * 0.08;
+        vec3 mc = vec3(0.86, 0.88, 0.93) * alb * (0.1 + 0.9 * lit) * (0.88 + 0.12 * n.z);
+        float mdisc = 1.0 - smoothstep(0.96, 1.02, rm);
+        col = mix(col, min(mc, vec3(0.93)), mdisc * mvis);
+      }
+
       gl_FragColor = vec4(col, 1.0);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
@@ -101,7 +133,10 @@ const K = {
 };
 const tmp = new THREE.Color(), tmp2 = new THREE.Color();
 export function updateSky(dt, focus) {
-  sky.t = (sky.t + dt * sky.speed / DAY_LEN) % 1;
+  { const t0 = sky.t; sky.t = (sky.t + dt * sky.speed / DAY_LEN) % 1; if (sky.t < t0) sky.days = (sky.days || 0) + 1; }
+  uni.time.value += dt;
+  // (the moon's phase goes round every eight days: full on the fourth night)
+  uni.phase.value = (((sky.days || 0) + sky.t) / 8 + 0.5) % 1;
   const a = (sky.t - 0.25) * Math.PI * 2;
   const sd = sky.sunDir.set(Math.cos(a), Math.sin(a), 0.32).normalize();
   const s = sd.y;

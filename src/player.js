@@ -329,13 +329,17 @@ export class Player {
     this.walk += dt * (4 + hs * 1.15);
     const t = performance.now() / 1000;
     const rolling = this.dash && this.dash.roll ? Math.max(0.01, this.dash.t / 0.42) : 0;
+    // (off the ground only counts once it lasts: walking down a slope leaves the ground by a hair every step, and the
+    // body shouldn't flick into a jump each time)
+    this.airT = this.onGround || swimming ? 0 : (this.airT || 0) + dt;
+    const airborne = this.airT > 0.16 || (!this.onGround && this.vel.y > 2);
     if (m.userData.kay) {
-      animKay(m, dt, { speed: this.onGround || swimming ? Math.min(1.6, hs / WALK) : 0, air: !this.onGround && !swimming && !rolling, swim: swimming, roll: rolling, cast: this.castT, castKind: this.castKind, aiming: !!this.aiming && cls0(this) === false, swing: this.swingT, swingN: this.swingN, whirl: this.whirl, slam: this.slamming, block: !!(this.buffs && this.buffs.block) });
+      animKay(m, dt, { speed: !airborne || swimming ? Math.min(1.6, hs / WALK) : 0, air: airborne && !swimming && !rolling, swim: swimming, roll: rolling, cast: this.castT, castKind: this.castKind, aiming: !!this.aiming && cls0(this) === false, swing: this.swingT, swingN: this.swingN, whirl: this.whirl, slam: this.slamming, block: !!(this.buffs && this.buffs.block) });
       return this.afterAnim(m, t, p);
     }
-    animHero(m, t, { walk: this.walk, move: this.onGround || swimming ? this.move : 0.15, roll: rolling, swing: this.swingT, cast: this.castT, whirl: this.whirl });
+    animHero(m, t, { walk: this.walk, move: !airborne || swimming ? this.move : 0.15, roll: rolling, swing: this.swingT, cast: this.castT, whirl: this.whirl });
     const u = m.userData;
-    if (!this.onGround && !swimming && !rolling && !this.slamming) {
+    if (airborne && !swimming && !rolling && !this.slamming) {
       // in the air: knees up, arms out
       const k = Math.max(-1, Math.min(1, this.vel.y / 20));
       u.legs[0].rotation.x = -0.6 - k * 0.2; u.legs[1].rotation.x = 0.25 - k * 0.3;
