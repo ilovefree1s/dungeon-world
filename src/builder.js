@@ -5,6 +5,7 @@
 // ============================================================================
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { loadKayKit, tickKayKit } from './kaykit.js';
 import { LOOKS, SKINS, HAIRS, MAINS, ACCENTS, buildHunterLook, tickHunter, poseHunter, setInk, INK } from './hunters.js';
 
 const $ = id => document.getElementById(id);
@@ -27,20 +28,28 @@ const rimStone = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.06, 8, 64), new 
 rimStone.rotation.x = Math.PI / 2; rimStone.position.y = 0.0; scene.add(rimStone);
 
 const state = { look: 'ranger', pal: {}, anim: 'walk', spin: true, yaw: 0.5, ink: true, close: false };
-try { const s = JSON.parse(localStorage.getItem('dw-hunter-builder')); if (s && LOOKS.some(l => l.id === s.look)) Object.assign(state, { look: s.look, pal: s.pal || {} }); } catch (e) { }
+try { const s = JSON.parse(localStorage.getItem('dw-hunter-builder')); if (s && (s.look === 'kaykit' || LOOKS.some(l => l.id === s.look))) Object.assign(state, { look: s.look, pal: s.pal || {} }); } catch (e) { }
 const save = () => { try { localStorage.setItem('dw-hunter-builder', JSON.stringify({ look: state.look, pal: state.pal })); } catch (e) { } };
 let hero = null;
+let kay = null;
+const KAY = { id: 'kaykit', name: 'KAYKIT RANGER', blurb: 'Kay Lousberg’s ranger from the KayKit Adventurers pack (free, CC0), with the pack’s own idle, walk and run. Its colors come from its texture, so the swatches don’t change it.' };
 function rebuild() {
-  if (hero) { scene.remove(hero); hero.traverse(o => o.geometry && o.geometry.dispose()); }
+  if (hero && hero !== (kay && kay.root)) { scene.remove(hero); hero.traverse(o => o.geometry && o.geometry.dispose()); } else if (hero) scene.remove(hero);
+  if (state.look === 'kaykit') {
+    hero = null; renderUI(); save();
+    loadKayKit().then(K => { kay = K; if (state.look !== 'kaykit') return; if (hero) scene.remove(hero); hero = K.root; scene.add(hero); });
+    return;
+  }
   hero = buildHunterLook(state.look, state.pal); setInk(hero, state.ink);
   scene.add(hero);
   renderUI(); save();
 }
-const palOf = () => ({ ...LOOKS.find(l => l.id === state.look).pal, ...state.pal });
+const lookOf = id => id === 'kaykit' ? { ...KAY, pal: LOOKS[0].pal } : LOOKS.find(l => l.id === id);
+const palOf = () => ({ ...lookOf(state.look).pal, ...state.pal });
 
 // ---------------------------------------------------------------- the panel
 function renderUI() {
-  const L = LOOKS.find(l => l.id === state.look), P = palOf();
+  const L = lookOf(state.look), P = palOf();
   for (const b of document.querySelectorAll('.look')) b.setAttribute('aria-pressed', b.dataset.id === state.look);
   $('lookName').textContent = L.name; $('lookBlurb').textContent = L.blurb;
   const row = (id, list, cur, isIndex) => {
@@ -51,12 +60,12 @@ function renderUI() {
   $('ink').setAttribute('aria-pressed', state.ink); $('close').setAttribute('aria-pressed', state.close);
   $('code').textContent = `${L.name} · skin ${P.skin + 1} · hair ${P.hair + 1} · main ${P.main} · accent ${P.accent}`;
 }
-$('looks').innerHTML = LOOKS.map((l, i) => `<button class="look" data-id="${l.id}"><span class="n">${i + 1}</span><span class="t">${l.name}</span></button>`).join('');
+$('looks').innerHTML = [...LOOKS, KAY].map((l, i) => `<button class="look" data-id="${l.id}"><span class="n">${i + 1}</span><span class="t">${l.name}</span></button>`).join('');
 $('looks').addEventListener('click', e => { const b = e.target.closest('.look'); if (!b) return; state.look = b.dataset.id; state.pal = {}; rebuild(); });
 const bindRow = (id, k, isIndex) => $(id).addEventListener('click', e => { const b = e.target.closest('.sw'); if (!b) return; state.pal[k] = isIndex ? +b.dataset.v : b.dataset.v; rebuild(); });
 bindRow('swSkin', 'skin', true); bindRow('swHair', 'hair', true); bindRow('swMain', 'main', false); bindRow('swAccent', 'accent', false);
 $('anims').addEventListener('click', e => { const b = e.target.closest('.anim'); if (!b) return; state.anim = b.dataset.a; animT = 0; renderUI(); });
-$('ink').addEventListener('click', () => { state.ink = !state.ink; setInk(hero, state.ink); renderUI(); });
+$('ink').addEventListener('click', () => { state.ink = !state.ink; if (hero) setInk(hero, state.ink); renderUI(); });
 $('close').addEventListener('click', () => { state.close = !state.close; resize(); renderUI(); });
 $('reset').addEventListener('click', () => { state.pal = {}; rebuild(); });
 $('shuffle').addEventListener('click', () => {
@@ -69,7 +78,7 @@ $('copy').addEventListener('click', async () => {
   catch (e) { const r = document.createRange(); r.selectNodeContents($('code')); getSelection().removeAllRanges(); getSelection().addRange(r); $('copy').textContent = 'SELECTED'; }
   setTimeout(() => $('copy').textContent = 'COPY', 1400);
 });
-addEventListener('keydown', e => { const n = +e.key; if (n >= 1 && n <= 5) { state.look = LOOKS[n - 1].id; state.pal = {}; rebuild(); } });
+addEventListener('keydown', e => { const n = +e.key; if (n >= 1 && n <= 6) { state.look = [...LOOKS, KAY][n - 1].id; state.pal = {}; rebuild(); } });
 
 // drag to turn
 let drag = null;
@@ -86,6 +95,7 @@ function animate(t, dt) {
   let draw = -1;
   if (state.anim === 'shoot') { animT = (animT + dt / 1.5) % 1; draw = animT; }
   const turn = dt > 0 ? (state.yaw - lastYaw) / dt : 0; lastYaw = state.yaw;
+  if (kay && hero === kay.root) { tickKayKit(kay, dt, state.anim); return; }
   poseHunter(hero, t, { speed: spd, draw });
   tickHunter(hero, dt, { speed: spd, turn, t, draw });
 }
@@ -110,4 +120,4 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 rebuild(); resize(); requestAnimationFrame(frame);
-window.__hb = { state, rebuild, LOOKS };
+window.__hb = { state, rebuild, LOOKS, get kay() { return kay; } };

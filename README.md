@@ -181,3 +181,7 @@ boats and mounts.
   combinations, wields one per hero and reloads. It also visits every biome by day and night, opens the menu, and saves
   screenshots to `shots/`. `?debug` shows frame time, chunks and triangles; `?seed=N` picks
   another world, `?fresh` ignores the save.
+
+## Credits
+
+- Characters and animations from KayKit (Adventurers, Character Animations, Skeletons) by Kay Lousberg, www.kaylousberg.com, CC0 (`assets/kaykit/License.txt`).
