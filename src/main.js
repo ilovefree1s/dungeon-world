@@ -68,6 +68,11 @@ let deadT = 0;
 monsters.hooks.dead = () => { sfx('death'); deadT = 2.6; banner('YOU FELL', 'back to the woods...'); player.invT = 9; if (player.model.userData.fade) player.model.userData.fade(0.4); };
 const ctx = { player, world, monsters, bolts, shake: k => { player.shake = Math.max(player.shake || 0, k); } };
 const abilities = new Abilities(ctx);
+// the cursors in play: a sword (its point is the hot spot), a red one over a monster, a loot bag over a fallen one with a drop
+const svgCursor = (svg, x, y, fallback) => `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${x} ${y}, ${fallback}`;
+const swordSvg = (blade, edge, glow) => `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>${glow ? `<path d='M2 2 L6 3 L21 18 L18 21 L3 6 Z' fill='none' stroke='${glow}' stroke-width='4' stroke-linejoin='round' opacity='.55'/>` : ''}<path d='M2 2 L6 3 L21 18 L18 21 L3 6 Z' fill='${blade}' stroke='#1a1210' stroke-width='1.4' stroke-linejoin='round'/><path d='M3 3 L20 20' stroke='${edge}' stroke-width='1' opacity='.8'/><path d='M15 23 L23 15 L25 17 L17 25 Z' fill='#c8962c' stroke='#1a1210' stroke-width='1.3' stroke-linejoin='round'/><path d='M21 21 L27 27' stroke='#5a3a22' stroke-width='3.4' stroke-linecap='round'/><path d='M21 21 L27 27' stroke='#1a1210' stroke-width='5' stroke-linecap='round' opacity='.35'/><circle cx='28' cy='28' r='2.4' fill='#ffd45a' stroke='#1a1210' stroke-width='1.2'/></svg>`;
+const bagSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><path d='M10 9 Q16 4 22 9' fill='none' stroke='#1a1210' stroke-width='2.6'/><path d='M10 9 Q16 5 22 9' fill='none' stroke='#c8962c' stroke-width='1.4'/><path d='M8 11 Q4 26 16 29 Q28 26 24 11 Z' fill='#8a5a2e' stroke='#1a1210' stroke-width='1.5' stroke-linejoin='round'/><path d='M9 12 L23 12' stroke='#ffd45a' stroke-width='2'/><circle cx='16' cy='21' r='3.2' fill='#ffd45a' stroke='#1a1210' stroke-width='1.1'/></svg>`;
+const CURSOR = { idle: svgCursor(swordSvg('#dfe6ee', '#ffffff', null), 1, 1, 'default'), foe: svgCursor(swordSvg('#ff8a7a', '#ffe0d8', '#ff3020'), 1, 1, 'crosshair'), loot: svgCursor(bagSvg, 16, 16, 'pointer') };
 // the fallen: bodies stay a while, some with a weapon on them
 const bodies = new Bodies(player);
 monsters.hooks.fallen = m => bodies.fall(m, rollDrop(m, player.cls));
@@ -114,7 +119,7 @@ function heroCombat(dt, inp, frozen) {
     if (inp.turnWith) { player.aimFace = player.yaw + Math.PI; inp.turnWith = false; }
     // what's under the cursor shapes it: a sword over a monster, a hand over loot
     if (inp.dragging && document.pointerLockElement) gl.style.cursor = 'none';   // (looking around: no cursor in the way)
-    else if (inp.cursor.in) { const m = pickMonster(monsters, inp.cursor.x, inp.cursor.y, w, h); const b = m ? null : bodies.pickAt(inp.cursor.x, inp.cursor.y, w, h); gl.style.cursor = m ? 'crosshair' : b ? 'pointer' : 'default'; }
+    else if (inp.cursor.in) { const m = pickMonster(monsters, inp.cursor.x, inp.cursor.y, w, h); const b = m ? null : bodies.pickAt(inp.cursor.x, inp.cursor.y, w, h); gl.style.cursor = m ? CURSOR.foe : b ? CURSOR.loot : CURSOR.idle; }
     // the left click targets: a monster is focused (attacks aim at it), a body with loot is looked at, the ground clears the focus
     if (inp.clickAt) {
       const c = inp.clickAt; inp.clickAt = null;
