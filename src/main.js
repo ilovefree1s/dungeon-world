@@ -113,7 +113,7 @@ function heroCombat(dt, inp, frozen) {
     // the right button turns the hero with the camera
     if (inp.turnWith) { player.aimFace = player.yaw + Math.PI; inp.turnWith = false; }
     // what's under the cursor shapes it: a sword over a monster, a hand over loot
-    if (inp.dragging) gl.style.cursor = 'none';   // (looking around: no cursor in the way)
+    if (inp.dragging && document.pointerLockElement) gl.style.cursor = 'none';   // (looking around: no cursor in the way)
     else if (inp.cursor.in) { const m = pickMonster(monsters, inp.cursor.x, inp.cursor.y, w, h); const b = m ? null : bodies.pickAt(inp.cursor.x, inp.cursor.y, w, h); gl.style.cursor = m ? 'crosshair' : b ? 'pointer' : 'default'; }
     // the left click targets: a monster is focused (attacks aim at it), a body with loot is looked at, the ground clears the focus
     if (inp.clickAt) {
@@ -127,6 +127,9 @@ function heroCombat(dt, inp, frozen) {
     if (inp.rclickAt) {
       const c = inp.rclickAt; inp.rclickAt = null;
       const m = pickMonster(monsters, c.x, c.y, w, h);
+      // (on a fallen one with loot, the right click opens it too)
+      const lb = m ? null : bodies.pickAt(c.x, c.y, w, h);
+      if (lb) { openLoot(lb); return; }
       if (m && m !== monsters.focus) { monsters.focus = m; inp.autoAtk = true; }
       else if (monsters.focus) inp.autoAtk = !inp.autoAtk;
       else inp.atkEdge = true;

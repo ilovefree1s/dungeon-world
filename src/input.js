@@ -91,7 +91,7 @@ export function initTouch(canvas) {
       l.moved += Math.abs(e.clientX - l.x) + Math.abs(e.clientY - l.y);
       // a real drag: the pointer is locked for as long as it lasts, so the cursor hides and stays where it was
       // (let go and it's back on the same spot); while locked, the movement comes through mousemove below
-      if (l.moved > 6 && !input.dragging) { input.dragging = true; dragLock = true; lockMouse(canvas); }
+      if (l.moved > 10 && !input.dragging) { input.dragging = true; dragLock = true; lockMouse(canvas); }
     }
     input.lookX += (e.clientX - l.x) * k; input.lookY += (e.clientY - l.y) * k;
     if (l.turn) input.turnWith = true;   // (the right button: the hero turns with the camera)
@@ -107,7 +107,7 @@ export function initTouch(canvas) {
       if (!mouseButtons) { input.dragging = false; if (dragLock) { dragLock = false; unlockMouse(); } }
       // a click that didn't drag: pick what's under the cursor (left), or the first ability (right)
       // a click that didn't drag: the left picks what's under the cursor (a target, loot); the right attacks it (auto-attack)
-      if (l && l.moved !== undefined && l.moved < 6 && performance.now() - l.t0 < 400) { if (l.button === 0) input.clickAt = { x: e.clientX, y: e.clientY }; else if (l.button === 2) input.rclickAt = { x: e.clientX, y: e.clientY }; }
+      if (l && l.moved !== undefined && l.moved <= 10 && performance.now() - l.t0 < 500) { if (l.button === 0) input.clickAt = { x: e.clientX, y: e.clientY }; else if (l.button === 2) input.rclickAt = { x: e.clientX, y: e.clientY }; }
       return;
     }
     if (e.button === 0) input.mAtk = 0;
@@ -127,7 +127,15 @@ export function initTouch(canvas) {
   document.addEventListener('mouseup', e => { if (!dragLock) return; mouseButtons &= ~(1 << e.button); input.bothHeld = (mouseButtons & 3) === 3; if (!mouseButtons) { input.dragging = false; dragLock = false; looks.clear(); unlockMouse(); } });
   // the scroll wheel brings the camera nearer or farther
   canvas.addEventListener('wheel', e => { e.preventDefault(); input.zoom += Math.sign(e.deltaY); }, { passive: false });
-  document.addEventListener('pointerlockchange', () => { input.onLockChange && input.onLockChange(mouseLocked()); });
+  document.addEventListener('pointerlockchange', () => {
+    // (a lock that arrives after its drag already ended — a quick flick: the browser grants it late — is let go at once,
+    // or the cursor would stay hidden)
+    if (input.cursorMode && mouseLocked() && !dragLock) { document.exitPointerLock(); return; }
+    if (input.cursorMode && !mouseLocked() && dragLock) { dragLock = false; input.dragging = false; mouseButtons = 0; input.bothHeld = false; looks.clear(); }
+    input.onLockChange && input.onLockChange(mouseLocked());
+  });
+  // (the window losing focus mid-drag: nothing is held any more)
+  addEventListener('blur', () => { if (dragLock) { dragLock = false; unlockMouse(); } input.dragging = false; mouseButtons = 0; input.bothHeld = false; looks.clear(); });
 }
 export const mouseLocked = () => !!document.pointerLockElement;
 export function lockMouse(canvas = document.getElementById('gl')) {

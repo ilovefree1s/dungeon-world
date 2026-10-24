@@ -43,7 +43,9 @@ export class Bodies {
     root.userData.flash && root.userData.flash(0);
     root.rotation.z = (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2;
     root.position.copy(m.pos); root.position.y += m.k.r * 0.6;
-    const b = { root, pos: m.pos.clone(), t: 0, spec, mark: null, h: m.k.h };
+    // (a flyer that dies in the air drops: the body falls to the ground and lies there)
+    const w = this.player.world, g = w && w.poly ? w.ground(m.pos.x, m.pos.z) : null;
+    const b = { root, pos: m.pos.clone(), t: 0, spec, mark: null, h: m.k.h, r: m.k.r, vy: 0, floor: g !== null && g !== undefined ? g : m.pos.y };
     if (spec) { const rr = rarityOf(spec); b.mark = new THREE.Sprite(markMat.clone()); b.mark.material.color.set(rr.color); b.mark.scale.setScalar(2.6 + RARITIES.indexOf(rr) * 0.5); b.mark.position.set(b.pos.x, b.pos.y + 3.5, b.pos.z); scene.add(b.mark); b.color = rr.color; }
     this.list.push(b);
     return true;
@@ -61,6 +63,11 @@ export class Bodies {
     let best = null, bd = LOOK;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const b = this.list[i]; b.t += dt;
+      if (b.pos.y > b.floor + 0.01) {
+        b.vy -= 40 * dt; b.pos.y = Math.max(b.floor, b.pos.y + b.vy * dt);
+        b.root.position.y = b.pos.y + b.r * 0.6;
+        if (b.pos.y <= b.floor) { b.vy = 0; burst(b.pos.x, b.pos.y + 0.3, b.pos.z, '#c8b090', 8, 5, 1.2, false, 0.5); }
+      }
       if (b.t > BODY_LIFE || b.pos.distanceTo(p) > 220) { if (b.t > BODY_LIFE - 1.2 && b.root.userData.fade) b.root.userData.fade(Math.max(0, BODY_LIFE - b.t) / 1.2); if (b.t > BODY_LIFE) this.remove(b); continue; }
       if (b.mark) { b.mark.position.y = b.pos.y + 3.5 + Math.sin(b.t * 3) * 0.3; b.mark.material.opacity = 0.7 + 0.3 * Math.sin(b.t * 5); if (Math.random() < dt * 2) burst(b.pos.x, b.pos.y + 1.5, b.pos.z, b.color || '#ffe08a', 3, 2, 0.8, true, 0.5, 1); }
       if (!b.spec || fighting) continue;
