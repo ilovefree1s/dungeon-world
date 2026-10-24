@@ -11,6 +11,7 @@
 //  motion) runs the cloth, hair and faces.
 // ============================================================================
 import * as THREE from 'three';
+import { sculptBody } from './sculpt.js';
 
 const V3 = THREE.Vector3, TAU = Math.PI * 2;
 const cl = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -184,16 +185,31 @@ class Chain {
 
 // ---------------------------------------------------------------- ink
 // a thin dark line around each piece: the piece drawn again a hair larger, inside out, in a deep shade of its color
-const INK_VS = `uniform float uW; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vec3 n = normalize(normalMatrix * normal); mv.xyz += n * uW * max(1.0, -mv.z) ; gl_Position = projectionMatrix * mv; }`;
-const INK_FS = `uniform vec3 uColor; void main(){ gl_FragColor = vec4(uColor, 1.0); }`;
 export const INK = { value: 0.0021 };
 const INKS = new Map();
-const inkMat = c => { const k = c.getHexString(); if (!INKS.has(k)) INKS.set(k, new THREE.ShaderMaterial({ uniforms: { uColor: { value: c.clone().multiplyScalar(0.16).lerp(new THREE.Color('#120c08'), 0.55) }, uW: INK }, vertexShader: INK_VS, fragmentShader: INK_FS, side: THREE.BackSide })); return INKS.get(k); };
+function inkMat(c) {
+  const k = c.getHexString();
+  if (INKS.has(k)) return INKS.get(k);
+  const m = new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(0.16).lerp(new THREE.Color('#120c08'), 0.55), side: THREE.BackSide });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uW = INK;
+    sh.vertexShader = 'uniform float uW;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+      #ifdef USE_SKINNING
+        vec3 inkN = objectNormal;
+      #else
+        vec3 inkN = normal;
+      #endif
+      mvPosition.xyz += normalize(normalMatrix * inkN) * uW * max(1.0, -mvPosition.z);
+      gl_Position = projectionMatrix * mvPosition;`);
+  };
+  m.customProgramCacheKey = () => 'hunter-ink';
+  INKS.set(k, m); return m;
+}
 function ink(root) {
   root.updateMatrixWorld(true);
   const list = [];
   root.traverse(o => {
-    if (!o.isMesh || o.userData.noInk || o.userData.ink || !o.material || o.material.isMeshBasicMaterial || o.material.side === THREE.DoubleSide) return;
+    if (!o.isMesh || o.isSkinnedMesh || o.userData.noInk || o.userData.ink || !o.material || o.material.isMeshBasicMaterial || o.material.side === THREE.DoubleSide) return;
     const gp = o.geometry.parameters || {};
     if (o.geometry.type === 'LatheGeometry' && ((gp.points[0].x > 0.01 || gp.points[gp.points.length - 1].x > 0.01) || gp.phiLength < TAU - 0.01)) return;
     if (o.geometry.type === 'SphereGeometry' && (gp.thetaLength < Math.PI - 0.01 || gp.phiLength < TAU - 0.01)) return;
@@ -204,45 +220,23 @@ function ink(root) {
   });
   const inks = [];
   for (const o of list) { const k = new THREE.Mesh(o.geometry, inkMat(o.material.color)); k.userData.ink = true; k.castShadow = false; k.raycast = () => { }; o.add(k); inks.push(k); }
+  // the sculpted body: one outline, skinned to the same bones
+  const sk = root.userData.skinned;
+  if (sk) { const k = new THREE.SkinnedMesh(sk.geometry, inkMat(new THREE.Color('#5a3a28'))); k.frustumCulled = false; k.castShadow = false; k.userData.ink = true; sk.parent.add(k); k.bind(sk.skeleton, sk.bindMatrix); inks.push(k); }
   root.userData.inks = inks;
 }
 export function setInk(root, on) { for (const k of root.userData.inks || []) k.visible = on; }
 
 // ---------------------------------------------------------------- the body
-// o: { skin, leg, knee, boot, torso, arm, fore, hand, slim, tall (boots to the knee), cuff }
+// o: { skin, leg, boot, torso, arm, fore, hand, slim, tall (boots to the knee), cuff, ears }: one sculpted, skinned body
 function rig(o) {
-  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
-  const S = o.slim ? 0.93 : 1, legs = [], arms = [], knees = [], elbows = [], hands = [];
-  for (const s of [-1, 1]) {
-    const leg = new THREE.Group(); leg.position.set(0.155 * s * S, 0.78, 0);
-    leg.add(mesh(limb(0.14 * S, 0.112 * S, 0.34), o.leg));
-    const knee = new THREE.Group(); knee.position.y = -0.36; leg.add(knee);
-    knee.add(mesh(limb(0.112 * S, 0.088 * S, 0.3), o.tall ? o.boot : o.leg));
-    const foot = new THREE.Group(); foot.position.y = -0.33; knee.add(foot);
-    const boot = mesh(rbox(0.22, 0.15, 0.36, 0.6), o.boot); boot.position.set(0, -0.04, 0.06); foot.add(boot);
-    const sole = mesh(rbox(0.235, 0.045, 0.38, 0.4), M('leather', '#2a1c12')); sole.position.set(0, -0.11, 0.06); foot.add(sole);
-    const cuff = mesh(cyl(0.122 * S, 0.112 * S, 0.08, 18), o.cuff || o.boot); cuff.position.y = o.tall ? 0.02 : -0.22; knee.add(cuff);
-    if (o.tall) { cuff.position.y = -0.02; const r = mesh(tor(0.118 * S, 0.022), o.cuff || o.boot); r.rotation.x = Math.PI / 2; knee.add(r); }
-    body.add(leg); legs.push(leg); knees.push(knee);
-  }
-  const torso = mesh(lathe([[0.001, 0.66], [0.2, 0.67], [0.28, 0.74], [0.3, 0.86], [0.285, 0.98], [0.31, 1.1], [0.335, 1.22], [0.34, 1.32], [0.31, 1.42], [0.22, 1.5], [0.12, 1.54], [0.001, 1.55]], 30), o.torso);
-  torso.scale.set(1.04 * S, 1, 0.78); body.add(torso);
-  const neck = mesh(limb(0.09, 0.1, 0.16, 14), o.skin); neck.position.y = 1.68; body.add(neck);
-  for (const s of [-1, 1]) {
-    const arm = new THREE.Group(); arm.position.set(0.4 * s * S, 1.39, 0);
-    arm.add(mesh(sph(0.118, 16, 12), o.arm));
-    arm.add(mesh(limb(0.098, 0.084, 0.27), o.arm));
-    const elbow = new THREE.Group(); elbow.position.y = -0.28; arm.add(elbow);
-    elbow.add(mesh(limb(0.084, 0.072, 0.24), o.fore || o.arm));
-    const hand = new THREE.Group(); hand.position.y = -0.28; elbow.add(hand);
-    const palm = mesh(sph(0.088, 14, 12), o.hand); palm.scale.set(0.9, 1.1, 0.75); hand.add(palm);
-    const thumb = mesh(limb(0.032, 0.026, 0.07, 8), o.hand); thumb.position.set(-0.05 * s, 0.01, 0.04); thumb.rotation.set(0.4, 0, 0.7 * s); hand.add(thumb);
-    body.add(arm); arms.push(arm); elbows.push(elbow); hands.push(hand);
-  }
-  const head = new THREE.Group(); head.position.y = 1.86; body.add(head);
-  const skull = mesh(sph(0.27, 30, 22), o.skin); skull.scale.set(1, 1.06, 0.98); head.add(skull);
-  const jaw = mesh(sph(0.2, 22, 16), o.skin); jaw.position.set(0, -0.1, 0.07); jaw.scale.set(1, 0.78, 0.92); head.add(jaw);
-  root.userData = { body, legs, arms, knees, elbows, hands, head, torso, sims: [], motes: null };
+  const root = new THREE.Group();
+  const B = sculptBody({ slim: o.slim, tall: o.tall, ears: o.ears, mask: !!o.mask, beard: !!o.beard }, { mask: o.mask, beard: o.beard, skin: o.skin, torso: o.torso, leg: o.leg, shin: o.leg, boot: o.boot, arm: o.arm, fore: o.fore || o.arm, hand: o.hand });
+  root.add(B.mesh);
+  const S = o.slim ? 0.93 : 1;
+  // a cuff where the boot ends
+  for (const k of B.knees) { const r = mesh(tor(o.tall ? 0.112 * S : 0.09 * S, 0.022, TAU, 22), o.cuff || o.boot); r.rotation.x = Math.PI / 2; r.position.y = o.tall ? -0.03 : -0.24; k.add(r); }
+  root.userData = { body: B.body, legs: B.legs, arms: B.arms, knees: B.knees, elbows: B.elbows, hands: B.hands, head: B.head, skinned: B.mesh, sculpted: true, sims: [], motes: null };
   return root;
 }
 // a face: eyes with lids that blink and squint, brows, a nose, a mouth
@@ -250,7 +244,7 @@ function face(u, o) {
   const head = u.head, skin = o.skin, F = { lids: [], brows: [], blinkT: 2 + Math.random() * 2, blink: 0 };
   for (const s of [-1, 1]) {
     if (o.glowEyes) { const e = new THREE.Mesh(sph(0.042, 12, 8), glow(o.glowEyes, 1.6)); e.position.set(0.095 * s, 0.03, 0.245); e.scale.set(1.4, 0.55, 0.6); e.rotation.z = 0.25 * s; head.add(e); continue; }
-    const eg = new THREE.Group(); eg.position.set(0.095 * s, 0.03, 0.218); head.add(eg);
+    const eg = new THREE.Group(); eg.position.set(0.093 * s, 0.03, 0.238); head.add(eg);
     const w = mesh(sph(0.058, 16, 12), M('gem', '#f6f2ea')); w.scale.set(1, 1.08, 0.55); w.userData.noInk = true; eg.add(w);
     const ir = mesh(sph(0.038, 14, 10), M('gem', o.eye || '#3a2a1c')); ir.position.z = 0.026; ir.scale.z = 0.5; eg.add(ir);
     const pu = new THREE.Mesh(sph(0.018, 10, 8), glow('#0a0606')); pu.position.z = 0.038; pu.scale.z = 0.5; eg.add(pu);
@@ -258,13 +252,14 @@ function face(u, o) {
     // the upper lid: a shell of skin over the eye that drops to blink
     const lid = mesh(new THREE.SphereGeometry(0.064, 16, 10, 0, TAU, 0, Math.PI * 0.5), skin); lid.scale.set(1.04, 0.3, 0.62); lid.rotation.x = -0.25; lid.position.y = 0.012; lid.userData.noInk = true; eg.add(lid); F.lids.push(lid);
     const lash = mesh(tor(0.06, 0.008, Math.PI, 14), M('dark', '#1a1210')); lash.scale.set(1.05, 1, 0.6); lash.position.set(0, 0.012, 0.012); lash.userData.noInk = true; eg.add(lash); F.lids.push(lash);
-    const bg = new THREE.Group(); bg.position.set(0.095 * s, 0.098, 0.252); head.add(bg); bg.userData.s = s; F.brows.push(bg);
+    const bg = new THREE.Group(); bg.position.set(0.095 * s, 0.092, 0.268); head.add(bg); bg.userData.s = s; F.brows.push(bg);
     const br = mesh(limb(0.019, 0.012, 0.11, 8), M('hair', o.brow || '#3a2418')); br.rotation.z = Math.PI / 2 * s; br.position.x = -0.055 * s; br.userData.noInk = true; bg.add(br); bg.rotation.x = -0.2;
-    if (o.ears === 'elf') { const e = mesh(cone(0.06, o.earLen || 0.26, 10), skin); e.position.set(0.33 * s, 0.06, -0.03); e.rotation.set(-0.3, 0, -1.2 * s); e.scale.z = 0.42; head.add(e); }
+    if (u.sculpted) { /* (the ears are part of the head) */ }
+    else if (o.ears === 'elf') { const e = mesh(cone(0.06, o.earLen || 0.26, 10), skin); e.position.set(0.33 * s, 0.06, -0.03); e.rotation.set(-0.3, 0, -1.2 * s); e.scale.z = 0.42; head.add(e); }
     else if (o.ears !== 'none') { const e = mesh(sph(0.062, 12, 10), skin); e.position.set(0.262 * s, 0.0, -0.01); e.scale.set(0.45, 1, 0.8); head.add(e); }
   }
-  const nose = mesh(sph(0.042, 14, 10), skin); nose.position.set(0, -0.035, 0.27); nose.scale.set(0.75, 0.95, 0.85); nose.userData.noInk = true; head.add(nose);
-  const mouth = mesh(tor(0.045, 0.011, Math.PI * 0.7, 12), M('skin', o.lip || '#9a4a3c')); mouth.rotation.z = Math.PI + Math.PI * 0.15; mouth.position.set(0, -0.1, 0.255); mouth.scale.set(1, o.smile ?? 0.5, 0.6); mouth.userData.noInk = true; head.add(mouth);
+  if (!u.sculpted) { const nose = mesh(sph(0.042, 14, 10), skin); nose.position.set(0, -0.035, 0.27); nose.scale.set(0.75, 0.95, 0.85); nose.userData.noInk = true; head.add(nose); }
+  const mouth = mesh(tor(0.045, 0.011, Math.PI * 0.7, 12), M('skin', o.lip || '#9a4a3c')); mouth.rotation.z = Math.PI + Math.PI * 0.15; mouth.position.set(0, -0.1, 0.262); mouth.scale.set(1, o.smile ?? 0.5, 0.6); mouth.userData.noInk = true; if (!o.noMouth) head.add(mouth);
   u.face = F;
 }
 // hair: 'top' (what shows under a hood or hat), 'short', 'long' (strands on springs), 'braid', 'pony'
@@ -288,7 +283,7 @@ function hair(u, style, m) {
 }
 // a bow in the left hand: 'recurve' | 'long' | 'bone' | 'dark' | 'wrapped'
 function makeBow(u, kind, limbM, gripM, accent) {
-  const bow = new THREE.Group(); bow.position.set(0, -0.02, 0.05); u.hands[0].add(bow);
+  const bow = new THREE.Group(); bow.position.set(0, -0.05, 0.04); u.hands[0].add(bow);
   const L = kind === 'long' ? 0.98 : 0.8;
   const prof = kind === 'recurve' || kind === 'dark' || kind === 'bone'
     ? [[-L, -0.2], [-L * 0.86, -0.07], [-L * 0.6, 0.08], [-L * 0.25, 0.16], [0, 0.18], [L * 0.25, 0.16], [L * 0.6, 0.08], [L * 0.86, -0.07], [L, -0.2]]
@@ -432,7 +427,7 @@ export function buildHunterLook(id, pal) {
   }
   function sentinel() {
     const silver = M('metal', pal.accent), leafC = M('cloth', mix(pal.main, '#7ae0b0', 0.35));
-    root = rig({ skin, leg: M('cloth', shade(pal.main, 0.5)), boot: M('leather', '#34343a'), torso: main, arm: mainD, fore: silver, hand: M('leather', '#34343a'), slim: true, tall: true, cuff: silver }); u = root.userData;
+    root = rig({ skin, leg: M('cloth', shade(pal.main, 0.5)), boot: M('leather', '#34343a'), torso: main, arm: mainD, fore: silver, hand: M('leather', '#34343a'), slim: true, tall: true, cuff: silver, ears: 'elf' }); u = root.userData;
     const { body, head } = u; u.fletch = '#e8f4ee';
     face(u, { skin, brow: hairC, eye: '#2a9a7a', ears: 'elf', earLen: 0.28, smile: 0.3 }); hair(u, 'long', hairM);
     const circ = mesh(tor(0.285, 0.014, TAU, 40), silver); circ.position.set(0, 0.1, 0); circ.rotation.x = Math.PI / 2 - 0.25; head.add(circ);
@@ -451,12 +446,11 @@ export function buildHunterLook(id, pal) {
     return Object.assign(root, { userData: Object.assign(u, { cape: cape.mesh, quiver, ...makeBow(u, 'long', M('wood', '#e8e0cc', { roughness: 0.35 }), M('leather', '#34343a'), silver) }) });
   }
   function trapper() {
-    root = rig({ skin, leg: M('cloth', '#4a4038'), boot: leatherD, torso: M('cloth', '#d8c8a8'), arm: main, fore: main, hand: leather, tall: true }); u = root.userData;
+    root = rig({ skin, leg: M('cloth', '#4a4038'), boot: leatherD, torso: M('cloth', '#d8c8a8'), arm: main, fore: main, hand: leather, tall: true, beard: hairM }); u = root.userData;
     const { body, head } = u; u.fletch = '#c83a2a';
     face(u, { skin, brow: hairC, eye: '#3a5a7a', smile: 0.15 }); hair(u, 'short', hairM);
     // stubble and a moustache
-    const beard = mesh(new THREE.SphereGeometry(0.205, 22, 12, -1.9, 3.8, Math.PI * 0.48, Math.PI * 0.36), hairM); beard.position.set(0, -0.06, 0.05); beard.userData.noInk = true; head.add(beard);
-    for (const s of [-1, 1]) { const mo = mesh(limb(0.022, 0.012, 0.09, 8), hairM); mo.position.set(0.012 * s, -0.075, 0.262); mo.rotation.z = (Math.PI / 2 + 0.35) * s; mo.userData.noInk = true; head.add(mo); }
+    for (const s of [-1, 1]) { const mo = mesh(limb(0.022, 0.012, 0.09, 8), hairM); mo.position.set(0.012 * s, -0.07, 0.29); mo.rotation.z = (Math.PI / 2 + 0.35) * s; mo.userData.noInk = true; head.add(mo); }
     // the hat, a band, a feather, goggles on the brim
     const hatM = M('leather', shade(pal.main, 0.85));
     const hat = new THREE.Group(); hat.position.y = 0.2; hat.rotation.x = -0.12; head.add(hat);
@@ -493,12 +487,10 @@ export function buildHunterLook(id, pal) {
   }
   function stalker() {
     const dark = M('cloth', pal.main), darker = M('cloth', shade(pal.main, 0.55)), black = M('leather', '#16141a'), glowA = M('gem', pal.accent, { emissive: pal.accent, emissiveIntensity: 1.2 });
-    root = rig({ skin, leg: darker, boot: black, torso: dark, arm: darker, fore: dark, hand: black, slim: true, tall: true, cuff: black }); u = root.userData;
+    root = rig({ skin, leg: darker, boot: black, torso: dark, arm: darker, fore: dark, hand: black, slim: true, tall: true, cuff: black, ears: 'none', mask: M('cloth', '#26222c') }); u = root.userData;
     const { body, head } = u; u.fletch = pal.accent;
-    face(u, { skin, glowEyes: pal.accent, ears: 'none' });
+    face(u, { skin, glowEyes: pal.accent, ears: 'none', noMouth: true });
     // the mask over the lower face, the cowl, its shadow
-    const mask = mesh(new THREE.SphereGeometry(0.283, 26, 14, -1.75, 3.5, Math.PI * 0.5, Math.PI * 0.42), M('cloth', '#26222c')); mask.scale.set(1.02, 1.05, 1.02); head.add(mask);
-    const seam = mesh(tor(0.284, 0.006, Math.PI * 1.1, 24), M('metal', '#4a4458')); seam.rotation.set(Math.PI / 2, 0, Math.PI * 0.95); seam.position.y = -0.005; seam.userData.noInk = true; head.add(seam);
     const cowl = mesh(new THREE.SphereGeometry(0.37, 28, 18, 0, TAU, 0, Math.PI * 0.72), M('cloth', pal.main, { side: THREE.DoubleSide })); cowl.position.set(0, 0.04, -0.08); cowl.rotation.x = -1.0; head.add(cowl);
     const peak = mesh(cone(0.22, 0.3, 14), dark); peak.position.set(0, 0.25, 0.12); peak.rotation.x = 1.05; peak.scale.z = 0.45; head.add(peak);
     const shadow = new THREE.Mesh(sph(0.2, 12, 8), M('dark', '#06040a')); shadow.position.set(0, 0.12, 0.13); shadow.scale.set(1.25, 0.45, 0.55); shadow.userData.noInk = true; head.add(shadow);
