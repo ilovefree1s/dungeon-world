@@ -59,7 +59,7 @@ const BY_BIOME = [
   [D.M_IMP, D.M_IMP, D.M_FIRESPRITE, D.M_HELLCRAB],
   [D.M_WISP, D.M_WISP, D.M_GHOST, D.M_SPIDER],
 ];
-const MAX_NEAR = 10, SPAWN_MIN = 48, SPAWN_MAX = 104, DESPAWN = 192;
+const MAX_NEAR = 7, SPAWN_MIN = 48, SPAWN_MAX = 104, DESPAWN = 192;
 const barMats = {
   back: new THREE.SpriteMaterial({ color: '#000000', transparent: true, opacity: 0.6, depthWrite: false, depthTest: false }),
   fill: new THREE.SpriteMaterial({ color: '#5ce65c', transparent: true, opacity: 0.95, depthWrite: false, depthTest: false }),
@@ -158,6 +158,7 @@ export class Monsters {
     burst(c.x, c.y, c.z, crit ? '#ffd45a' : '#ffffff', crit ? 10 : 6, 8, 1, true, 0.35);
     sfx(crit ? 'crit' : 'hit');
     if (m.hp <= 0) {
+      this.spawnT = Math.max(this.spawnT, 25);
       burst(c.x, c.y, c.z, '#ffffff', 14, 12, 1.8, false, 0.6);
       ring(m.pos.x, m.pos.y + 0.1, m.pos.z, '#ffe08a', 0.8, 5, 0.4);
       sfx('kill');
@@ -234,7 +235,8 @@ export class Monsters {
     const w = this.world, p = this.player, hero = p.pos, t = performance.now() / 1000;
     this.timer += dt * 60;
     this.spawnT -= dt;
-    if (this.spawnT <= 0 && !this.world.flat) { this.spawnT = 1.4; this.trySpawn(); }
+    // new ones wander in slowly (one every 8 s or so), never while you're in a fight, and a kill buys 25 s of quiet
+    if (this.spawnT <= 0 && !this.world.flat) { this.spawnT = 8; if (!this.list.some(m => m.state === 'chase')) this.trySpawn(); }
     for (let i = this.list.length - 1; i >= 0; i--) {
       const m = this.list[i], k = m.k;
       const d = m.pos.distanceTo(hero);
