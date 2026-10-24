@@ -18,6 +18,7 @@ const GRAV = 68, JUMP_V = 28.8;
 export const HERO_SCALE = 2.56;
 // the old hero's height (the ranger is sized to it)
 let hh = 0;
+const cls0 = p => p.cls === 0;
 function heroHeight() { if (!hh) { const m = buildHero(2); m.scale.multiplyScalar(HERO_SCALE / 2.15); m.updateMatrixWorld(true); hh = new THREE.Box3().setFromObject(m).getSize(new V3()).y; } return hh; }     // (Dungeon Heart's heroes are 2.15 tall in its units)
 const STEP = 2;                     // (how many blocks the hero steps up without a jump)
 
@@ -43,7 +44,7 @@ export class Player {
     this.cls = cls;
     let m;
     // (the hunter is KayKit's ranger once its models are in; until then, and for the others, Dungeon Heart's heroes)
-    if (cls === 2 && kay.ready) m = makeKayHero(heroHeight());
+    if ((cls === 2 || cls === 0) && kay.ready) m = makeKayHero(heroHeight(), cls);
     else { m = buildHero(cls); equipHeroWeapon(m, cls, 1, 0); m.scale.multiplyScalar(HERO_SCALE / 2.15); }
     m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
     // (the shine from the environment map dims at night; remember each material's own)
@@ -329,7 +330,7 @@ export class Player {
     const t = performance.now() / 1000;
     const rolling = this.dash && this.dash.roll ? Math.max(0.01, this.dash.t / 0.42) : 0;
     if (m.userData.kay) {
-      animKay(m, dt, { speed: this.onGround || swimming ? Math.min(1.6, hs / WALK) : 0, air: !this.onGround && !swimming && !rolling, swim: swimming, roll: rolling, cast: this.castT, castKind: this.castKind, aiming: !!this.aiming });
+      animKay(m, dt, { speed: this.onGround || swimming ? Math.min(1.6, hs / WALK) : 0, air: !this.onGround && !swimming && !rolling, swim: swimming, roll: rolling, cast: this.castT, castKind: this.castKind, aiming: !!this.aiming && cls0(this) === false, swing: this.swingT, swingN: this.swingN, whirl: this.whirl, slam: this.slamming, block: !!(this.buffs && this.buffs.block) });
       return this.afterAnim(m, t, p);
     }
     animHero(m, t, { walk: this.walk, move: this.onGround || swimming ? this.move : 0.15, roll: rolling, swing: this.swingT, cast: this.castT, whirl: this.whirl });

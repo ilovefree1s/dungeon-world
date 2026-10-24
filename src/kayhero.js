@@ -13,7 +13,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { makeFlashable } from './dh/models.js';
 
 const V3 = THREE.Vector3;
-const FILES = ['Ranger.glb', 'Rig_Medium_General.glb', 'Rig_Medium_MovementBasic.glb', 'Rig_Medium_MovementAdvanced.glb', 'Rig_Medium_CombatRanged.glb', 'bow_withString.glb', 'arrow_bow.glb'];
+const FILES = ['Ranger.glb', 'Knight.glb', 'Rig_Medium_General.glb', 'Rig_Medium_MovementBasic.glb', 'Rig_Medium_MovementAdvanced.glb', 'Rig_Medium_CombatRanged.glb', 'Rig_Medium_CombatMelee.glb', 'bow_withString.glb', 'arrow_bow.glb', 'sword_1handed.glb', 'shield_badge_color.glb'];
 export const SHAPE = { leg: 1.5, thick: 1.19, head: 0.7 };
 async function bytes(name) {
   const packed = window.__KAY && window.__KAY[name];
@@ -27,18 +27,24 @@ export const kay = { ready: false };
 export function loadKay() {
   if (assets) return assets;
   return (assets = (async () => {
-    const [ranger, gen, mov, adv, ranged, bow, arrow] = await Promise.all(FILES.map(f => bytes(f).then(parse)));
-    kay.ranger = ranger; kay.bow = bow.scene; kay.arrow = arrow.scene;
-    kay.clips = [...gen.animations, ...mov.animations, ...adv.animations, ...ranged.animations];
+    const [ranger, knight, gen, mov, adv, ranged, melee, bow, arrow, sword, shield] = await Promise.all(FILES.map(f => bytes(f).then(parse)));
+    kay.models = { 2: ranger.scene, 0: knight.scene }; kay.bow = bow.scene; kay.arrow = arrow.scene; kay.sword = sword.scene; kay.shield = shield.scene;
+    kay.clips = [...gen.animations, ...mov.animations, ...adv.animations, ...ranged.animations, ...melee.animations];
     kay.ready = true;
     return kay;
   })());
 }
-const CLIP = { idle: 'Ranged_Bow_Idle', aim: 'Ranged_Bow_Aiming_Idle', walk: 'Walking_A', run: 'Running_HoldingBow', jump: 'Jump_Idle', swim: 'Walking_C',
-  dodge: 'Dodge_Forward', shoot: 'Ranged_Bow_Release', up: 'Ranged_Bow_Release_Up', draw: 'Ranged_Bow_Draw', hit: 'Hit_A', die: 'Death_A' };
-// a new ranger, as tall as the hero it replaces
-export function makeKayHero(height) {
-  const model = SkeletonUtils.clone(kay.ranger.scene), root = new THREE.Group(); root.add(model);
+const CLIPS = {
+  2: { idle: 'Ranged_Bow_Idle', aim: 'Ranged_Bow_Aiming_Idle', walk: 'Walking_A', run: 'Running_HoldingBow', jump: 'Jump_Idle', swim: 'Walking_C',
+    dodge: 'Dodge_Forward', shoot: 'Ranged_Bow_Release', up: 'Ranged_Bow_Release_Up', hit: 'Hit_A', die: 'Death_A' },
+  0: { idle: 'Idle_A', aim: 'Melee_Blocking', block: 'Melee_Blocking', walk: 'Walking_A', run: 'Running_A', jump: 'Jump_Idle', swim: 'Walking_C', dodge: 'Dodge_Forward',
+    s0: 'Melee_1H_Attack_Slice_Diagonal', s1: 'Melee_1H_Attack_Slice_Horizontal', s2: 'Melee_1H_Attack_Chop', s3: 'Melee_1H_Attack_Stab',
+    spin: 'Melee_2H_Attack_Spinning', slam: 'Melee_1H_Attack_Jump_Chop', bash: 'Melee_Block_Attack', hit: 'Hit_A', die: 'Death_A' },
+};
+const ONCE = ['dodge', 'shoot', 'up', 'hit', 'die', 's0', 's1', 's2', 's3', 'slam', 'bash'];
+// a new hero (2 the ranger, 0 the knight), as tall as the hero it replaces
+export function makeKayHero(height, cls = 2) {
+  const model = SkeletonUtils.clone(kay.models[cls]), root = new THREE.Group(); root.add(model);
   model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
   model.updateMatrixWorld(true);
   const box = new THREE.Box3(); model.traverse(o => { if (o.isSkinnedMesh) { o.computeBoundingBox(); box.union(o.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
@@ -48,24 +54,25 @@ export function makeKayHero(height) {
   model.updateMatrixWorld(true);
   const legLen = B.ul[0].getWorldPosition(new V3()).distanceTo(B.ft[0].getWorldPosition(new V3())) / root.scale.y;
   // the bow (the pack's, or a forged one in its place) and an arrow in the drawing hand
-  const hold = new THREE.Group(); B.slot[0].add(hold); hold.add(kay.bow.clone());
-  const arrow = kay.arrow.clone(); B.slot[1].add(arrow); arrow.visible = false;
+  // the ranger: the bow in the left hand, an arrow in the right; the knight: the sword in the right, the shield on the left
+  const hold = new THREE.Group(), arrow = kay.arrow.clone(); arrow.visible = false;
+  if (cls === 2) { B.slot[0].add(hold); hold.add(kay.bow.clone()); B.slot[1].add(arrow); }
+  else { B.slot[1].add(hold); hold.add(kay.sword.clone()); B.slot[0].add(kay.shield.clone()); }
   makeFlashable(root);
-  const mixer = new THREE.AnimationMixer(model), act = {};
+  const mixer = new THREE.AnimationMixer(model), act = {}, CLIP = CLIPS[cls];
   for (const k in CLIP) { const c = kay.clips.find(c => c.name === CLIP[k]); if (c) act[k] = mixer.clipAction(c); }
-  for (const k of ['dodge', 'shoot', 'up', 'hit', 'die', 'draw']) if (act[k]) { act[k].setLoop(THREE.LoopOnce, 1); act[k].clampWhenFinished = true; }
+  for (const k of ONCE) if (act[k]) { act[k].setLoop(THREE.LoopOnce, 1); act[k].clampWhenFinished = true; }
   act.idle.play();
   const rest = []; model.traverse(o => { if (o.isBone) rest.push([o, o.quaternion.clone()]); });
-  Object.assign(root.userData, { kay: true, model, mixer, act, cur: 'idle', base: 'idle', one: null, oneT: 0, B, legLen, baseY: model.position.y, rest, hold, bowLen: bowLength(hold), arrow, lastCast: -1 });
+  Object.assign(root.userData, { kay: true, model, mixer, act, cur: 'idle', base: 'idle', one: null, oneT: 0, B, legLen, baseY: model.position.y, rest, hold, arrow, lastCast: -1, lastSwing: -1, cls, own: () => (cls === 2 ? kay.bow : kay.sword).clone() });
   return root;
 }
-const bowLength = g => { const b = new THREE.Box3().setFromObject(g), s = b.getSize(new V3()); return Math.max(s.x, s.y, s.z); };
 // a forged bow in the ranger's hand (null: the pack's own): turned so its long side lies as the pack's bow's does
 export function holdForged(root, w) {
   const u = root.userData, h = u.hold;
   for (const c of [...h.children]) h.remove(c);
-  if (!w) { h.add(kay.bow.clone()); return; }
-  const ref = kay.bow.clone(), rb = new THREE.Box3().setFromObject(ref).getSize(new V3()), wb = new THREE.Box3().setFromObject(w).getSize(new V3());
+  if (!w) { h.add(u.own()); return; }
+  const ref = u.own(), rb = new THREE.Box3().setFromObject(ref).getSize(new V3()), wb = new THREE.Box3().setFromObject(w).getSize(new V3());
   const axis = s => s.x >= s.y && s.x >= s.z ? new V3(1, 0, 0) : s.y >= s.z ? new V3(0, 1, 0) : new V3(0, 0, 1);
   const g = new THREE.Group(); g.quaternion.setFromUnitVectors(axis(wb), axis(rb));
   g.scale.setScalar(Math.max(rb.x, rb.y, rb.z) / Math.max(wb.x, wb.y, wb.z));
@@ -78,7 +85,15 @@ export function animKay(root, dt, s) {
   if (s.cast >= 0 && (u.lastCast < 0 || s.cast < u.lastCast)) playOnce(u, s.castKind === 'rain' ? 'up' : 'shoot', 0.55);
   u.lastCast = s.cast;
   if (s.roll > 0 && u.one !== 'dodge') playOnce(u, 'dodge', 0.42);
-  const base = s.swim ? 'swim' : s.air ? 'jump' : s.speed > 0.55 ? 'run' : s.speed > 0.08 ? 'walk' : s.aiming ? 'aim' : 'idle';
+  // the knight: a swing of the sword (four cuts in turn), the whirlwind spinning, the slam leaping down on them
+  if (u.cls === 0) {
+    const sw = s.swing ?? -1;
+    if (sw >= 0 && (u.lastSwing < 0 || sw < u.lastSwing)) { if (s.whirl) playOnce(u, 'spin', 0.6); else playOnce(u, 's' + ((s.swingN || 0) % 4), 0.5); }
+    u.lastSwing = sw;
+    if (s.slam && u.one !== 'slam') playOnce(u, 'slam', 0.7);
+  }
+  const still = s.block ? 'block' : s.aiming ? 'aim' : 'idle';
+  const base = s.swim ? 'swim' : s.air && !s.slam ? 'jump' : s.speed > 0.55 ? 'run' : s.speed > 0.08 ? 'walk' : (u.act[still] ? still : 'idle');
   if (u.one) { u.oneT -= dt; if (u.oneT <= 0) { const a = A[u.one]; u.one = null; to(u, base, 0.15, a); } }
   else if (base !== u.cur) to(u, base, 0.2);
   // (the walk and run keep step with the ground the hero covers)
@@ -86,7 +101,7 @@ export function animKay(root, dt, s) {
   if (A.run) A.run.timeScale = Math.max(0.8, s.speed * 1.05);
   for (const [b, q] of u.rest) b.quaternion.copy(q);
   u.mixer.update(dt);
-  u.arrow.visible = !!u.one && (u.one === 'shoot' || u.one === 'up') && u.oneT > 0.3;
+  u.arrow.visible = u.cls === 2 && !!u.one && (u.one === 'shoot' || u.one === 'up') && u.oneT > 0.3;
   const B = u.B, k = SHAPE.leg, t = SHAPE.thick;
   for (let i = 0; i < 2; i++) { B.ul[i].scale.set(t, k, t); B.ft[i].scale.set(1 / t, 1 / k, 1 / t); }
   B.head.scale.setScalar(SHAPE.head);

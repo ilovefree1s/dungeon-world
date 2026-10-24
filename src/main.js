@@ -57,7 +57,7 @@ const player = new Player(world);
 player.onHurt = () => { sfx('hurt'); $('hurt').style.opacity = 1; setTimeout(() => $('hurt').style.opacity = 0, 250); };
 player.setClass(UI.cls);
 // the hunter's KayKit ranger: loaded in the background, swapped in when it's ready
-loadKay().then(() => { if (player.cls === 2) { const f = player.face; player.setClass(2); player.face = f; } }).catch(e => console.warn('the ranger did not load', e));
+loadKay().then(() => { if (player.cls === 2 || player.cls === 0) { const f = player.face; player.setClass(2); player.face = f; } }).catch(e => console.warn('the ranger did not load', e));
 let start = save && save.seed === seed ? [save.x, save.y, save.z] : world.spawnPoint();
 player.place(...start);
 if (save && save.seed === seed) { player.yaw = save.yaw ?? player.yaw; sky.t = save.t ?? sky.t; }
