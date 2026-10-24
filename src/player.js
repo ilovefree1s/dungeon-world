@@ -5,6 +5,7 @@
 // ============================================================================
 import { THREE, scene, camera, TEX, V3 } from './engine.js';
 import { buildHero, equipHeroWeapon, animHero } from './dh/models.js';
+import { kay, makeKayHero, animKay, holdForged } from './kayhero.js';
 import { animAttack, bowPull } from './heroanim.js';
 import { buildForged, statsOf, clsOf } from './weaponkit.js';
 import { SEA } from './gen.js';
@@ -14,7 +15,10 @@ const SEA_TOP = SEA + 0.86; // (the sea's surface)
 const HW = 0.96, HH = 5.2;          // the hero's box: half its width, its height (blocks)
 const WALK = 15, RUN = 23, SWIM = 8.4;
 const GRAV = 68, JUMP_V = 28.8;
-export const HERO_SCALE = 2.56;     // (Dungeon Heart's heroes are 2.15 tall in its units)
+export const HERO_SCALE = 2.56;
+// the old hero's height (the ranger is sized to it)
+let hh = 0;
+function heroHeight() { if (!hh) { const m = buildHero(2); m.scale.multiplyScalar(HERO_SCALE / 2.15); m.updateMatrixWorld(true); hh = new THREE.Box3().setFromObject(m).getSize(new V3()).y; } return hh; }     // (Dungeon Heart's heroes are 2.15 tall in its units)
 const STEP = 2;                     // (how many blocks the hero steps up without a jump)
 
 export class Player {
@@ -35,11 +39,12 @@ export class Player {
     this.blob.rotation.x = -Math.PI / 2; this.blob.renderOrder = 1; scene.add(this.blob);
   }
   setClass(cls) {
-    if (this.model) { scene.remove(this.model); this.model.traverse(o => o.geometry && o.geometry.dispose()); }
+    if (this.model) { scene.remove(this.model); if (!this.model.userData.kay) this.model.traverse(o => o.geometry && o.geometry.dispose()); }
     this.cls = cls;
-    const m = buildHero(cls);
-    equipHeroWeapon(m, cls, 1, 0);
-    m.scale.multiplyScalar(HERO_SCALE / 2.15);
+    let m;
+    // (the hunter is KayKit's ranger once its models are in; until then, and for the others, Dungeon Heart's heroes)
+    if (cls === 2 && kay.ready) m = makeKayHero(heroHeight());
+    else { m = buildHero(cls); equipHeroWeapon(m, cls, 1, 0); m.scale.multiplyScalar(HERO_SCALE / 2.15); }
     m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
     // (the shine from the environment map dims at night; remember each material's own)
     this.mats = [];
@@ -58,6 +63,7 @@ export class Player {
     const spec = this.forgedSpecs ? this.forgedSpecs[this.cls] : null;
     this.forged = spec ? statsOf(spec) : null;
     const u = this.model && this.model.userData, hold = u && [u.sword, u.staff, u.bow][this.cls];
+    if (u && u.kay) { holdForged(this.model, spec ? buildForged(spec) : null); return; }
     if (!hold) return;
     if (!spec) { equipHeroWeapon(this.model, this.cls, 1, 0); return; }
     for (const c of [...hold.children]) hold.remove(c);
@@ -322,6 +328,10 @@ export class Player {
     this.walk += dt * (4 + hs * 1.15);
     const t = performance.now() / 1000;
     const rolling = this.dash && this.dash.roll ? Math.max(0.01, this.dash.t / 0.42) : 0;
+    if (m.userData.kay) {
+      animKay(m, dt, { speed: this.onGround || swimming ? Math.min(1.6, hs / WALK) : 0, air: !this.onGround && !swimming && !rolling, swim: swimming, roll: rolling, cast: this.castT, castKind: this.castKind, aiming: !!this.aiming });
+      return this.afterAnim(m, t, p);
+    }
     animHero(m, t, { walk: this.walk, move: this.onGround || swimming ? this.move : 0.15, roll: rolling, swing: this.swingT, cast: this.castT, whirl: this.whirl });
     const u = m.userData;
     if (!this.onGround && !swimming && !rolling && !this.slamming) {
@@ -336,6 +346,10 @@ export class Player {
       animAttack(m, { swing: this.swingT, swingN: this.swingN, whirl: this.whirl, cast: this.castT, castKind: this.castKind, slamAir: this.slamming && !this.onGround, land: this.landT, cls: this.cls });
       if (u.string) { const pull = this.castT >= 0 ? bowPull(this.castKind, this.castT) : 0; u.arms[1].position.z = -pull * 0.1; u.string.geometry.attributes.position.setZ(1, (u.stringZ ?? -0.1) - pull * 0.35); u.string.geometry.attributes.position.needsUpdate = true; }
     }
+    this.afterAnim(m, t, p);
+  }
+  afterAnim(m, t, p) {
+    const u = m.userData;
     // the hurt flash
     if (u.flash) u.flash(this.hurtT > 0 ? (Math.sin(t * 40) > 0 ? 0.8 : 0) : 0, '#ff5a2a');
     // the shadow on the ground below

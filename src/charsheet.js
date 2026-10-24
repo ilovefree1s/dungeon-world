@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { forge, wieldSaved, unwield, deleteSaved, loadSaved, equippedSpec } from './forge.js';
 import { TYPES, MATERIALS, AURAS, HERO_NAME, rarityOf, clsOf, statsOf, buildForged, plainStats, dpsOf, hitOf } from './weaponkit.js';
 import { buildHero, equipHeroWeapon, animHero } from './dh/models.js';
+import { kay, makeKayHero, animKay, holdForged } from './kayhero.js';
 import { Turntable } from './turntable.js';
 import { stats, xpToNext } from './combat.js';
 import { sfx } from './audio.js';
@@ -49,11 +50,17 @@ export class CharSheet {
     const p = this.player, cls = p.cls, have = equippedSpec(cls), st = have ? statsOf(have) : null;
     $('csName').textContent = HERO_NAME[cls]; $('csLevel').textContent = `LEVEL ${stats.level}`;
     // the hero on the stand, idling, with what's in hand
+    if (cls === 2 && kay.ready) {
+      const m = makeKayHero(2.15); if (have) holdForged(m, buildForged(have));
+      let last = performance.now();
+      this.heroView.showModel(m, () => { const now = performance.now(); animKay(m, Math.min(0.05, (now - last) / 1000), { speed: 0, cast: -1 }); last = now; }, { spin: 0.35, sway: false, face: 0.4, wobble: 0.5, dist: 1.4 });
+    } else {
     const m = buildHero(cls); equipHeroWeapon(m, cls, 1, 0);
     if (have) { const u = m.userData, hold = [u.sword, u.staff, u.bow][cls]; for (const c of [...hold.children]) hold.remove(c); const w = buildForged(have); if (cls === 0) w.rotation.x = Math.PI / 2; if (cls === 1 && have.type === 'staff') { w.position.y = -0.55 * (have.length || 1); w.rotation.z = -0.1; } hold.add(w); u.wtick = w.userData.tick; if (cls === 0) { u.bladeMat = w.userData.bladeMat; u.bladeBase = u.bladeMat.emissive.clone(); u.bladeBaseI = u.bladeMat.emissiveIntensity; } if (cls === 1) { u.orbMat = w.userData.orbMat; u.orb = w.userData.orb; } if (cls === 2) { u.string = w.userData.string; u.stringZ = w.userData.stringZ; } }
     m.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
     let walk = 0;
     this.heroView.showModel(m, t => { walk += 0.016 * 2; animHero(m, t, { walk, move: 0.08, roll: 0, swing: -1, cast: -1, whirl: false }); }, { spin: 0.35, sway: false, face: 0.4, wobble: 0.5, dist: 1.4 });
+    }
     // the slots: gear comes in a later stage; the hands hold what the forge gave
     const grid = $('csSlots'); grid.innerHTML = '';
     for (const [label, id] of SLOTS) {

@@ -18,6 +18,7 @@ const head = fs.readFileSync(path.join(root, 'src/head.html'), 'utf8')
 const esc = s => s.replace(/<\/script/gi, '<\\/script');
 const html = head + `
 <div id="boot" style="position:fixed;inset:0;display:grid;place-items:center;background:#0b0908;color:#ffc93c;font:900 28px 'Luckiest Guy',Nunito,sans-serif;z-index:99;letter-spacing:.04em">LOADING THE WORLD...</div>
+<script>window.__KAY = ${JSON.stringify(Object.fromEntries(fs.readdirSync(path.join(root, 'assets/kaykit')).filter(f => f.endsWith('.glb')).map(f => [f, fs.readFileSync(path.join(root, 'assets/kaykit', f)).toString('base64')])))};</script>
 <script>window.__DW_WORKER_URL = URL.createObjectURL(new Blob([${JSON.stringify(esc(worker))}], { type: 'text/javascript' }));</script>
 <script type="module">${esc(main)}</script>
 `;

@@ -64,6 +64,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   | Ghost | vanishes and reappears right behind you |
   | Imp, fire sprite, wisp | keep their distance and throw fire, flame and light that you can dodge; they back off if you close in |
   | Hell crab | shakes, then rushes in a straight line, hitting hard; dazed for a moment after |
+- **The hunter is KayKit's ranger** (Kay Lousberg, CC0), with KayKit's animations: idle with the bow, walk, run holding the bow, a dodge for the roll, a jump, the string drawn and loosed for each shot (straight up for the rain of arrows), an aiming stance while auto-attacking. Longer, sturdier legs than the pack's own (150% long, 119% thick) and a smaller head (70%), set in the hunter builder (`dist/builder.html`). A forged bow takes the place of his own.
 - **Three separate heroes**: the warrior, the mage and the hunter each have their own level, XP, health, kills, bags, armor and gold (the hunter alone keeps a pet). Switching hero switches all of it. The forged weapons stay one shared collection.
 - **Every monster is near your level** (one under to one over), wherever you go: the lands are all mixed up, so the
   danger and the loot go with you. Everything a monster drops is at its level (the item level): a higher item level

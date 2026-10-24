@@ -10,6 +10,7 @@ import { readInput, takeLook, menuKeys, initTouch, onFirstInput, input, lockMous
 import { startAudio, sfx, setSfx, setMusic, audioState } from './audio.js';
 import { BIOME_NAME, BIOME_SUB, CH } from './gen.js';
 import { Monsters, Bolts, stats, xpToNext, pickMonster } from './combat.js';
+import { loadKay } from './kayhero.js';
 import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollLoot, bestRarity } from './loot.js';
@@ -55,6 +56,8 @@ const world = new World(seed, Q.has('flat'), !Q.has('blocks'));
 const player = new Player(world);
 player.onHurt = () => { sfx('hurt'); $('hurt').style.opacity = 1; setTimeout(() => $('hurt').style.opacity = 0, 250); };
 player.setClass(UI.cls);
+// the hunter's KayKit ranger: loaded in the background, swapped in when it's ready
+loadKay().then(() => { if (player.cls === 2) { const f = player.face; player.setClass(2); player.face = f; } }).catch(e => console.warn('the ranger did not load', e));
 let start = save && save.seed === seed ? [save.x, save.y, save.z] : world.spawnPoint();
 player.place(...start);
 if (save && save.seed === seed) { player.yaw = save.yaw ?? player.yaw; sky.t = save.t ?? sky.t; }
@@ -242,6 +245,7 @@ function heroCombat(dt, inp, frozen) {
     }
     // auto-attack ends with its target
     if (inp.autoAtk && !monsters.focus) inp.autoAtk = false;
+    player.aiming = inp.autoAtk && !!monsters.focus;
     // and it only swings when the target is in range (else it waits, and says so now and then); in range, every
     // class turns to face it as the swing timer comes up and strikes (the swing and the shot aim at the target)
     if (inp.autoAtk && !inp.atkHeld) {
