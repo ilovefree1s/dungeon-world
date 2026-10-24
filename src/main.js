@@ -68,6 +68,9 @@ let deadT = 0;
 monsters.hooks.dead = () => { sfx('death'); deadT = 2.6; banner('YOU FELL', 'back to the woods...'); player.invT = 9; if (player.model.userData.fade) player.model.userData.fade(0.4); };
 const ctx = { player, world, monsters, bolts, shake: k => { player.shake = Math.max(player.shake || 0, k); } };
 const abilities = new Abilities(ctx);
+// the red line at the top of the screen, the MMO way, for what you can't do right now (shown at most once a second or so)
+let errT = 0, errLast = '', errAt = 0;
+function sayError(msg) { const now = performance.now(); if (msg === errLast && now - errAt < 1400) return; errLast = msg; errAt = now; $('err').textContent = msg; $('err').classList.add('on'); errT = 1.6; sfx('nope'); }
 // the cursors in play: a sword (its point is the hot spot), a red one over a monster, a loot bag over a fallen one with a drop
 const svgCursor = (svg, x, y, fallback) => `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${x} ${y}, ${fallback}`;
 const swordSvg = (blade, edge, glow) => `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>${glow ? `<path d='M2 2 L6 3 L21 18 L18 21 L3 6 Z' fill='none' stroke='${glow}' stroke-width='4' stroke-linejoin='round' opacity='.55'/>` : ''}<path d='M2 2 L6 3 L21 18 L18 21 L3 6 Z' fill='${blade}' stroke='#1a1210' stroke-width='1.4' stroke-linejoin='round'/><path d='M3 3 L20 20' stroke='${edge}' stroke-width='1' opacity='.8'/><path d='M15 23 L23 15 L25 17 L17 25 Z' fill='#c8962c' stroke='#1a1210' stroke-width='1.3' stroke-linejoin='round'/><path d='M21 21 L27 27' stroke='#5a3a22' stroke-width='3.4' stroke-linecap='round'/><path d='M21 21 L27 27' stroke='#1a1210' stroke-width='5' stroke-linecap='round' opacity='.35'/><circle cx='28' cy='28' r='2.4' fill='#ffd45a' stroke='#1a1210' stroke-width='1.2'/></svg>`;
@@ -141,6 +144,14 @@ function heroCombat(dt, inp, frozen) {
     }
     // auto-attack ends with its target
     if (inp.autoAtk && !monsters.focus) inp.autoAtk = false;
+    // and it only swings when the target is in range and in front of you (else it waits, and says why now and then)
+    if (inp.autoAtk && !inp.atkHeld) {
+      const m = monsters.focus, p = player.pos, dx = m.pos.x - p.x, dz = m.pos.z - p.z, d = Math.hypot(dx, dz) || 1;
+      const reach = player.cls === 0 ? (player.forged ? player.forged.reach : 4.6) + m.k.r + 1 : 42;
+      const fx = Math.sin(player.face), fz = Math.cos(player.face), facing = (dx * fx + dz * fz) / d > 0.45;
+      const why = d > reach ? 'OUT OF RANGE' : !facing ? 'YOU ARE FACING THE WRONG WAY' : '';
+      if (why) { inp.atk = false; if (abilities.atkCd <= 0) sayError(why); }
+    }
     // F looks at the loot you're near, as before
     if (bodies.target && inp.useEdge) { inp.useEdge = false; openLoot(bodies.target); return; }
   }
@@ -199,6 +210,7 @@ function updateHud(dt) {
   place(cspans[8], (Math.atan2(-p.x, p.z) * 180 / Math.PI + 360) % 360);
   $('hpfill').style.width = (stats.hp / stats.maxHp * 100) + '%'; $('hpT').textContent = `${stats.hp}/${stats.maxHp}`;
   $('xpfill').style.width = (stats.xp / xpToNext() * 100) + '%'; $('lvT').textContent = 'LV ' + stats.level; $('pName').textContent = ['WARRIOR', 'MAGE', 'HUNTER'][player.cls];
+  if (errT > 0 && (errT -= dt) <= 0) $('err').classList.remove('on');
   // the target's frame: the focused monster's name, level and health, lit AUTO while auto-attacking
   { const m = monsters.focus; $('tframe').hidden = !m; if (m) { $('tName').textContent = m.name; $('tLv').textContent = 'LV ' + m.lvl; $('thpfill').style.width = Math.max(0, m.hp / m.maxHp * 100) + '%'; $('thpT').textContent = `${Math.max(0, Math.ceil(m.hp))}/${m.maxHp}`; $('tAuto').hidden = !input.autoAtk; } }
   $('clockT').textContent = clock();

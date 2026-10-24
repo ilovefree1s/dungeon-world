@@ -187,7 +187,8 @@ export function readInput() {
   input.lookRY = p ? p.ry : 0;
   input.jump = !!(keys.jump || input.tJump || (p && p.now.jump));
   input.sprint = !!(keys.sprint || (p && p.now.sprint));
-  input.atk = !!(keys.atk || input.tAtk || input.mAtk || input.autoAtk || (p && p.now.atk));
+  input.atkHeld = !!(keys.atk || input.tAtk || input.mAtk || (p && p.now.atk));
+  input.atk = input.atkHeld || input.autoAtk;
   return input;
 }
 export function takeLook() { const x = input.lookX, y = input.lookY; input.lookX = input.lookY = 0; return [x, y]; }

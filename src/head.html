@@ -71,6 +71,8 @@ html.locked #cross{display:block}
 #compass span.n{color:#ff8a6a}
 #compass span.tw{color:var(--gold);font-size:13px}
 #compass::after{content:"";position:absolute;left:50%;top:3px;bottom:3px;width:2px;margin-left:-1px;background:rgba(255,255,255,.5);border-radius:2px}
+#err{position:absolute;left:0;right:0;top:calc(96px + env(safe-area-inset-top,0px));text-align:center;font-family:var(--display);font-size:17px;letter-spacing:.04em;color:#ff4a3c;text-shadow:0 2px 0 #000;opacity:0;transition:opacity .3s;pointer-events:none}
+#err.on{opacity:1}
 #banner{position:absolute;left:0;right:0;top:24%;text-align:center;pointer-events:none;opacity:0;transform:scale(.88);transition:opacity .4s,transform .4s;padding:0 16px}
 #banner.on{opacity:1;transform:scale(1)}
 #banner h1{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(30px,7.5vw,64px);letter-spacing:.03em;color:var(--gold);text-shadow:0 5px 0 #5a2c08,0 0 34px rgba(0,0,0,.6)}
@@ -247,6 +249,7 @@ html.touchy .keys{display:none}
       <button class="hbtn" id="bagsBtn" aria-label="Bags" title="Bags (B)"><svg viewBox="0 0 24 24" fill="none" stroke="#f6eee2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14l-1 11H6z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg></button>
       <button class="hbtn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="#f6eee2" stroke-width="2.6" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     </div>
+    <div id="err"></div>
     <div id="banner"><h1 id="bannerT"></h1><p id="bannerS"></p></div>
     <div id="swing"><i></i><b></b></div>
     <div id="abil"><div class="slot"><b class="g"></b><span class="n"></span><em class="k">1</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">2</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">3</em><i class="cd"></i></div></div>
