@@ -19,6 +19,7 @@ import { Turntable } from './turntable.js';
 import { AURA_VIEW } from './auras.js';
 import { VERSION } from './version.js';
 import { CharSheet } from './charsheet.js';
+import { Pet } from './pet.js';
 import { burst, ring, stepFx } from './fx.js';
 import { grassUniforms } from './flora.js';
 import { updateAmbience } from './ambience.js';
@@ -67,11 +68,12 @@ monsters.hooks.hurt = () => player.onHurt();
 monsters.hooks.level = lv => { sfx('levelup'); ring(player.pos.x, player.pos.y + 0.1, player.pos.z, '#ffe08a', 1, 10, 0.7); burst(player.pos.x, player.pos.y + 3, player.pos.z, '#ffe9a0', 20, 10, 1.6, true, 0.8); banner('LEVEL ' + lv, 'stronger, and all healed up'); };
 let deadT = 0;
 monsters.hooks.dead = () => { sfx('death'); deadT = 2.6; banner('YOU FELL', 'back to the woods...'); player.invT = 9; if (player.model.userData.fade) player.model.userData.fade(0.4); };
-const ctx = { player, world, monsters, bolts, shake: k => { player.shake = Math.max(player.shake || 0, k); } };
+const pet = new Pet(player, world, monsters);
+const ctx = { player, world, monsters, bolts, pet, say: (m, c) => sayError(m, c), shake: k => { player.shake = Math.max(player.shake || 0, k); } };
 const abilities = new Abilities(ctx);
 // the red line at the top of the screen, the MMO way, for what you can't do right now (shown at most once a second or so)
 let errT = 0, errLast = '', errAt = 0;
-function sayError(msg) { const now = performance.now(); if (msg === errLast && now - errAt < 1400) return; errLast = msg; errAt = now; $('err').textContent = msg; $('err').classList.add('on'); errT = 1.6; sfx('nope'); }
+function sayError(msg, color) { const now = performance.now(); if (msg === errLast && now - errAt < 1400) return; errLast = msg; errAt = now; $('err').textContent = msg; $('err').style.color = color || ''; $('err').classList.add('on'); errT = 1.6; if (!color) sfx('nope'); }
 // the cursors in play: a sword (its point is the hot spot), a red one over a monster, a loot bag over a fallen one with a drop
 const svgCursor = (svg, x, y, fallback) => `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${x} ${y}, ${fallback}`;
 const swordSvg = (blade, edge, glow) => `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>${glow ? `<path d='M2 2 L6 3 L21 18 L18 21 L3 6 Z' fill='none' stroke='${glow}' stroke-width='4' stroke-linejoin='round' opacity='.55'/>` : ''}<path d='M2 2 L6 3 L21 18 L18 21 L3 6 Z' fill='${blade}' stroke='#1a1210' stroke-width='1.4' stroke-linejoin='round'/><path d='M3 3 L20 20' stroke='${edge}' stroke-width='1' opacity='.8'/><path d='M15 23 L23 15 L25 17 L17 25 Z' fill='#c8962c' stroke='#1a1210' stroke-width='1.3' stroke-linejoin='round'/><path d='M21 21 L27 27' stroke='#5a3a22' stroke-width='3.4' stroke-linecap='round'/><path d='M21 21 L27 27' stroke='#1a1210' stroke-width='5' stroke-linecap='round' opacity='.35'/><circle cx='28' cy='28' r='2.4' fill='#ffd45a' stroke='#1a1210' stroke-width='1.2'/></svg>`;
@@ -81,6 +83,8 @@ const CURSOR = { idle: svgCursor(swordSvg('#dfe6ee', '#ffffff', null), 1, 1, 'de
 // stamina adds health (two a point)
 setLevelSource(() => stats.level);
 monsters.hooks.armor = () => armorCut(gearTotals().armor, stats.level);
+// a shield block takes most of a blow; an ice barrier soaks blows until it's spent
+monsters.hooks.absorb = dmg => { const B = player.buffs || {}; if (B.block) dmg = Math.round(dmg * 0.3); if (B.absorb) { const t = Math.min(B.absorb.left, dmg); B.absorb.left -= t; dmg -= t; } return dmg; };
 let gearHp = 0;
 function applyGearHp() { const want = gearTotals().stam * 2; stats.maxHp += want - gearHp; gearHp = want; stats.hp = Math.min(stats.hp, stats.maxHp); }
 inv.onGear = () => applyGearHp();
@@ -222,6 +226,7 @@ function heroCombat(dt, inp, frozen) {
   abilities.update(dt, inp);
 }
 function respawn() {
+  setTimeout(() => pet.recall(), 50);
   stats.hp = stats.maxHp;
   player.place(spawn[0], spawn[1] + 1, spawn[2]); placed = false;
   if (player.model.userData.fade) player.model.userData.fade(1);
@@ -461,7 +466,7 @@ function frame(now) {
   fwd.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   world.update(p.x, p.z, fwd.x, fwd.z);
   AURA_VIEW.h = renderer.domElement.height;   // (the auras' particles size themselves to the render)
-  if (UI.state === 'play') { monsters.update(dt); bolts.update(dt); }
+  if (UI.state === 'play') { monsters.update(dt); bolts.update(dt); pet.update(dt, input.autoAtk); }
   stepFx(dt);
   // the grass: the wind, and who walks through it
   grassUniforms.uTime.value = performance.now() / 1000;
@@ -506,7 +511,7 @@ document.getElementById('boot')?.remove();
 
 // a hook for testing
 window.__dw = {
-  world, player, sky, UI, input, view, renderer, scene, camera, THREE, monsters, bolts, hero: stats, abilities, forge, bodies, openLoot, closeLoot, sheet, openSheet,
+  world, player, sky, UI, input, view, renderer, scene, camera, THREE, monsters, bolts, hero: stats, abilities, forge, bodies, openLoot, closeLoot, sheet, openSheet, pet,
   start(cls = 0) { pickHero(cls); },
   teleport(x, z) { player.place(x + 0.5, 90, z + 0.5); placed = false; },
   setQuality(q) { UI.autoQ = false; UI.quality = q; setQuality(q); },

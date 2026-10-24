@@ -73,6 +73,22 @@ with sync_playwright() as pw:
             check(ok, f"{name} {i + 1} {got}: {want} ({hp0} -> {hp1}, moved {moved:.1f}, frozen {sum(1 for f in frz if f > 0)})")
         cd = page.evaluate('__dw.abilities.slots().map(s => +s.left.toFixed(2))')
         check(cd[2] > 0, f'{name}: the last ability is on cooldown after use ({cd})')
+        # the six more on the bar (4 to 9): each with a target, each does what it says
+        check(page.evaluate('__dw.abilities.slots().length') == 9, f'{name}: nine skills on the bar')
+        for i in range(3, 9):
+            page.evaluate(SPAWN); frames(2)
+            page.evaluate('__dw.monsters.focus = __dw.monsters.list[0]; __dw.abilities.reset(); __dw.player.buffs = {}')
+            n0 = page.evaluate('__dw.monsters.list.length'); hp0 = page.evaluate('__dw.monsters.list.map(m => m.hp)')
+            got = page.evaluate(f'__dw.abilities.slots()[{i}].name')
+            page.evaluate(f'__dw.input.abEdge[{i}] = true'); frames(4)
+            st = page.evaluate('(() => { const ms = __dw.monsters.list; return { buffs: Object.keys(__dw.player.buffs), dots: ms.some(m => m.dots && m.dots.length), frz: ms.some(m => m.frz > 0), slow: ms.some(m => m.slow > 0), wrath: __dw.pet.wrath > 0, pet: __dw.pet.name }; })()')
+            frames(60)
+            hp1 = page.evaluate('__dw.monsters.list.map(m => m.hp)'); n1 = page.evaluate('__dw.monsters.list.length')
+            did = st['buffs'] or st['dots'] or st['frz'] or st['slow'] or st['wrath'] or n1 < n0 or (hp1 and hp0 and min(hp1) < min(hp0)) or page.evaluate('!!__dw.pet.name')
+            check(bool(did), f'{name} {i + 1} {got}: does something ({st}, {hp0} -> {hp1})')
+            page.evaluate('__dw.abilities.reset()')
+        if name == 'HUNTER':
+            check(page.evaluate('!!__dw.pet.name'), f"the hunter's TAME made a pet of a slime ({page.evaluate('__dw.pet.name')})")
     b.close()
 for e in errors: print('  page error:', e)
 check(not errors, 'no page errors')

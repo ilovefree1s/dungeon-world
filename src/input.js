@@ -7,7 +7,7 @@ export const input = {
   mx: 0, my: 0,          // move: -1..1 (my: -1 is forward)
   lookX: 0, lookY: 0,    // look this frame (radians, from swipes and the mouse)
   lookRX: 0, lookRY: 0,  // look rate (the right stick, the turn keys)
-  jump: false, jumpEdge: false, sprint: false, atk: false, atkEdge: false, useEdge: false, abEdge: [false, false, false],
+  jump: false, jumpEdge: false, sprint: false, atk: false, atkEdge: false, useEdge: false, abEdge: new Array(9).fill(false),
   menuEdge: [], lastDevice: 'kb', stickX: 0, stickY: 0, stickId: null,
   mouseSpeed: 1, zoom: 0, wantLock: null, onLockChange: null,
   cursorMode: false, cursor: { x: 0, y: 0, in: false }, clickAt: null, rclickAt: null, bothHeld: false, turnWith: false, autoAtk: false, dragging: false,
@@ -15,7 +15,7 @@ export const input = {
 const keys = {};
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyD: 'right',
   ArrowLeft: 'turnL', ArrowRight: 'turnR', Space: 'jump', ShiftLeft: 'sprint', ShiftRight: 'sprint',
-  KeyJ: 'atk', KeyZ: 'atk', Digit1: 'ab0', KeyK: 'ab0', Digit2: 'ab1', KeyQ: 'ab1', KeyL: 'ab1', Digit3: 'ab2', KeyE: 'ab2',
+  KeyJ: 'atk', KeyZ: 'atk', Digit1: 'ab0', KeyK: 'ab0', Digit2: 'ab1', KeyQ: 'ab1', KeyL: 'ab1', Digit3: 'ab2', KeyE: 'ab2', Digit4: 'ab3', Digit5: 'ab4', Digit6: 'ab5', Digit7: 'ab6', Digit8: 'ab7', Digit9: 'ab8',
   Escape: 'pause', KeyP: 'pause', Enter: 'ok', NumpadEnter: 'ok', KeyF: 'use', KeyC: 'char', KeyB: 'bags', KeyI: 'bags' };
 let onAny = () => { };
 export function onFirstInput(f) { onAny = f; }

@@ -9,6 +9,17 @@ into endless land: woods, frozen peaks, dunes, bog, ash fields and crystal cliff
 Made for a PC first (keyboard and mouse, or a controller); phones work too.
 
 ## Stage 2 (in progress): fighting
+- **Nine skills a hero**, on a bar of nine at the bottom (keys 1 to 9), after Dungeon Heart's talents and the MMO
+  classes. The first three are below; the six more:
+  | | 4 | 5 | 6 | 7 | 8 | 9 |
+  |---|---|---|---|---|---|---|
+  | Warrior | **Heroic**: the next swing hits more than twice as hard | **Rend**: a bleed on the target | **Throw**: an axe at a far target | **Block**: shield up, blows land at a third | **Shout**: a quarter more damage for 12 s | **Second Wind**: heal over 8 s |
+  | Mage | **Fireball**: a big, slow bolt | **Missiles**: five quick arcane bolts | **Ice Lance**: quick, near triple on the frozen | **Chain**: lightning leaping to four foes | **Polymorph**: the target stands harmless for 8 s | **Barrier**: ice soaks blows |
+  | Hunter | **Aimed**: a slow, triple shot | **Sting**: poison over 8 s | **Concuss**: a dazed, slowed target | **Rapid Fire**: shots 60% quicker for 10 s | **Tame**: a wild slime, bat or spider becomes your pet | **Wrath**: your pet bites twice as hard |
+  Single-target skills go at your target (or the nearest monster in front).
+- **The hunter's pet** (Dungeon Heart's cute ones, in a red bandana, with a name): it trots at your heel, joins your
+  fights (biting your target, or whatever's after you), comes back when you stand up from a fall, and stays with you
+  between visits. Taming another lets the old one go.
 - Every hero has a basic attack and three abilities, after Dungeon Heart's talents:
   | | Attack | 1 | 2 | 3 |
   |---|---|---|---|---|
@@ -116,7 +127,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 | Target | left click a monster (your attacks aim at it until it falls; a click on the ground lets it go) | | |
 | Attack | right click a monster: auto-attack on the weapon's swing timer until it falls (right click again stops); right click elsewhere or J swings where you look | X / ▢ | ATTACK |
 | Look at loot | left click a fallen monster, or F near one | X / ▢ | ATTACK |
-| Abilities 1, 2, 3 | 1, 2, 3 (or K, Q, E; right click too with the captured mouse) | B / ○, Y / △, LB | the ability bar |
+| Skills 1 to 9 | 1 to 9 (or K, Q, E for the first three; right click too with the captured mouse) | B / ○, Y / △, LB (the first three) | the skill bar |
 | Jump | Space | A / ✕ | JUMP |
 | Run | Shift (the stick pushed all the way runs too) | RB, LT or a stick's click | push the stick to its edge |
 | Menu | Esc, P | Start | the ☰ button |
@@ -147,7 +158,7 @@ boats and mounts.
 - `src/weaponkit.js`: weapons from parts (the model, the name, the numbers); `src/forge.js`:
   the forge screen, with its own small renderer for the turning preview.
 - `src/combat.js`: the monsters (where they live, how they wander, chase and bite), the
-  hero's bolts and aim, health, XP and levels. `src/loot.js`: the fallen's bodies and what they drop; `src/charsheet.js`: the character sheet and the bags;
+  hero's bolts and aim, health, XP and levels. `src/loot.js`: the fallen's bodies and what they drop; `src/inventory.js`: armor, potions, gold; `src/pet.js`: the hunter's pet; `src/charsheet.js`: the character sheet and the bags;
   `src/turntable.js`: the turning pictures (a weapon, the hero). `src/fx.js`: sparks, rings and damage numbers.
 - `src/engine.js`: the renderer in Dungeon Heart's style (ACES, soft shadows, bloom) and the
   helpers its models use. `src/dh/` holds Dungeon Heart's model files, copied unchanged.

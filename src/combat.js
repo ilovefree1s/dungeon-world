@@ -14,7 +14,10 @@ import { CH } from './gen.js';
 // ---------------------------------------------------------------- the hero's numbers
 export const stats = { hp: 30, maxHp: 30, xp: 0, level: 1, kills: 0, dead: 0 };
 export const xpToNext = () => 18 + stats.level * 10;
+// the hero's buffs that touch every blow (battle shout, bestial wrath...): set by the abilities each frame
+export const heroBuff = { dmg: 1 };
 export const heroDamage = (mult = 1) => {
+  mult *= heroBuff.dmg;
   const base = 5 + stats.level * 1.5;
   const crit = Math.random() < 0.12;
   return { d: Math.max(1, Math.round(base * mult * (0.85 + Math.random() * 0.3) * (crit ? 2 : 1))), crit };
@@ -78,7 +81,7 @@ export function pickMonster(monsters, x, y, w, h) {
 export class Monsters {
   constructor(world, player) {
     this.world = world; this.player = player; this.list = []; this.spawnT = 2; this.timer = 0;
-    this.hooks = { hurt: null, level: null, dead: null, fallen: null, armor: null };
+    this.hooks = { hurt: null, level: null, dead: null, fallen: null, armor: null, absorb: null };
     this.shots = [];                 // what the ranged ones throw
     this.focus = null;               // the one clicked on: attacks aim at it
     this.focusRing = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 40), new THREE.MeshBasicMaterial({ color: '#ff6a55', transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
@@ -167,6 +170,7 @@ export class Monsters {
   hurt(dmg, fx, fz, shove = 18) {
     const p = this.player;
     if (p.invT > 0 || stats.hp <= 0) return false;
+    if (this.hooks.absorb) { dmg = this.hooks.absorb(dmg); if (dmg <= 0) { number(p.pos.x, p.pos.y + 5.2, p.pos.z, 'ABSORB', ''); p.invT = 0.4; return false; } }
     const cut = this.hooks.armor ? this.hooks.armor() : 0;   // (worn armor turns part of it aside)
     dmg = Math.max(1, Math.round(dmg * (1 - cut)));
     stats.hp = Math.max(0, stats.hp - dmg);
@@ -234,6 +238,9 @@ export class Monsters {
       if (!w.loaded(m.pos.x, m.pos.z)) continue;
       m.t -= dt; m.atkCd -= dt; m.hopCd -= dt; m.daze = Math.max(0, m.daze - dt); m.leap = Math.max(0, m.leap - dt);
       const frozen = m.frz > 0; if (frozen) m.frz -= dt;
+      // bleeds and stings: damage every so often until they run out
+      if (m.dots && m.dots.length) { for (let j = m.dots.length - 1; j >= 0; j--) { const D2 = m.dots[j]; D2.t -= dt; D2.acc += dt; if (D2.acc >= D2.every) { D2.acc -= D2.every; if (this.hit(m, D2.dmg, false, new V3())) break; } if (D2.t <= 0) m.dots.splice(j, 1); } if (!this.list.includes(m)) continue; }
+      if (m.slow > 0) m.slow -= dt;
       // what it wants
       const alive = stats.hp > 0;
       if (m.state === 'wander') {
@@ -280,6 +287,7 @@ export class Monsters {
         else { gx = gz = 0; if (m.state === 'wander') m.rest = true; }
       }
       if (frozen || m.wind > 0 || m.daze > 0) want = 0;
+      if (m.slow > 0) want *= 0.45;
       // choosing an attack
       if (chasing && m.wind <= 0 && m.atkCd <= 0 && m.daze <= 0) {
         switch (k.atk) {
@@ -448,8 +456,7 @@ export class Bolts {
       const steps = 4; let gone = false;
       for (let s = 0; s < steps && !gone; s++) {
         b.pos.addScaledVector(b.vel, dt / steps);
-        const gnd = this.world.poly ? this.world.ground(b.pos.x, b.pos.z) : null;
-        if ((this.world.poly ? (gnd !== null && b.pos.y < gnd) : this.world.solid(b.pos.x, b.pos.y, b.pos.z)) || b.pos.y < 0) { if (b.onEnd) b.onEnd(b.pos); else burst(b.pos.x, b.pos.y, b.pos.z, b.color, 6, 8, 1.2, true, 0.3); gone = true; break; }
+        // (a monster first, then the ground: a point-blank shot at one standing at your feet lands on it)
         for (const m of this.monsters.list) {
           const cy = m.pos.y + m.k.h * 0.5;
           if (Math.hypot(b.pos.x - m.pos.x, (b.pos.y - cy) * 0.8, b.pos.z - m.pos.z) < m.k.r + b.r) {
@@ -459,6 +466,9 @@ export class Bolts {
             gone = true; break;
           }
         }
+        if (gone) break;
+        const gnd = this.world.poly ? this.world.ground(b.pos.x, b.pos.z) : null;
+        if ((this.world.poly ? (gnd !== null && b.pos.y < gnd) : this.world.solid(b.pos.x, b.pos.y, b.pos.z)) || b.pos.y < 0) { if (b.onEnd) b.onEnd(b.pos); else burst(b.pos.x, b.pos.y, b.pos.z, b.color, 6, 8, 1.2, true, 0.3); gone = true; break; }
       }
       if (gone || b.t > b.life) { scene.remove(b.g); if (!b.arrow) b.g.traverse(o => o.material && o.material.dispose()); this.list.splice(i, 1); continue; }
       b.g.position.copy(b.pos);

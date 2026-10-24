@@ -88,21 +88,22 @@ html.locked #cross{display:block}
 #hint{position:absolute;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);font-weight:900;font-size:13px;letter-spacing:.12em;color:var(--dim);
   text-shadow:0 2px 0 #000;transition:opacity .6s;white-space:nowrap;pointer-events:none;text-transform:uppercase}
 /* the swing timer: the time between swings running down under the ability bar, lit while auto-attacking */
-#swing{position:absolute;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:190px;height:7px;border-radius:999px;background:rgba(0,0,0,.5);box-shadow:inset 0 0 0 1px var(--line);opacity:0;transition:opacity .25s;pointer-events:none}
+#swing{position:absolute;left:50%;bottom:calc(78px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:190px;height:7px;border-radius:999px;background:rgba(0,0,0,.5);box-shadow:inset 0 0 0 1px var(--line);opacity:0;transition:opacity .25s;pointer-events:none}
 #swing i{position:absolute;inset:0 auto 0 0;width:0;border-radius:inherit;background:linear-gradient(90deg,#ff8a5c,#ffd45a)}
 #swing b{position:absolute;right:0;top:-15px;font-family:var(--display);font-weight:400;font-size:10px;color:var(--dim);text-shadow:0 1px 0 #000;letter-spacing:.06em}
 #swing.on{opacity:1}
 html.touchy #swing{left:auto;right:calc(16px + env(safe-area-inset-right,0px));transform:none;width:58px;bottom:calc(200px + env(safe-area-inset-bottom,0px))}
 /* the ability bar: three slots, their cooldowns sweeping down */
 #abil{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto}
-#abil .slot{position:relative;width:58px;height:58px;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);overflow:hidden;display:grid;place-items:center;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none}
-#abil .slot .g{font-size:24px;line-height:1;color:var(--gold);text-shadow:0 2px 0 #000;font-weight:400;margin-bottom:14px}
-#abil .slot .n{position:absolute;left:0;right:0;bottom:4px;text-align:center;font-family:var(--display);font-size:10px;letter-spacing:.06em;color:var(--text);text-shadow:0 1px 0 #000}
+#abil .slot{position:relative;width:52px;height:52px;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);overflow:hidden;display:grid;place-items:center;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none}
+#abil .slot .g{font-size:20px;line-height:1;color:var(--gold);text-shadow:0 2px 0 #000;font-weight:400;margin-bottom:14px}
+#abil .slot .n{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-family:var(--display);font-size:8px;white-space:nowrap;overflow:hidden;letter-spacing:.06em;color:var(--text);text-shadow:0 1px 0 #000}
 #abil .slot .k{position:absolute;left:5px;top:3px;font-style:normal;font-weight:900;font-size:10px;color:var(--dim)}
 #abil .slot .cd{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(0,0,0,.6);pointer-events:none}
 #abil .slot.ready{box-shadow:inset 0 0 0 1px rgba(255,201,60,.55)}
 #abil .slot.on{transform:scale(.92)}
-html.touchy #abil{left:auto;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(216px + env(safe-area-inset-bottom,0px));transform:none;flex-direction:column}
+html.touchy #abil{left:auto;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(216px + env(safe-area-inset-bottom,0px));transform:none;display:grid;grid-template-columns:repeat(3,44px);gap:6px}
+html.touchy #abil .slot{width:44px;height:44px}
 html.touchy #abil .slot .k{display:none}
 #dbg{position:absolute;left:12px;top:calc(110px + env(safe-area-inset-top,0px));font:700 11px/1.35 ui-monospace,monospace;color:#cfe;background:rgba(0,0,0,.5);padding:4px 7px;border-radius:6px;white-space:pre;pointer-events:none}
 
@@ -260,9 +261,9 @@ html.touchy .keys{display:none}
     <div id="err"></div>
     <div id="banner"><h1 id="bannerT"></h1><p id="bannerS"></p></div>
     <div id="swing"><i></i><b></b></div>
-    <div id="abil"><div class="slot"><b class="g"></b><span class="n"></span><em class="k">1</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">2</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">3</em><i class="cd"></i></div></div>
+    <div id="abil"><div class="slot"><b class="g"></b><span class="n"></span><em class="k">1</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">2</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">3</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">4</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">5</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">6</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">7</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">8</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">9</em><i class="cd"></i></div></div>
     <div id="lootHint" class="chip" style="position:absolute;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(90,60,10,.8);color:var(--gold)" hidden>IT DROPPED SOMETHING · CLICK OR F TO LOOK</div>
-    <div id="hint"><span class="t">Swipe the screen to look around</span><span class="k kc">Drag to look around (right-drag turns you, both buttons walk) · WASD to move · Space to jump · left click targets a monster or loots a fallen one · right click attacks (on a monster: auto-attack) · 1, 2, 3 (or Q, E) for your abilities · Esc for the menu</span><span class="k kl">Click the world to look around · WASD to move · Space to jump · left click attacks · 1, 2, 3 (or right click, Q, E) for your abilities · Esc for the menu</span></div>
+    <div id="hint"><span class="t">Swipe the screen to look around</span><span class="k kc">Drag to look around (right-drag turns you, both buttons walk) · WASD to move · Space to jump · left click targets a monster or loots a fallen one · right click attacks (on a monster: auto-attack) · 1 to 9 for your skills · Esc for the menu</span><span class="k kl">Click the world to look around · WASD to move · Space to jump · left click attacks · 1, 2, 3 (or right click, Q, E) for your abilities · Esc for the menu</span></div>
     <div id="dbg" hidden></div>
   </div>
   <div id="ver" style="position:absolute;right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(6px + env(safe-area-inset-bottom,0px));font:800 11px var(--body);letter-spacing:.08em;color:var(--dim);opacity:.7;text-shadow:0 1px 0 #000;pointer-events:none;z-index:3"></div>
