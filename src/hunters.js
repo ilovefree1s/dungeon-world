@@ -360,7 +360,7 @@ export function buildHunterLook(id, pal) {
   function ranger() {
     root = rig({ skin, leg: M('cloth', '#4a3a28'), boot: leather, torso: mainD, arm: main, fore: leather, hand: leatherD, tall: true, cuff: leatherD }); u = root.userData;
     const { body, head } = u; u.fletch = '#d8d0c0';
-    face(u, { skin, brow: hairC, eye: '#4a6a2a', smile: 0.35 }); hair(u, 'top', hairM);
+    face(u, { skin, brow: hairC, eye: '#4a6a2a', smile: 0.35 });
     // the jerkin: leather over the tunic, stitched down the front, laced at the collar
     const jer = mesh(lathe([[0.3, 0.84], [0.315, 0.98], [0.345, 1.16], [0.35, 1.3], [0.32, 1.4]], 30, -1.25, 2.5), leather); jer.scale.set(1.05, 1, 0.8); body.add(jer);
     for (let i = 0; i < 6; i++) { const st = mesh(box(0.008, 0.035, 0.01), accentC); st.position.set(-0.06, 0.92 + i * 0.08, 0.282 - Math.max(0, i - 3) * 0.01); st.userData.noInk = true; body.add(st); const st2 = st.clone(); st2.position.x = 0.06; body.add(st2); }
@@ -372,16 +372,16 @@ export function buildHunterLook(id, pal) {
     kn.add(mesh(rbox(0.06, 0.2, 0.035, 0.5), leatherD)); const hilt = mesh(cyl(0.018, 0.018, 0.09, 8), M('wood', '#5a3a1c')); hilt.position.y = 0.14; kn.add(hilt);
     const sb = mesh(tor(0.14, 0.018, TAU, 20), leatherD); sb.rotation.x = Math.PI / 2; sb.position.y = -0.1; u.legs[1].add(sb);
     // the hood: a cowl with a deep rim, a peak at the back, a drape down the neck
-    const hoodG = new THREE.SphereGeometry(0.35, 40, 28, Math.PI / 2 + 0.95, TAU - 1.9, 0, Math.PI * 0.86);
+    const hoodG = new THREE.SphereGeometry(0.37, 40, 28, Math.PI / 2 + 0.9, TAU - 1.8, 0, Math.PI * 0.86);
     { const p = hoodG.attributes.position; for (let i = 0; i < p.count; i++) { let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
       const low = Math.max(0, -y - 0.05) / 0.25;                      // (the lower part flares out over the shoulders)
       x *= 1 + low * 0.5; z *= 1 + low * 0.25; z -= low * 0.04;
       if (y > 0 && z < 0) { const k = (y / 0.35) * (-z / 0.35); z -= k * k * 0.22; y += k * 0.06; }   // (a point at the back)
-      const fr = Math.max(0, z / 0.35); y += fr * fr * 0.05;          // (the front edge drawn up into a peak over the brow)
+      const fr = Math.max(0, z / 0.37); y += fr * fr * 0.06; z += fr * 0.13;   // (the front edge drawn forward past the face, peaked over the brow)
       p.setXYZ(i, x, y, z); } hoodG.computeVertexNormals(); }
-    const hood = mesh(hoodG, mainCape); hood.position.set(0, 0.03, -0.03); hood.rotation.x = -0.18; hood.userData.noInk = true; head.add(hood);
+    const hood = mesh(hoodG, mainCape); hood.position.set(0, 0.04, 0.0); hood.scale.set(0.9, 0.94, 0.95); hood.rotation.x = -0.18; hood.userData.noInk = true; head.add(hood);
     // the hood's lining shows inside the opening, a turned-back edge frames the face
-    const lining = mesh(new THREE.SphereGeometry(0.34, 30, 20, Math.PI / 2 + 1.0, TAU - 2.0, 0, Math.PI * 0.8), M('cloth', shade(pal.main, 0.45), { side: THREE.BackSide })); lining.position.copy(hood.position); lining.rotation.x = -0.18; lining.userData.noInk = true; head.add(lining);
+    const lining = mesh(new THREE.SphereGeometry(0.36, 30, 20, Math.PI / 2 + 0.95, TAU - 1.9, 0, Math.PI * 0.8), M('cloth', shade(pal.main, 0.45), { side: THREE.BackSide })); lining.position.copy(hood.position); lining.scale.copy(hood.scale); lining.rotation.x = -0.18; lining.userData.noInk = true; head.add(lining);
     const mantle = mesh(lathe([[0.12, 0.3], [0.24, 0.27], [0.42, 0.1], [0.5, -0.14]], 30), main); mantle.position.y = 1.42; mantle.scale.z = 0.82; body.add(mantle);
     for (let i = 0; i < 18; i++) { const a = i / 18 * TAU; const d = mesh(cone(0.045, 0.08, 4), main); d.position.set(Math.sin(a) * 0.5, 1.26, Math.cos(a) * 0.41); d.rotation.x = Math.PI; d.userData.noInk = true; body.add(d); }
     const clasp = mesh(rbox(0.07, 0.07, 0.03, 0.6), brass); clasp.position.set(0, 1.62, 0.17); body.add(clasp);
