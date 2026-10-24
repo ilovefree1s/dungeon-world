@@ -22,6 +22,10 @@ export const heroDamage = (mult = 1) => {
   const crit = Math.random() < 0.12;
   return { d: Math.max(1, Math.round(base * mult * (0.85 + Math.random() * 0.3) * (crit ? 2 : 1))), crit };
 };
+// a monster's health, made to match what a hero of its level hits for: the hero's base blow at that level times
+// what an on-level weapon adds (its item level), over about six seconds of plain auto-attacks, for an average
+// monster (a slime a little less, a skeleton a little more, the big ones a lot more)
+export const monHp = (type, lvl) => Math.max(8, Math.round((5 + lvl * 1.5) * (1 + (lvl - 1) * 0.05) * 6 * (0.6 + D.MON_BASE_HP[type] / 15)));
 export function gainXp(n, onLevel) {
   stats.xp += n;
   while (stats.xp >= xpToNext()) { stats.xp -= xpToNext(); stats.level++; stats.maxHp += 6; stats.hp = stats.maxHp; onLevel && onLevel(stats.level); }
@@ -97,7 +101,7 @@ export class Monsters {
     // (every monster is near your level, wherever you are: the lands are all mixed up, so the danger goes with you)
     const lvl = Math.max(1, stats.level + Math.floor(Math.random() * 3) - 1);
     const m = { type, k, root, name: D.MON_NAME[type] || 'MONSTER', lvl, pos: new V3(x, y, z), vel: new V3(), home: new V3(x, y, z), face: Math.random() * 6.28, seed: Math.random() * 10,
-      hp: D.MON_BASE_HP[type] * 3 + lvl * 4, atk: D.MON_BASE_ATK[type] + Math.floor(lvl * 0.8), state: 'wander', t: Math.random() * 2, atkCd: 1 + Math.random(), flash: 0, frz: 0, kb: new V3(), onGround: false, moving: false, bob: Math.random() * 6,
+      hp: monHp(type, lvl), atk: D.MON_BASE_ATK[type] + Math.floor(lvl * 0.8), state: 'wander', t: Math.random() * 2, atkCd: 1 + Math.random(), flash: 0, frz: 0, kb: new V3(), onGround: false, moving: false, bob: Math.random() * 6,
       wind: 0, act: null, lastAct: null, daze: 0, hopCd: 0, leap: 0, dive: null, rush: null, barT: 0, bar: null, tint: '' };
     m.maxHp = m.hp;
     this.list.push(m);

@@ -102,7 +102,7 @@ export const KITS = [
       { name: 'THROW', glyph: '🪓', cd: 9, use(ctx) { const m = target(ctx, 40); if (!m) return noTarget(ctx); const f = ctx.player.forged; ctx.player.swingT = 0; fireAt(ctx, m, '#c8c8d0', { speed: 70, mult: 1.6 * (f ? f.dmg : 1), arrow: true }); sfx('swing'); } },
       { name: 'BLOCK', glyph: '🛡', cd: 14, use(ctx) { const p = ctx.player; buff(p, 'block', 5); sfx('block'); ring(p.pos.x, p.pos.y + 0.2, p.pos.z, '#9fd8ff', 0.5, 5, 0.6); } },
       { name: 'SHOUT', glyph: '📯', cd: 22, use(ctx) { const p = ctx.player; buff(p, 'dmgUp', 12, { mult: 1.25 }); sfx('roar'); ring(p.pos.x, p.pos.y + 0.2, p.pos.z, '#ffd45a', 1, 12, 0.7); } },
-      { name: 'SECOND WIND', glyph: '❤', cd: 40, use(ctx) { const p = ctx.player; buff(p, 'hot', 8, { per: stats.maxHp * 0.05 }); sfx('drink'); burst(p.pos.x, p.pos.y + 3, p.pos.z, '#7cff8a', 16, 6, 1.2, true, 0.8); } },
+      { name: '2ND WIND', glyph: '❤', cd: 40, use(ctx) { const p = ctx.player; buff(p, 'hot', 8, { per: stats.maxHp * 0.05 }); sfx('drink'); burst(p.pos.x, p.pos.y + 3, p.pos.z, '#7cff8a', 16, 6, 1.2, true, 0.8); } },
     ] },
   // ---- mage
   { name: 'MAGE', attack: { name: 'BOLT', cd: 1.8, cdOf: p => p.forged ? p.forged.time : PLAIN_TIME[1], use(ctx) {

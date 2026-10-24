@@ -13,7 +13,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   classes. The first three are below; the six more:
   | | 4 | 5 | 6 | 7 | 8 | 9 |
   |---|---|---|---|---|---|---|
-  | Warrior | **Heroic**: the next swing hits more than twice as hard | **Rend**: a bleed on the target | **Throw**: an axe at a far target | **Block**: shield up, blows land at a third | **Shout**: a quarter more damage for 12 s | **Second Wind**: heal over 8 s |
+  | Warrior | **Heroic**: the next swing hits more than twice as hard | **Rend**: a bleed on the target | **Throw**: an axe at a far target | **Block**: shield up, blows land at a third | **Shout**: a quarter more damage for 12 s | **2nd Wind**: heal over 8 s |
   | Mage | **Fireball**: a big, slow bolt | **Missiles**: five quick arcane bolts | **Ice Lance**: quick, near triple on the frozen | **Chain**: lightning leaping to four foes | **Polymorph**: the target stands harmless for 8 s | **Barrier**: ice soaks blows |
   | Hunter | **Aimed**: a slow, triple shot | **Sting**: poison over 8 s | **Concuss**: a dazed, slowed target | **Rapid Fire**: shots 60% quicker for 10 s | **Tame**: a wild slime, bat or spider becomes your pet | **Wrath**: your pet bites twice as hard |
   Single-target skills go at your target (or the nearest monster in front).
@@ -66,7 +66,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   | Hell crab | shakes, then rushes in a straight line, hitting hard; dazed for a moment after |
 - **Every monster is near your level** (one under to one over), wherever you go: the lands are all mixed up, so the
   danger and the loot go with you. Everything a monster drops is at its level (the item level): a higher item level
-  hits harder or guards better.
+  hits harder or guards better. Their health is matched to a hero of their level: about four or five plain swings for an average one, fewer with a better weapon.
 - **Loot besides weapons**: gold nearly always, and now and then **armor** for the six gear slots (head, shoulders,
   chest, hands, legs, feet; cloth, leather, mail or plate; armor turns part of each blow aside, stamina adds two
   health a point) and **healing potions** (drink them from the bags). The loot window lists everything a body
@@ -128,6 +128,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
 | Attack | right click a monster: auto-attack on the weapon's swing timer until it falls (right click again stops); right click elsewhere or J swings where you look | X / ▢ | ATTACK |
 | Look at loot | left click a fallen monster, or F near one | X / ▢ | ATTACK |
 | Skills 1 to 9 | 1 to 9 (or K, Q, E for the first three; right click too with the captured mouse) | B / ○, Y / △, LB (the first three) | the skill bar |
+| Target nearest enemy | Tab (again: cycles the enemies in range) | | the next one in range |
 | Jump | Space | A / ✕ | JUMP |
 | Run | Shift (the stick pushed all the way runs too) | RB, LT or a stick's click | push the stick to its edge |
 | Menu | Esc, P | Start | the ☰ button |

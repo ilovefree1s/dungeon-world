@@ -68,6 +68,18 @@ monsters.hooks.hurt = () => player.onHurt();
 monsters.hooks.level = lv => { sfx('levelup'); ring(player.pos.x, player.pos.y + 0.1, player.pos.z, '#ffe08a', 1, 10, 0.7); burst(player.pos.x, player.pos.y + 3, player.pos.z, '#ffe9a0', 20, 10, 1.6, true, 0.8); banner('LEVEL ' + lv, 'stronger, and all healed up'); };
 let deadT = 0;
 monsters.hooks.dead = () => { sfx('death'); deadT = 2.6; banner('YOU FELL', 'back to the woods...'); player.invT = 9; if (player.model.userData.fade) player.model.userData.fade(0.4); };
+const TAB_RANGE = 45, tabSeen = new Set();
+function tabTarget() {
+  const near = monsters.list.filter(m => m.hp > 0 && m.pos.distanceTo(player.pos) <= TAB_RANGE).sort((a, b) => a.pos.distanceTo(player.pos) - b.pos.distanceTo(player.pos));
+  if (!near.length) { sayError('No enemies in range'); return; }
+  const f = monsters.focus;
+  if (!f || !near.includes(f)) tabSeen.clear();
+  if (f) tabSeen.add(f);
+  for (const m of [...tabSeen]) if (!near.includes(m)) tabSeen.delete(m);
+  let next = !f || !near.includes(f) ? near[0] : near.find(m => !tabSeen.has(m));
+  if (!next) { tabSeen.clear(); tabSeen.add(f); next = near.find(m => m !== f) || f; }
+  monsters.focus = next;
+}
 const pet = new Pet(player, world, monsters);
 const ctx = { player, world, monsters, bolts, pet, say: (m, c) => sayError(m, c), shake: k => { player.shake = Math.max(player.shake || 0, k); } };
 const abilities = new Abilities(ctx);
@@ -182,6 +194,8 @@ function heroCombat(dt, inp, frozen) {
   // a body in your sights: a click or F looks at what it dropped instead of swinging
   bodies.update(dt, monsters.list.some(m => m.state === 'chase' && m.pos.distanceTo(player.pos) < 16));
   $('lootHint').hidden = !bodies.target || input.cursorMode;
+  // TAB: the nearest enemy; pressed again, the next one in range not yet picked, round and round
+  if (inp.tabEdge) { inp.tabEdge = false; tabTarget(); }
   if (!input.cursorMode && bodies.target && (inp.atkEdge || inp.useEdge)) { inp.atkEdge = false; inp.useEdge = false; openLoot(bodies.target); return; }
   if (input.cursorMode) {
     const gl = $('gl'), w = gl.clientWidth, h = gl.clientHeight;
