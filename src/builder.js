@@ -38,7 +38,7 @@ function rebuild() {
   if (state.look === 'kaykit') {
     hero = null; renderUI(); save();
     $('lookBlurb').textContent = 'Loading the ranger…';
-    loadKayKit().then(K => { kay = K; if (state.look !== 'kaykit') return; renderUI(); if (hero) scene.remove(hero); hero = K.root; scene.add(hero); })
+    loadKayKit().then(K => { kay = K; Object.assign(K.shape, shape); if (state.look !== 'kaykit') return; renderUI(); if (hero) scene.remove(hero); hero = K.root; scene.add(hero); })
       .catch(e => { $('lookBlurb').textContent = 'The ranger could not load here: ' + (e && e.message || e); });
     return;
   }
@@ -60,15 +60,23 @@ function renderUI() {
   row('swSkin', SKINS, P.skin, true); row('swHair', HAIRS, P.hair, true); row('swMain', MAINS, P.main, false); row('swAccent', ACCENTS, P.accent, false);
   for (const b of document.querySelectorAll('.anim')) b.setAttribute('aria-pressed', b.dataset.a === state.anim);
   $('ink').setAttribute('aria-pressed', state.ink); $('close').setAttribute('aria-pressed', state.close);
+  $('kayShape').hidden = state.look !== 'kaykit';
   $('code').textContent = `${L.name} · skin ${P.skin + 1} · hair ${P.hair + 1} · main ${P.main} · accent ${P.accent}`;
 }
-$('looks').innerHTML = [...LOOKS, KAY].map((l, i) => `<button class="look" data-id="${l.id}"><span class="n">${i + 1}</span><span class="t">${l.name}</span></button>`).join('');
+$('looks').innerHTML = [KAY].map((l, i) => `<button class="look" data-id="${l.id}"><span class="n">${i + 1}</span><span class="t">${l.name}</span></button>`).join('');
 $('looks').addEventListener('click', e => { const b = e.target.closest('.look'); if (!b) return; state.look = b.dataset.id; state.pal = {}; rebuild(); });
 const bindRow = (id, k, isIndex) => $(id).addEventListener('click', e => { const b = e.target.closest('.sw'); if (!b) return; state.pal[k] = isIndex ? +b.dataset.v : b.dataset.v; rebuild(); });
 bindRow('swSkin', 'skin', true); bindRow('swHair', 'hair', true); bindRow('swMain', 'main', false); bindRow('swAccent', 'accent', false);
 $('anims').addEventListener('click', e => { const b = e.target.closest('.anim'); if (!b) return; state.anim = b.dataset.a; animT = 0; renderUI(); });
 $('ink').addEventListener('click', () => { state.ink = !state.ink; if (hero) setInk(hero, state.ink); renderUI(); });
 $('close').addEventListener('click', () => { state.close = !state.close; resize(); renderUI(); });
+const shape = { leg: 1, thick: 1, head: 1 };
+try { Object.assign(shape, JSON.parse(localStorage.getItem('dw-kay-shape')) || {}); } catch (e) { }
+for (const [id, k] of [['shLeg', 'leg'], ['shThick', 'thick'], ['shHead', 'head']]) {
+  const el = $(id), show = () => { $(id + 'V').textContent = Math.round(shape[k] * 100) + '%'; if (kay) kay.shape[k] = shape[k]; };
+  el.value = shape[k]; show();
+  el.addEventListener('input', () => { shape[k] = +el.value; show(); try { localStorage.setItem('dw-kay-shape', JSON.stringify(shape)); } catch (e) { } });
+}
 $('reset').addEventListener('click', () => { state.pal = {}; rebuild(); });
 $('shuffle').addEventListener('click', () => {
   const r = a => Math.floor(Math.random() * a.length);
@@ -80,7 +88,7 @@ $('copy').addEventListener('click', async () => {
   catch (e) { const r = document.createRange(); r.selectNodeContents($('code')); getSelection().removeAllRanges(); getSelection().addRange(r); $('copy').textContent = 'SELECTED'; }
   setTimeout(() => $('copy').textContent = 'COPY', 1400);
 });
-addEventListener('keydown', e => { const n = +e.key; if (n >= 1 && n <= 6) { state.look = [...LOOKS, KAY][n - 1].id; state.pal = {}; rebuild(); } });
+addEventListener('keydown', e => { const n = +e.key; if (false) { state.look = [...LOOKS, KAY][n - 1].id; state.pal = {}; rebuild(); } });
 
 // drag to turn
 let drag = null;
@@ -121,5 +129,6 @@ function frame(now) {
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
+state.look = 'kaykit';
 rebuild(); resize(); requestAnimationFrame(frame);
 window.__hb = { state, rebuild, LOOKS, get kay() { return kay; } };

@@ -34,7 +34,7 @@ export function loadKayKit() {
     model.scale.setScalar(2.3 / h); model.position.y = -box.min.y * 2.3 / h;
     const bone = n => model.getObjectByName(n) || model.getObjectByName(n.replace(/\./g, ''));
     const B = { hips: bone('hips'), spine: bone('spine'), chest: bone('chest'), head: bone('head'),
-      ua: [bone('upperarm.l'), bone('upperarm.r')], la: [bone('lowerarm.l'), bone('lowerarm.r')], wr: [bone('wrist.l'), bone('wrist.r')], hand: [bone('hand.l'), bone('hand.r')], slot: [bone('handslot.l'), bone('handslot.r')] };
+      ul: [bone('upperleg.l'), bone('upperleg.r')], ll: [bone('lowerleg.l'), bone('lowerleg.r')], ft: [bone('foot.l'), bone('foot.r')], ua: [bone('upperarm.l'), bone('upperarm.r')], la: [bone('lowerarm.l'), bone('lowerarm.r')], wr: [bone('wrist.l'), bone('wrist.r')], hand: [bone('hand.l'), bone('hand.r')], slot: [bone('handslot.l'), bone('handslot.r')] };
     const mixer = new THREE.AnimationMixer(model), clips = [...gen.animations, ...mov.animations, ...ranged.animations, ...adv.animations], act = {};
     for (const [k, n] of [['idle', 'Ranged_Bow_Idle'], ['walk', 'Walking_A'], ['run', 'Running_HoldingBow'], ['draw', 'Ranged_Bow_Draw'], ['aim', 'Ranged_Bow_Aiming_Idle'], ['release', 'Ranged_Bow_Release']]) { const c = clips.find(c => c.name === n); if (c) act[k] = mixer.clipAction(c); }
     for (const k of ['draw', 'release']) { act[k].setLoop(THREE.LoopOnce, 1); act[k].clampWhenFinished = true; }
@@ -42,7 +42,9 @@ export function loadKayKit() {
     const rest = []; model.traverse(o => { if (o.isBone) rest.push([o, o.quaternion.clone()]); });
     const bowM = bow.scene; B.slot[0].add(bowM);
     const arrowM = arrow.scene; B.slot[1].add(arrowM); arrowM.visible = false;
-    return { root, model, mixer, act, B, bowM, arrowM, rest, cur: 'idle' };
+    model.updateMatrixWorld(true);
+    const legLen = B.ul[0].getWorldPosition(new V3()).distanceTo(B.ft[0].getWorldPosition(new V3()));
+    return { root, model, mixer, act, B, bowM, arrowM, rest, cur: 'idle', baseY: model.position.y, legLen, shape: { leg: 1, thick: 1, head: 1 } };
   })());
 }
 // a two-bone limb reaching a point in the world, its elbow toward the pole (world): turns each bone from where it
@@ -76,5 +78,11 @@ export function tickKayKit(K, dt, anim) {
   } else K.shot = null;
   if (want !== K.cur) { const a = K.act[want], b = K.act[K.cur]; a.reset().play(); a.crossFadeFrom(b, want === 'release' || want === 'aim' ? 0.08 : 0.2, false); K.cur = want; K.shotT = 0; }
   K.mixer.update(dt);
+  // proportions: the legs stretched along their bones (the feet kept their own size), thickened, the head scaled;
+  // the whole body raised so the longer legs still reach the ground
+  const sh = K.shape, k = sh.leg, t = sh.thick, B = K.B;
+  for (let i = 0; i < 2; i++) { B.ul[i].scale.set(t, k, t); B.ll[i].scale.set(1, 1, 1); B.ft[i].scale.set(1 / t, 1 / k, 1 / t); }
+  B.head.scale.setScalar(sh.head);
+  K.model.position.y = K.baseY + K.legLen * (k - 1);
   K.arrowM.visible = K.cur === 'draw' || K.cur === 'aim';
 }
