@@ -538,8 +538,8 @@ export function poseHunter(root, t, m) {
   const ph = t * (8 + run * 4), w = Math.sin(ph) * Math.min(1, sp);
   const swing = 0.6 + run * 0.35;
   u.legs[0].rotation.x = w * swing; u.legs[1].rotation.x = -w * swing;
-  u.knees[0].rotation.x = Math.max(0, -Math.sin(ph - 0.9)) * (0.9 + run * 0.6) * Math.min(1, sp) + 0.04;
-  u.knees[1].rotation.x = Math.max(0, Math.sin(ph - 0.9)) * (0.9 + run * 0.6) * Math.min(1, sp) + 0.04;
+  u.knees[0].rotation.x = Math.max(0, Math.sin(ph - 0.85)) * (0.9 + run * 0.6) * Math.min(1, sp) + 0.04;
+  u.knees[1].rotation.x = Math.max(0, -Math.sin(ph - 0.85)) * (0.9 + run * 0.6) * Math.min(1, sp) + 0.04;
   u.body.position.y = Math.abs(Math.cos(ph)) * (0.05 + run * 0.06) * Math.min(1, sp) + Math.sin(t * 2) * 0.012 * (1 - Math.min(1, sp));
   u.body.rotation.set(run * 0.18, 0, Math.sin(ph) * 0.03 * Math.min(1, sp));
   u.head.rotation.set(-run * 0.12, Math.sin(t * 0.7) * 0.08 * (1 - Math.min(1, sp)), 0);
