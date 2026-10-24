@@ -269,7 +269,7 @@ function hair(u, style, m) {
   const top = mesh(new THREE.SphereGeometry(0.288, 26, 16, 0, TAU, 0, Math.PI * 0.52), m); top.position.y = 0.025; top.rotation.x = -0.28; top.scale.set(1.03, 1.06, 1.03); head.add(top);
   if (style === 'top') return;
   const back = mesh(sph(0.275, 20, 14), m); back.position.set(0, 0.0, -0.07); back.scale.set(1.04, 1.02, 0.92); head.add(back);
-  for (const s of [-1, 1]) { const sb = mesh(cone(0.06, 0.18, 8), m); sb.position.set(0.255 * s, -0.08, 0.06); sb.rotation.z = Math.PI; sb.scale.z = 0.6; head.add(sb); }
+  if (style !== 'short') for (const s of [-1, 1]) { const sb = mesh(cone(0.06, 0.18, 8), m); sb.position.set(0.255 * s, -0.08, 0.06); sb.rotation.z = Math.PI; sb.scale.z = 0.6; head.add(sb); }
   if (style === 'long') {
     const hm = M('hair', '#' + m.color.getHexString(), { side: THREE.DoubleSide });
     for (let i = 0; i < 5; i++) {
@@ -372,9 +372,16 @@ export function buildHunterLook(id, pal) {
     kn.add(mesh(rbox(0.06, 0.2, 0.035, 0.5), leatherD)); const hilt = mesh(cyl(0.018, 0.018, 0.09, 8), M('wood', '#5a3a1c')); hilt.position.y = 0.14; kn.add(hilt);
     const sb = mesh(tor(0.14, 0.018, TAU, 20), leatherD); sb.rotation.x = Math.PI / 2; sb.position.y = -0.1; u.legs[1].add(sb);
     // the hood: a cowl with a deep rim, a peak at the back, a drape down the neck
-    const hood = mesh(new THREE.SphereGeometry(0.345, 28, 18, 0, TAU, 0, Math.PI * 0.7), mainCape); hood.position.set(0, 0.03, -0.05); hood.rotation.x = -0.72; head.add(hood);
-    const rim = mesh(tor(0.31, 0.035, Math.PI * 1.3, 26), mainD); rim.position.set(0, 0.0, 0.06); rim.rotation.set(-0.62, 0, -Math.PI * 0.15); rim.scale.set(1.04, 1.1, 1); head.add(rim);
-    const tip = mesh(cone(0.15, 0.4, 14), main); tip.position.set(0, 0.06, -0.33); tip.rotation.x = -2.15; head.add(tip);
+    const hoodG = new THREE.SphereGeometry(0.35, 40, 28, Math.PI / 2 + 0.95, TAU - 1.9, 0, Math.PI * 0.86);
+    { const p = hoodG.attributes.position; for (let i = 0; i < p.count; i++) { let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      const low = Math.max(0, -y - 0.05) / 0.25;                      // (the lower part flares out over the shoulders)
+      x *= 1 + low * 0.5; z *= 1 + low * 0.25; z -= low * 0.04;
+      if (y > 0 && z < 0) { const k = (y / 0.35) * (-z / 0.35); z -= k * k * 0.22; y += k * 0.06; }   // (a point at the back)
+      const fr = Math.max(0, z / 0.35); y += fr * fr * 0.05;          // (the front edge drawn up into a peak over the brow)
+      p.setXYZ(i, x, y, z); } hoodG.computeVertexNormals(); }
+    const hood = mesh(hoodG, mainCape); hood.position.set(0, 0.03, -0.03); hood.rotation.x = -0.18; hood.userData.noInk = true; head.add(hood);
+    // the hood's lining shows inside the opening, a turned-back edge frames the face
+    const lining = mesh(new THREE.SphereGeometry(0.34, 30, 20, Math.PI / 2 + 1.0, TAU - 2.0, 0, Math.PI * 0.8), M('cloth', shade(pal.main, 0.45), { side: THREE.BackSide })); lining.position.copy(hood.position); lining.rotation.x = -0.18; lining.userData.noInk = true; head.add(lining);
     const mantle = mesh(lathe([[0.12, 0.3], [0.24, 0.27], [0.42, 0.1], [0.5, -0.14]], 30), main); mantle.position.y = 1.42; mantle.scale.z = 0.82; body.add(mantle);
     for (let i = 0; i < 18; i++) { const a = i / 18 * TAU; const d = mesh(cone(0.045, 0.08, 4), main); d.position.set(Math.sin(a) * 0.5, 1.26, Math.cos(a) * 0.41); d.rotation.x = Math.PI; d.userData.noInk = true; body.add(d); }
     const clasp = mesh(rbox(0.07, 0.07, 0.03, 0.6), brass); clasp.position.set(0, 1.62, 0.17); body.add(clasp);
@@ -451,17 +458,28 @@ export function buildHunterLook(id, pal) {
     face(u, { skin, brow: hairC, eye: '#3a5a7a', smile: 0.15 }); hair(u, 'short', hairM);
     // stubble and a moustache
     for (const s of [-1, 1]) { const mo = mesh(limb(0.022, 0.012, 0.09, 8), hairM); mo.position.set(0.012 * s, -0.07, 0.29); mo.rotation.z = (Math.PI / 2 + 0.35) * s; mo.userData.noInk = true; head.add(mo); }
-    // the hat, a band, a feather, goggles on the brim
-    const hatM = M('leather', shade(pal.main, 0.85));
-    const hat = new THREE.Group(); hat.position.y = 0.2; hat.rotation.x = -0.12; head.add(hat);
-    const brim = mesh(lathe([[0.001, 0.02], [0.5, 0.0], [0.52, 0.035], [0.49, 0.03], [0.001, 0.045]], 36), hatM); hat.add(brim);
-    { const p = brim.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), r = Math.hypot(x, z); if (r > 0.3) p.setY(i, p.getY(i) + Math.pow(Math.abs(x) / 0.5, 2) * 0.09); } brim.geometry.computeVertexNormals(); }
-    const crown = mesh(lathe([[0.27, 0.0], [0.26, 0.18], [0.22, 0.27], [0.001, 0.25]], 30), hatM); hat.add(crown);
-    const dent = mesh(box(0.04, 0.04, 0.3), M('leather', shade(pal.main, 0.6))); dent.position.y = 0.26; dent.userData.noInk = true; hat.add(dent);
-    const band = mesh(cyl(0.275, 0.272, 0.05, 30), accentC); band.position.y = 0.04; hat.add(band);
-    const fth = mesh(sph(0.05, 8, 6), M('cloth', '#e8e0d0')); fth.scale.set(0.25, 2.2, 0.9); fth.position.set(0.24, 0.15, -0.08); fth.rotation.z = -0.7; hat.add(fth);
-    for (const s of [-1, 1]) { const g = mesh(tor(0.058, 0.02, TAU, 16), brass); g.position.set(0.075 * s, 0.11, 0.23); g.rotation.x = -0.4; hat.add(g); const l = new THREE.Mesh(new THREE.CircleGeometry(0.048, 16), M('gem', '#7ac8e8', { metalness: 0.3 })); l.position.set(0.075 * s, 0.11, 0.24); l.rotation.x = -0.4; hat.add(l); }
-    const gstrap = mesh(tor(0.276, 0.012, TAU, 30), leatherD); gstrap.rotation.x = Math.PI / 2; gstrap.position.y = 0.09; gstrap.userData.noInk = true; hat.add(gstrap);
+    // the hat: a wide brim turned up at the sides and dipping front and back, a pinched crown with a crease
+    // down the top, a band with a buckle, a feather tucked in it
+    const hatM = M('leather', shade(pal.main, 0.85), { side: THREE.DoubleSide, roughness: 0.75 }), hatD = M('leather', shade(pal.main, 0.6));
+    const hat = new THREE.Group(); hat.position.set(0, 0.17, -0.01); hat.rotation.x = -0.1; head.add(hat);
+    const brimG = lathe([[0.001, 0.014], [0.24, 0.012], [0.42, 0.004], [0.5, 0.0], [0.51, 0.008], [0.5, 0.016], [0.42, 0.014], [0.24, 0.024], [0.001, 0.026]], 72);
+    { const p = brimG.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i) * 0.9, r = Math.hypot(x, z), out = Math.max(0, r - 0.27) / 0.24;
+      const side = Math.abs(x) / (r || 1), up = Math.pow(out, 1.8) * (0.15 * side * side) - Math.pow(out, 2) * 0.035 * (1 - side * side);
+      p.setXYZ(i, x, p.getY(i) + up, z); } brimG.computeVertexNormals(); }
+    hat.add(mesh(brimG, hatM));
+    const crownG = lathe([[0.255, 0.0], [0.26, 0.06], [0.252, 0.14], [0.23, 0.21], [0.19, 0.26], [0.11, 0.285], [0.001, 0.28]], 48);
+    { const p = crownG.attributes.position; for (let i = 0; i < p.count; i++) { let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      const hy = Math.max(0, (y - 0.1) / 0.18);
+      if (z > 0) x *= 1 - 0.32 * (z / 0.26) * hy;               // (pinched at the front)
+      y -= 0.07 * hy * Math.exp(-(x * x) / 0.004) * (0.6 + 0.4 * Math.cos(z * 4));   // (a crease along the top)
+      z *= 1.04; p.setXYZ(i, x, y, z); } crownG.computeVertexNormals(); }
+    hat.add(mesh(crownG, hatM));
+    const band = mesh(cyl(0.262, 0.258, 0.055, 48), accentC); band.position.y = 0.04; band.scale.z = 1.04; hat.add(band);
+    const buckle = mesh(rbox(0.06, 0.055, 0.02, 0.4), brass); buckle.position.set(0.17, 0.04, 0.2); buckle.rotation.y = 0.7; hat.add(buckle);
+    const fth = new THREE.Group(); fth.position.set(-0.24, 0.06, -0.06); fth.rotation.set(-0.5, 0, 0.55); hat.add(fth);
+    const vane = mesh(sph(0.06, 14, 10), M('cloth', '#e8e0d0')); vane.scale.set(0.28, 2.4, 0.06 / 0.06); vane.position.y = 0.13; fth.add(vane);
+    const tipF = mesh(sph(0.03, 10, 8), M('cloth', '#3a2a20')); tipF.scale.set(0.3, 1.6, 1); tipF.position.y = 0.26; fth.add(tipF);
+    const quill = mesh(cyl(0.006, 0.004, 0.32, 5), M('wood', '#c8b898')); quill.position.y = 0.12; fth.add(quill);
     // the bandana and its knot, a tail of it blowing back
     const bandana = mesh(cone(0.2, 0.2, 3), accentC); bandana.position.set(0, 1.5, 0.15); bandana.rotation.set(Math.PI + 0.2, 0, 0); bandana.scale.z = 0.4; body.add(bandana);
     const knot = mesh(tor(0.14, 0.04, TAU, 18), accentC); knot.position.y = 1.58; knot.rotation.x = Math.PI / 2; body.add(knot);
@@ -532,6 +550,17 @@ export function tickHunter(root, dt, m) {
     p.needsUpdate = true; u.motes.material.opacity = 0.7;
   }
 }
+// two bones (upper arm, forearm, each 0.28 long, hanging down -y) reaching from the shoulder to a point (in the body's
+// frame), the elbow swung toward the pole
+function ik(arm, elbow, T, pole, l1 = 0.28, l2 = 0.28) {
+  const S = arm.position, d = T.clone().sub(S), dist = Math.min(Math.max(d.length(), 0.05), l1 + l2 - 0.002), dn = d.normalize();
+  const a = (l1 * l1 + dist * dist - l2 * l2) / (2 * dist), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const pd = pole.clone().normalize().addScaledVector(dn, -pole.clone().normalize().dot(dn)).normalize();
+  const E = dn.clone().multiplyScalar(a).addScaledVector(pd, h), D = new V3(0, -1, 0);
+  arm.quaternion.setFromUnitVectors(D, E.clone().normalize());
+  const f = dn.clone().multiplyScalar(dist).sub(E).normalize().applyQuaternion(arm.quaternion.clone().invert());
+  elbow.quaternion.setFromUnitVectors(D, f);
+}
 // the whole body's pose: walk / run cycles with knees and elbows, and the bow draw
 export function poseHunter(root, t, m) {
   const u = root.userData, sp = m.speed, run = Math.max(0, sp - 1);
@@ -552,12 +581,20 @@ export function poseHunter(root, t, m) {
   const pos = u.string.geometry.attributes.position;
   if (m.draw >= 0) {
     const k = m.draw;
-    // the bow arm straight out, the drawing elbow out to the side and folding back to the cheek
+    // side-on to the target, the bow arm reaching straight to it, the drawing hand pulling the string back
+    // to the jaw, its elbow up and out behind: each arm placed by solving for where its elbow must be
     const pull = k < 0.6 ? k / 0.6 : Math.max(0, 1 - (k - 0.6) / 0.08);
-    u.body.rotation.y = -0.45; u.head.rotation.set(0, 0.42, 0);
-    u.arms[0].rotation.set(-1.5, 0.45, 0); u.elbows[0].rotation.set(0, 0, 0);
-    u.arms[1].rotation.set(-1.45, -0.15 + pull * 0.35, 0.2 + pull * 0.55);
-    u.elbows[1].rotation.set(0, 0, -0.35 - pull * 1.9);
+    const yaw = 0.8, A = new V3(-Math.sin(yaw), 0.04, Math.cos(yaw)).normalize();
+    u.body.rotation.set(0, yaw, 0); u.head.rotation.set(0.05, -yaw + 0.1, 0);
+    const C = new V3(-0.03, 1.57, 0.2), B = C.clone().addScaledVector(A, 0.52), H = B.clone().addScaledVector(A, -(0.1 + 0.42 * pull));
+    ik(u.arms[0], u.elbows[0], B, new V3(-0.3, -1, -0.4));
+    ik(u.arms[1], u.elbows[1], H, new V3(1, 0.5, -0.8));
+    // (the bow upright, its belly toward the target, whatever the hand's twist)
+    root.updateMatrixWorld(true);
+    const rq = root.getWorldQuaternion(new THREE.Quaternion()), aimW = new V3(0, 0, 1).applyQuaternion(rq), up = new V3(0, 1, 0);
+    const bx = new V3().crossVectors(up, aimW).normalize(), bz = new V3().crossVectors(bx, up), bq = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(bx, up, bz));
+    u.bow.quaternion.copy(u.hands[0].getWorldQuaternion(new THREE.Quaternion()).invert().multiply(bq));
+    u.legs[0].rotation.set(-0.12, 0, 0.14); u.legs[1].rotation.set(0.1, 0, -0.14); u.knees[0].rotation.x = 0.1; u.knees[1].rotation.x = 0.16;
     pos.setZ(1, u.stringZ - pull * 0.42);
     u.nock.visible = k < 0.66;
     if (u.nock.visible) {
@@ -567,6 +604,6 @@ export function poseHunter(root, t, m) {
       u.nock.quaternion.copy(u.hands[1].getWorldQuaternion(new THREE.Quaternion()).invert().multiply(q));
     }
     u.legs[0].rotation.x = -0.25; u.legs[1].rotation.x = 0.25; u.knees[0].rotation.x = 0.12; u.knees[1].rotation.x = 0.2;
-  } else { pos.setZ(1, u.stringZ); u.nock.visible = false; }
+  } else { pos.setZ(1, u.stringZ); u.nock.visible = false; u.bow.rotation.set(Math.PI / 2, 0, 0); u.arms[0].quaternion.setFromEuler(u.arms[0].rotation); u.legs[0].rotation.z = 0; u.legs[1].rotation.z = 0; }
   pos.needsUpdate = true;
 }
