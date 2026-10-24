@@ -15,7 +15,7 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   |---|---|---|---|---|---|---|
   | Warrior | **Heroic**: the next swing hits more than twice as hard | **Rend**: a bleed on the target | **Throw**: an axe at a far target | **Block**: shield up, blows land at a third | **Shout**: a quarter more damage for 12 s | **2nd Wind**: heal over 8 s |
   | Mage | **Fireball**: a big, slow bolt | **Missiles**: five quick arcane bolts | **Ice Lance**: quick, near triple on the frozen | **Chain**: lightning leaping to four foes | **Polymorph**: the target stands harmless for 8 s | **Barrier**: ice soaks blows |
-  | Hunter | **Aimed**: a slow, triple shot | **Sting**: poison over 8 s | **Concuss**: a dazed, slowed target | **Rapid Fire**: shots 60% quicker for 10 s | **Tame**: a wild slime, bat or spider becomes your pet | **Wrath**: your pet bites twice as hard |
+  | Hunter | **Aimed**: a slow, triple shot | **Sting**: poison over 8 s | **Concuss**: a dazed, slowed target | **Rapid Fire**: shots 60% quicker for 10 s | **Tame**: make almost any monster your pet (2.4 s cast; not the big ones) | **Wrath**: your pet bites twice as hard |
   Single-target skills go at your target (or the nearest monster in front).
 - **The hunter's pet** (Dungeon Heart's cute ones, in a red bandana, with a name): it trots at your heel, joins your
   fights (biting your target, or whatever's after you), comes back when you stand up from a fall, and stays with you

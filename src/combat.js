@@ -36,7 +36,7 @@ export function gainXp(n, onLevel) {
 // fights: melee (walks up, winds up, strikes), hop (slimes bounce at you), swoop (bats dive from the air),
 // pounce (spiders crouch and leap), phase (ghosts blink behind you), shot (imps, sprites and wisps keep
 // their distance and throw), charge (crabs rush in a line)
-const KIND = {
+export const KIND = {
   [D.M_SLIME]: { spd: 6.4, r: 1.8, h: 2.6, fly: 0, see: 28, atk: 'hop' },
   [D.M_BAT]: { spd: 12, r: 1.2, h: 1.6, fly: 1, see: 36, atk: 'swoop', hover: 7 },
   [D.M_SKEL]: { spd: 8, r: 1.2, h: 4.4, fly: 0, see: 36, atk: 'melee' },
@@ -149,6 +149,7 @@ export class Monsters {
   }
   // the hero's bolt or blade lands on one
   hit(m, dmg, crit, dir) {
+    if (m.taming) return;   // (being tamed: blows hold off)
     m.hp -= dmg; m.flash = 0.18; m.state = 'chase';
     m.kb.set(dir.x * 14, 0, dir.z * 14);
     if (crit && m.wind > 0) { m.wind = 0; m.act = null; m.atkCd = Math.max(m.atkCd, 0.8); }   // a critical hit breaks a wind-up

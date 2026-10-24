@@ -7,15 +7,21 @@
 // ============================================================================
 import { THREE, scene, V3 } from './engine.js';
 import { buildPet, PET_NAMES } from './dh/pets.js';
-import { stats, heroBuff } from './combat.js';
+import { stats, heroBuff, KIND as MKIND } from './combat.js';
+import { buildMonster } from './dh/models.js';
 import { burst, ring, number } from './fx.js';
 import { sfx } from './audio.js';
 import * as D from './dh/data.js';
 
 const KEY = 'dw-pet-v1';
 const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { } } };
-export const TAMEABLE = { [D.M_SLIME]: 1, [D.M_BAT]: 2, [D.M_SPIDER]: 4 };
-const KIND = { 1: { spd: 15, fly: 0, scale: 1.7 }, 2: { spd: 18, fly: 1, scale: 1.6 }, 4: { spd: 17, fly: 0, scale: 1.7 } };
+// anything but the big ones (golem, slime king, demon, wraith, inferno) can be tamed: a slime, bat or spider becomes
+// one of Dungeon Heart's own pets in a bandana; anything else keeps its own shape
+const BOSSES = new Set([D.M_GOLEM, D.M_SLIMEKING, 15, 16, 17]);
+export const TAMEABLE = new Proxy({}, { get: (_, t) => !BOSSES.has(+t) && +t > 0 });
+const CUTE = { [D.M_SLIME]: 1, [D.M_BAT]: 2, [D.M_SPIDER]: 4 };
+const KIND = new Proxy({ 1: { spd: 15, fly: 0, scale: 1.7 }, 2: { spd: 18, fly: 1, scale: 1.6 }, 4: { spd: 17, fly: 0, scale: 1.7 } },
+  { get: (o, t) => o[t] || { spd: 16, fly: MKIND[t] && MKIND[t].fly ? 1 : 0, scale: 1.24 } });
 
 export class Pet {
   constructor(player, world, monsters) {
@@ -27,7 +33,7 @@ export class Pet {
   save() { ls.set(KEY, JSON.stringify(this.p ? { type: this.p.type, name: this.p.name } : null)); }
   make(type, name, at) {
     this.dismiss(true);
-    const root = buildPet(type); root.scale.multiplyScalar(KIND[type].scale);
+    const root = CUTE[type] ? buildPet(CUTE[type]) : buildMonster(type, 1 + Math.floor(stats.level / 3)); root.scale.multiplyScalar(KIND[type].scale);
     root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
     scene.add(root);
     this.p = { type, name, root, pos: at.clone(), face: 0, biteCd: 0, seed: Math.random() * 10, moving: false };
@@ -40,8 +46,8 @@ export class Pet {
   }
   // a wild one becomes yours
   tame(m) {
-    const type = TAMEABLE[m.type]; if (!type) return false;
-    const names = PET_NAMES[type], name = names[Math.floor(Math.random() * names.length)];
+    if (!TAMEABLE[m.type]) return false; const type = m.type;
+    const names = PET_NAMES[CUTE[type] || 1], name = names[Math.floor(Math.random() * names.length)];
     const at = m.pos.clone();
     this.monsters.remove(m);
     this.make(type, name, at);
@@ -82,7 +88,7 @@ export class Pet {
     P.root.position.copy(P.pos);
     if (P.lunge > 0) { const a = Math.sin(P.lunge / 0.25 * Math.PI) * 0.8; P.root.position.x += Math.sin(P.face) * a; P.root.position.z += Math.cos(P.face) * a; }
     P.root.rotation.y = P.face;
-    if (P.root.userData.anim) P.root.userData.anim(t, { moving: P.moving, seed: P.seed, attack: P.lunge > 0 });
+    if (P.root.userData.anim) P.root.userData.anim(t, { moving: P.moving, seed: P.seed, timer: Math.floor(t * 4 + P.seed * 20), attack: P.lunge > 0 });
     if (this.wrath > 0 && Math.random() < dt * 8) burst(P.pos.x, P.pos.y + 1.2, P.pos.z, '#ff4a3c', 2, 2, 0.8, true, 0.4);
   }
 }
