@@ -78,7 +78,7 @@ export function pickMonster(monsters, x, y, w, h) {
 export class Monsters {
   constructor(world, player) {
     this.world = world; this.player = player; this.list = []; this.spawnT = 2; this.timer = 0;
-    this.hooks = { hurt: null, level: null, dead: null, fallen: null };
+    this.hooks = { hurt: null, level: null, dead: null, fallen: null, armor: null };
     this.shots = [];                 // what the ranged ones throw
     this.focus = null;               // the one clicked on: attacks aim at it
     this.focusRing = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 40), new THREE.MeshBasicMaterial({ color: '#ff6a55', transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
@@ -91,8 +91,10 @@ export class Monsters {
     root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
     scene.add(root);
     const k = KIND[type];
-    const m = { type, k, root, name: D.MON_NAME[type] || 'MONSTER', lvl: 1 + Math.floor(stats.level / 3), pos: new V3(x, y, z), vel: new V3(), home: new V3(x, y, z), face: Math.random() * 6.28, seed: Math.random() * 10,
-      hp: D.MON_BASE_HP[type] * 3 + stats.level * 2, atk: D.MON_BASE_ATK[type] + Math.floor(stats.level / 2), state: 'wander', t: Math.random() * 2, atkCd: 1 + Math.random(), flash: 0, frz: 0, kb: new V3(), onGround: false, moving: false, bob: Math.random() * 6,
+    // (every monster is near your level, wherever you are: the lands are all mixed up, so the danger goes with you)
+    const lvl = Math.max(1, stats.level + Math.floor(Math.random() * 3) - 1);
+    const m = { type, k, root, name: D.MON_NAME[type] || 'MONSTER', lvl, pos: new V3(x, y, z), vel: new V3(), home: new V3(x, y, z), face: Math.random() * 6.28, seed: Math.random() * 10,
+      hp: D.MON_BASE_HP[type] * 3 + lvl * 4, atk: D.MON_BASE_ATK[type] + Math.floor(lvl * 0.8), state: 'wander', t: Math.random() * 2, atkCd: 1 + Math.random(), flash: 0, frz: 0, kb: new V3(), onGround: false, moving: false, bob: Math.random() * 6,
       wind: 0, act: null, lastAct: null, daze: 0, hopCd: 0, leap: 0, dive: null, rush: null, barT: 0, bar: null, tint: '' };
     m.maxHp = m.hp;
     this.list.push(m);
@@ -153,7 +155,7 @@ export class Monsters {
       ring(m.pos.x, m.pos.y + 0.1, m.pos.z, '#ffe08a', 0.8, 5, 0.4);
       sfx('kill');
       stats.kills++;
-      gainXp(3 + D.MON_BASE_XP[m.type], this.hooks.level);
+      gainXp(3 + D.MON_BASE_XP[m.type] + Math.max(0, (m.lvl || 1) - 1), this.hooks.level);
       // (the body may stay on the ground, with whatever it carried: the fallen hook takes the model)
       if (this.hooks.fallen && this.hooks.fallen(m)) { if (m.bar) { scene.remove(m.bar); m.bar.userData.fill.material.dispose(); } this.list.splice(this.list.indexOf(m), 1); }
       else this.remove(m);
@@ -165,6 +167,8 @@ export class Monsters {
   hurt(dmg, fx, fz, shove = 18) {
     const p = this.player;
     if (p.invT > 0 || stats.hp <= 0) return false;
+    const cut = this.hooks.armor ? this.hooks.armor() : 0;   // (worn armor turns part of it aside)
+    dmg = Math.max(1, Math.round(dmg * (1 - cut)));
     stats.hp = Math.max(0, stats.hp - dmg);
     this.calm = 0; this.regenAcc = 0;
     p.invT = 0.7; p.hurtT = 0.4;

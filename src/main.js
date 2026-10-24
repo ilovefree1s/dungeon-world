@@ -12,8 +12,9 @@ import { BIOME_NAME, BIOME_SUB, CH } from './gen.js';
 import { Monsters, Bolts, stats, xpToNext, pickMonster } from './combat.js';
 import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
-import { Bodies, rollDrop } from './loot.js';
-import { statsOf, plainStats, dpsOf, hitOf } from './weaponkit.js';
+import { Bodies, rollLoot, bestRarity } from './loot.js';
+import { inv, addItem, addGold, equipItem, gearTotals, armorCut, GLYPH_ITEM, SLOT_NAME } from './inventory.js';
+import { statsOf, plainStats, dpsOf, hitOf, RARITIES, setLevelSource } from './weaponkit.js';
 import { Turntable } from './turntable.js';
 import { AURA_VIEW } from './auras.js';
 import { VERSION } from './version.js';
@@ -76,28 +77,89 @@ const svgCursor = (svg, x, y, fallback) => `url("data:image/svg+xml;utf8,${encod
 const swordSvg = (blade, edge, glow) => `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>${glow ? `<path d='M2 2 L6 3 L21 18 L18 21 L3 6 Z' fill='none' stroke='${glow}' stroke-width='4' stroke-linejoin='round' opacity='.55'/>` : ''}<path d='M2 2 L6 3 L21 18 L18 21 L3 6 Z' fill='${blade}' stroke='#1a1210' stroke-width='1.4' stroke-linejoin='round'/><path d='M3 3 L20 20' stroke='${edge}' stroke-width='1' opacity='.8'/><path d='M15 23 L23 15 L25 17 L17 25 Z' fill='#c8962c' stroke='#1a1210' stroke-width='1.3' stroke-linejoin='round'/><path d='M21 21 L27 27' stroke='#5a3a22' stroke-width='3.4' stroke-linecap='round'/><path d='M21 21 L27 27' stroke='#1a1210' stroke-width='5' stroke-linecap='round' opacity='.35'/><circle cx='28' cy='28' r='2.4' fill='#ffd45a' stroke='#1a1210' stroke-width='1.2'/></svg>`;
 const bagSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><path d='M10 9 Q16 4 22 9' fill='none' stroke='#1a1210' stroke-width='2.6'/><path d='M10 9 Q16 5 22 9' fill='none' stroke='#c8962c' stroke-width='1.4'/><path d='M8 11 Q4 26 16 29 Q28 26 24 11 Z' fill='#8a5a2e' stroke='#1a1210' stroke-width='1.5' stroke-linejoin='round'/><path d='M9 12 L23 12' stroke='#ffd45a' stroke-width='2'/><circle cx='16' cy='21' r='3.2' fill='#ffd45a' stroke='#1a1210' stroke-width='1.1'/></svg>`;
 const CURSOR = { idle: svgCursor(swordSvg('#dfe6ee', '#ffffff', null), 1, 1, 'default'), foe: svgCursor(swordSvg('#ff8a7a', '#ffe0d8', '#ff3020'), 1, 1, 'crosshair'), loot: svgCursor(bagSvg, 16, 16, 'pointer') };
+// a weapon with no item level of its own (a forged one) is at your level; worn armor turns blows aside and its
+// stamina adds health (two a point)
+setLevelSource(() => stats.level);
+monsters.hooks.armor = () => armorCut(gearTotals().armor, stats.level);
+let gearHp = 0;
+function applyGearHp() { const want = gearTotals().stam * 2; stats.maxHp += want - gearHp; gearHp = want; stats.hp = Math.min(stats.hp, stats.maxHp); }
+inv.onGear = () => applyGearHp();
+applyGearHp();
 // the fallen: bodies stay a while, some with a weapon on them
 const bodies = new Bodies(player);
-monsters.hooks.fallen = m => bodies.fall(m, rollDrop(m, player.cls));
+monsters.hooks.fallen = m => bodies.fall(m, rollLoot(m, player.cls));
 let lootBody = null;
 const lootView = new Turntable($('lootGl'));
+// the loot window: everything the fallen carried in a list; the one picked shows on top (a weapon turning on its
+// stand, the rest as their icons) with its numbers against what you have, and what you can do with it
+function lootEntries(b) {
+  const L = b.loot, out = [];
+  if (L.weapon) out.push({ kind: 'weapon', it: L.weapon });
+  for (const it of L.items) out.push({ kind: it.kind, it });
+  if (L.gold) out.push({ kind: 'gold', it: { name: `${L.gold} GOLD`, rarity: 'common' } });
+  return out;
+}
+let lootPick = 0;
 function openLoot(b) {
-  lootBody = b; const d = bodies.describe(b.spec);
-  // the rarity colors the name and the frame; the picture turns on its stand
-  $('lootT').textContent = d.rarity.id === 'common' ? 'IT DROPPED' : `A ${d.rarity.name} DROP`;
-  $('lootRarity').textContent = d.rarity.name; $('lootRarity').style.color = d.rarity.color;
-  $('lootName').textContent = d.name; $('lootName').style.color = d.rarity.color; $('lootName').style.textShadow = `0 5px 0 rgba(0,0,0,.55), 0 0 24px ${d.rarity.color}66`;
-  $('loot').querySelector('.panel').style.boxShadow = `inset 0 0 0 2px ${d.rarity.color}, 0 24px 60px rgba(0,0,0,.55), 0 0 40px ${d.rarity.color}44`;
-  $('loot').hidden = false; lootView.show(b.spec);
-  $('lootLine').textContent = d.line;
-  // each number beside what the hero of that class wields now (the plain weapon if nothing's forged): up in green, down in red
-  const have = equippedSpec(d.cls), cur = have ? statsOf(have) : plainStats(d.cls);
-  // (less is better for the time between swings: its arrow goes the other way)
-  const row = (label, a, b, pre = 'x', post = '', lessIsBetter = false) => { const dlt = +(a - b).toFixed(2), good = lessIsBetter ? -dlt : dlt; const col = good > 0 ? '#5ce65c' : good < 0 ? '#ff6a55' : 'var(--dim)'; const arrow = good > 0 ? '▲' : good < 0 ? '▼' : '='; return `<div><span style="display:inline-block;width:72px;text-align:left">${label}</span> ${pre}${a}${post} <b style="color:${col}">${arrow} ${dlt > 0 ? '+' : ''}${dlt || ''}</b> <span style="color:var(--dim);font-weight:700">(now ${pre}${b}${post})</span></div>`; };
-  $('lootStats').innerHTML = row('DPS', dpsOf(d.stats, d.cls, stats.level), dpsOf(cur, d.cls, stats.level), '') + row('HIT', Math.round(hitOf(d.stats, d.cls, stats.level)), Math.round(hitOf(cur, d.cls, stats.level)), '') + row(d.stats.cls === 0 ? 'SWING' : 'SHOT', d.stats.time, cur.time, '', 's', true) + (d.stats.cls !== 0 ? row('SHOT SPD', d.stats.shot, cur.shot) : '')
-    + `<div class="small" style="margin-top:6px">${have ? 'AGAINST ' + (have.name || 'YOUR FORGED WEAPON') : 'AGAINST THE PLAIN ONE'}</div>`;
-  $('lootWield').textContent = d.cls === player.cls ? 'TAKE & WIELD' : `TAKE & WIELD (AS THE ${['WARRIOR', 'MAGE', 'HUNTER'][d.cls]})`;
-  unlockMouse(); UI.state = 'loot'; sfx(d.rarity.id === 'legendary' ? 'legend' : d.rarity.id === 'common' ? 'pickup' : 'rare');
+  lootBody = b; lootPick = 0;
+  unlockMouse(); UI.state = 'loot'; $('loot').hidden = false;
+  const best = bestRarity(b.loot);
+  sfx(best.id === 'legendary' ? 'legend' : best.id === 'common' ? 'pickup' : 'rare');
+  showLoot();
+}
+function showLoot() {
+  const b = lootBody; if (!b) return;
+  const E = lootEntries(b);
+  if (!E.length) { closeLoot(); return; }
+  lootPick = Math.min(lootPick, E.length - 1);
+  const e = E[lootPick], it = e.it, rr = RARITIES.find(r => r.id === it.rarity) || RARITIES[0];
+  const best = bestRarity(b.loot);
+  $('lootT').textContent = best.id === 'common' ? 'IT DROPPED' : `A ${best.name} DROP`;
+  $('loot').querySelector('.panel').style.boxShadow = `inset 0 0 0 2px ${best.color}, 0 24px 60px rgba(0,0,0,.55), 0 0 40px ${best.color}44`;
+  $('lootRarity').textContent = e.kind === 'gold' ? 'COIN' : `${rr.name} · ITEM LEVEL ${it.ilvl || stats.level}`; $('lootRarity').style.color = rr.color;
+  $('lootName').textContent = it.name; $('lootName').style.color = rr.color; $('lootName').style.textShadow = `0 5px 0 rgba(0,0,0,.55), 0 0 24px ${rr.color}66`;
+  const row = (label, a, bb, pre = 'x', post = '', lessIsBetter = false) => { const dlt = +(a - bb).toFixed(2), good = lessIsBetter ? -dlt : dlt; const col = good > 0 ? '#5ce65c' : good < 0 ? '#ff6a55' : 'var(--dim)'; const arrow = good > 0 ? '▲' : good < 0 ? '▼' : '='; return `<div><span style="display:inline-block;width:72px;text-align:left">${label}</span> ${pre}${a}${post} <b style="color:${col}">${arrow} ${dlt > 0 ? '+' : ''}${dlt || ''}</b> <span style="color:var(--dim);font-weight:700">(now ${pre}${bb}${post})</span></div>`; };
+  $('lootGl').hidden = e.kind !== 'weapon'; $('lootIcon').hidden = e.kind === 'weapon';
+  $('lootWield').hidden = !(e.kind === 'weapon' || e.kind === 'armor');
+  if (e.kind === 'weapon') {
+    const d = bodies.describe(it); lootView.show(it);
+    $('lootLine').textContent = d.line;
+    const have = equippedSpec(d.cls), cur = have ? statsOf(have) : plainStats(d.cls);
+    $('lootStats').innerHTML = row('DPS', dpsOf(d.stats, d.cls, stats.level), dpsOf(cur, d.cls, stats.level), '') + row('HIT', Math.round(hitOf(d.stats, d.cls, stats.level)), Math.round(hitOf(cur, d.cls, stats.level)), '') + row(d.stats.cls === 0 ? 'SWING' : 'SHOT', d.stats.time, cur.time, '', 's', true)
+      + `<div class="small" style="margin-top:6px">${have ? 'AGAINST ' + (have.name || 'YOUR FORGED WEAPON') : 'AGAINST THE PLAIN ONE'}</div>`;
+    $('lootWield').textContent = d.cls === player.cls ? 'TAKE & WIELD' : `TAKE & WIELD (AS THE ${['WARRIOR', 'MAGE', 'HUNTER'][d.cls]})`;
+    $('lootTake').textContent = 'TAKE (INTO THE BAGS)';
+  } else {
+    lootView.stop();
+    $('lootIcon').textContent = e.kind === 'gold' ? '🪙' : GLYPH_ITEM[e.kind === 'armor' ? it.slot : 'potion'];
+    if (e.kind === 'armor') {
+      const cur = inv.equipped[it.slot] || { armor: 0, stam: 0 };
+      $('lootLine').textContent = `${SLOT_NAME[it.slot]} ARMOR`;
+      $('lootStats').innerHTML = row('ARMOR', it.armor, cur.armor, '') + row('STAMINA', it.stam, cur.stam, '') + `<div class="small" style="margin-top:6px">${inv.equipped[it.slot] ? 'AGAINST ' + inv.equipped[it.slot].name : 'NOTHING WORN THERE'}</div>`;
+      $('lootWield').textContent = 'TAKE & EQUIP'; $('lootTake').textContent = 'TAKE (INTO THE BAGS)';
+    } else if (e.kind === 'potion') { $('lootLine').textContent = `HEALS ${Math.round(it.heal * 100)}% OF YOUR HEALTH`; $('lootStats').innerHTML = ''; $('lootTake').textContent = 'TAKE'; }
+    else { $('lootLine').textContent = 'COIN OF THE REALM'; $('lootStats').innerHTML = ''; $('lootTake').textContent = 'TAKE'; }
+  }
+  // the list
+  $('lootList').innerHTML = '';
+  $('lootList').hidden = E.length < 2;
+  E.forEach((x, i) => {
+    const r2 = RARITIES.find(r => r.id === x.it.rarity) || RARITIES[0], el = document.createElement('button'); el.type = 'button';
+    const g = x.kind === 'weapon' ? '⚔' : x.kind === 'gold' ? '🪙' : GLYPH_ITEM[x.kind === 'armor' ? x.it.slot : 'potion'];
+    el.innerHTML = `<span class="g">${g}</span><span class="n" style="color:${r2.color}">${x.it.name}</span><span class="s">${x.kind === 'gold' ? '' : 'LV ' + (x.it.ilvl || '')}</span>`;
+    if (i === lootPick) el.classList.add('on');
+    el.addEventListener('click', () => { lootPick = i; sfx('pickup'); showLoot(); });
+    $('lootList').appendChild(el);
+  });
+  $('lootAll').hidden = E.length < 2;
+}
+// take one thing off the body (wear/wield it if asked); false if there was no room
+function takeOne(e, use) {
+  const L = lootBody.loot;
+  if (e.kind === 'weapon') { takeLoot(e.it, use); L.weapon = null; }
+  else if (e.kind === 'gold') { addGold(L.gold); L.gold = 0; sfx('coin'); }
+  else { if (!addItem(e.it)) { sayError('YOUR BAGS ARE FULL'); return false; } L.items.splice(L.items.indexOf(e.it), 1); if (use && e.kind === 'armor') equipItem(e.it.id); }
+  return true;
 }
 // the character sheet and the bags (C and B, or the buttons by the menu's)
 const sheet = new CharSheet(player);
@@ -107,8 +169,9 @@ sheet.onForge = () => { sheet.close(); forgeFrom = 'play'; UI.state = 'forge'; o
 $('charBtn').addEventListener('click', () => openSheet('char'));
 $('bagsBtn').addEventListener('click', () => openSheet('bags'));
 function closeLoot() { UI.state = 'play'; $('loot').hidden = true; lootBody = null; lootView.stop(); }
-$('lootWield').addEventListener('click', () => { if (!lootBody) return; takeLoot(lootBody.spec, true); bodies.took(lootBody); sfx('legend'); closeLoot(); });
-$('lootTake').addEventListener('click', () => { if (!lootBody) return; takeLoot(lootBody.spec, false); bodies.took(lootBody); sfx('pickup'); closeLoot(); });
+$('lootWield').addEventListener('click', () => { if (!lootBody) return; const e = lootEntries(lootBody)[lootPick]; if (e && takeOne(e, true)) { bodies.took(lootBody); sfx('rare'); showLoot(); } });
+$('lootTake').addEventListener('click', () => { if (!lootBody) return; const e = lootEntries(lootBody)[lootPick]; if (e && takeOne(e, false)) { bodies.took(lootBody); sfx('pickup'); showLoot(); } });
+$('lootAll').addEventListener('click', () => { if (!lootBody) return; for (const e of lootEntries(lootBody)) if (!takeOne(e, false)) break; bodies.took(lootBody); sfx('pickup'); showLoot(); });
 $('lootLeave').addEventListener('click', () => { sfx('nope'); closeLoot(); });
 function heroCombat(dt, inp, frozen) {
   ctx.frozen = frozen;
@@ -144,13 +207,13 @@ function heroCombat(dt, inp, frozen) {
     }
     // auto-attack ends with its target
     if (inp.autoAtk && !monsters.focus) inp.autoAtk = false;
-    // and it only swings when the target is in range and in front of you (else it waits, and says why now and then)
+    // and it only swings when the target is in range (else it waits, and says so now and then); in range, every
+    // class turns to face it as the swing timer comes up and strikes (the swing and the shot aim at the target)
     if (inp.autoAtk && !inp.atkHeld) {
-      const m = monsters.focus, p = player.pos, dx = m.pos.x - p.x, dz = m.pos.z - p.z, d = Math.hypot(dx, dz) || 1;
+      const m = monsters.focus, p = player.pos, d = Math.hypot(m.pos.x - p.x, m.pos.z - p.z);
       const reach = player.cls === 0 ? (player.forged ? player.forged.reach : 4.6) + m.k.r + 1 : 42;
-      const fx = Math.sin(player.face), fz = Math.cos(player.face), facing = (dx * fx + dz * fz) / d > 0.45;
-      const why = d > reach ? 'OUT OF RANGE' : !facing ? 'YOU ARE FACING THE WRONG WAY' : '';
-      if (why) { inp.atk = false; if (abilities.atkCd <= 0) sayError(why); }
+      if (d > reach) { inp.atk = false; if (abilities.atkCd <= 0) sayError('OUT OF RANGE'); }
+      else player.aimFace = Math.atan2(m.pos.x - p.x, m.pos.z - p.z);
     }
     // F looks at the loot you're near, as before
     if (bodies.target && inp.useEdge) { inp.useEdge = false; openLoot(bodies.target); return; }

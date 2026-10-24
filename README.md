@@ -53,6 +53,13 @@ Made for a PC first (keyboard and mouse, or a controller); phones work too.
   | Ghost | vanishes and reappears right behind you |
   | Imp, fire sprite, wisp | keep their distance and throw fire, flame and light that you can dodge; they back off if you close in |
   | Hell crab | shakes, then rushes in a straight line, hitting hard; dazed for a moment after |
+- **Every monster is near your level** (one under to one over), wherever you go: the lands are all mixed up, so the
+  danger and the loot go with you. Everything a monster drops is at its level (the item level): a higher item level
+  hits harder or guards better.
+- **Loot besides weapons**: gold nearly always, and now and then **armor** for the six gear slots (head, shoulders,
+  chest, hands, legs, feet; cloth, leather, mail or plate; armor turns part of each blow aside, stamina adds two
+  health a point) and **healing potions** (drink them from the bags). The loot window lists everything a body
+  carried: pick one to see it against what you have, take it, wear or wield it, or TAKE ALL.
 - **Loot**: a fallen monster's body stays on the ground a while, and some of them carry a weapon
   (a glint marks one): rolled at random from the Forge's parts, likelier the tougher the monster
   and the higher your level, more often one your hero can use. Every drop has a rarity, common

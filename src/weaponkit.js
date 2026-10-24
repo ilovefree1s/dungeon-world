@@ -207,10 +207,14 @@ export const dpsOf = (st, cls, level) => +(hitOf(st, cls, level) / st.time).toFi
 export const plainStats = cls => ({ dmg: 1, spd: 1, time: PLAIN_TIME[cls], reach: 4.6, shot: 1, aura: 'none' });
 // ---------------------------------------------------------------- numbers
 // damage and speed as multipliers of the warrior's plain swing, reach in blocks
+// the hero's level, for a weapon with no item level of its own (a forged one is made at your level)
+let levelOf = () => 1;
+export function setLevelSource(f) { levelOf = f; }
 export function statsOf(spec) {
   const t = TYPES.find(x => x.id === spec.type) || TYPES[0], m = MATERIALS.find(x => x.id === spec.material) || MATERIALS[0];
   const sm = canDraw(spec) && spec.shape ? shapeMass(spec.shape) : { mass: 1, len: 1 };
   const rr = rarityOf(spec).mult;   // (a rarer drop hits harder, swings a little quicker, reaches a little farther)
+  const ilvl = spec.ilvl || levelOf(), il = 1 + (ilvl - 1) * 0.05;   // (and a higher item level hits harder)
   const dmg = t.dmg * m.dmg * (0.8 + spec.length * 0.2) * (0.85 + spec.width * 0.15) * (0.7 + 0.3 * sm.mass) * rr;
   const spd = t.spd / (0.75 + spec.length * 0.15 + spec.width * 0.1) / (0.8 + 0.2 * sm.mass) * (1 + (rr - 1) * 0.3);
   const reach = 4.6 * t.reach * (0.7 + spec.length * 0.3) * (0.6 + 0.4 * sm.len) * (1 + (rr - 1) * 0.2);
@@ -222,7 +226,7 @@ export function statsOf(spec) {
   // a hit's damage scales with that time, so a slow weapon lands hard and a quick one nicks
   const time = +Math.max(1, Math.min(3.5, t.time / (spd / t.spd))).toFixed(2);
   const base = PLAIN_TIME[t.cls];
-  return { dmg: +(dmg * time / base).toFixed(2), spd: +spd.toFixed(2), time, reach: +reach.toFixed(1), shot: +shot.toFixed(2), glow: !!m.glow, cls: t.cls, color: aura && aura.color ? aura.color : ACCENTS[spec.accent % ACCENTS.length][0], aura: spec.aura || 'none' };
+  return { ilvl, dmg: +(dmg * il * time / base).toFixed(2), spd: +spd.toFixed(2), time, reach: +reach.toFixed(1), shot: +shot.toFixed(2), glow: !!m.glow, cls: t.cls, color: aura && aura.color ? aura.color : ACCENTS[spec.accent % ACCENTS.length][0], aura: spec.aura || 'none' };
 }
 
 // ---------------------------------------------------------------- the model
