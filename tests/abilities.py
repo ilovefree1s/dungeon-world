@@ -67,7 +67,7 @@ with sync_playwright() as pw:
             frames(40 if aname == 'RAIN' else 24)
             hp1 = page.evaluate('__dw.monsters.list.map(m => m.hp)'); p1 = page.evaluate('__dw.player.pos.toArray()')
             moved = ((p1[0] - p0[0]) ** 2 + (p1[2] - p0[2]) ** 2) ** 0.5
-            hurt = len(hp1) < 3 or min(hp1) < 14
+            hurt = len(hp1) < 3 or sum(hp1) < sum(hp0)   # (monsters now have health to match the hero: a skill hurts, it needn't kill)
             res = { 'hurt': hurt, 'move': moved > 8, 'freeze': any(f > 0 for f in frz) }
             ok = got == aname and all(res[w] for w in want.split())
             check(ok, f"{name} {i + 1} {got}: {want} ({hp0} -> {hp1}, moved {moved:.1f}, frozen {sum(1 for f in frz if f > 0)})")
