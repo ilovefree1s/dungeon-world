@@ -13,7 +13,7 @@ import { Monsters, Bolts, stats, xpToNext, pickMonster } from './combat.js';
 import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollLoot, bestRarity } from './loot.js';
-import { inv, addItem, addGold, equipItem, gearTotals, armorCut, GLYPH_ITEM, SLOT_NAME } from './inventory.js';
+import { inv, loadInv, addItem, addGold, equipItem, gearTotals, armorCut, GLYPH_ITEM, SLOT_NAME } from './inventory.js';
 import { statsOf, plainStats, dpsOf, hitOf, RARITIES, setLevelSource } from './weaponkit.js';
 import { Turntable } from './turntable.js';
 import { AURA_VIEW } from './auras.js';
@@ -58,7 +58,16 @@ player.setClass(UI.cls);
 let start = save && save.seed === seed ? [save.x, save.y, save.z] : world.spawnPoint();
 player.place(...start);
 if (save && save.seed === seed) { player.yaw = save.yaw ?? player.yaw; sky.t = save.t ?? sky.t; }
-if (save && save.level) { stats.level = save.level; stats.xp = save.xp || 0; stats.maxHp = 30 + (stats.level - 1) * 6; stats.hp = Math.min(stats.maxHp, save.hp || stats.maxHp); stats.kills = save.kills || 0; }
+// three heroes, each with a level, XP, health and kills of their own (a save from before they were kept apart is the hunter's)
+const heroSaves = save && save.heroes ? save.heroes : save && save.level ? { 2: { level: save.level, xp: save.xp || 0, hp: save.hp, kills: save.kills || 0 } } : {};
+let heroCls = -1;
+function stashHero() { if (heroCls >= 0) heroSaves[heroCls] = { level: stats.level, xp: stats.xp, hp: stats.hp, kills: stats.kills }; }
+function loadHeroStats(cls) {
+  const h = heroSaves[cls] || { level: 1, xp: 0, kills: 0 };
+  stats.level = h.level || 1; stats.xp = h.xp || 0; stats.kills = h.kills || 0;
+  stats.maxHp = 30 + (stats.level - 1) * 6; stats.hp = Math.min(stats.maxHp, h.hp || stats.maxHp);
+}
+loadHeroStats(UI.cls);
 const spawn = start.slice();
 
 // ---------------------------------------------------------------- combat
@@ -98,9 +107,17 @@ monsters.hooks.armor = () => armorCut(gearTotals().armor, stats.level);
 // a shield block takes most of a blow; an ice barrier soaks blows until it's spent
 monsters.hooks.absorb = dmg => { const B = player.buffs || {}; if (B.block) dmg = Math.round(dmg * 0.3); if (B.absorb) { const t = Math.min(B.absorb.left, dmg); B.absorb.left -= t; dmg -= t; } return dmg; };
 let gearHp = 0;
+// switching heroes: the one leaving keeps its level and bags; the one arriving brings theirs
+function swapHero(cls) {
+  if (cls === heroCls) return;
+  stashHero(); heroCls = cls;
+  loadHeroStats(cls); loadInv(cls); gearHp = 0; applyGearHp();
+  monsters.focus = null; input.autoAtk = false;
+}
+{ const setClass = player.setClass.bind(player); player.setClass = c => { swapHero(c); return setClass(c); }; }
 function applyGearHp() { const want = gearTotals().stam * 2; stats.maxHp += want - gearHp; gearHp = want; stats.hp = Math.min(stats.hp, stats.maxHp); }
 inv.onGear = () => applyGearHp();
-applyGearHp();
+swapHero(player.cls);
 // the fallen: bodies stay a while, some with a weapon on them
 const bodies = new Bodies(player);
 monsters.hooks.fallen = m => bodies.fall(m, rollLoot(m, player.cls));
@@ -424,7 +441,7 @@ function menuStep() {
 function writeSave() {
   if (UI.state === 'title') return;
   const p = player.pos;
-  ls.set(SAVE_KEY, JSON.stringify({ seed, cls: UI.cls, x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +player.yaw.toFixed(3), t: +sky.t.toFixed(4), level: stats.level, xp: stats.xp, hp: stats.hp, kills: stats.kills }));
+  ls.set(SAVE_KEY, JSON.stringify({ seed, cls: UI.cls, x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +player.yaw.toFixed(3), t: +sky.t.toFixed(4), level: stats.level, xp: stats.xp, hp: stats.hp, kills: stats.kills, heroes: (stashHero(), heroSaves) }));
 }
 let saveT = 0;
 addEventListener('pagehide', writeSave);

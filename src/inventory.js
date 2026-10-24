@@ -21,8 +21,21 @@ export const GLYPH_ITEM = { head: '⛑', shoulders: '🛡', chest: '🥋', hands
 
 export const inv = { items: [], equipped: {}, gold: 0, onChange: null, onGear: null };
 let nextId = 1;
-try { const s = JSON.parse(ls.get(KEY)); if (s) { inv.items = s.items || []; inv.equipped = s.equipped || {}; inv.gold = s.gold || 0; nextId = 1 + Math.max(0, ...inv.items.map(i => i.id || 0), ...Object.values(inv.equipped).map(i => i.id || 0)); } } catch (e) { }
-export function persistInv() { ls.set(KEY, JSON.stringify({ items: inv.items, equipped: inv.equipped, gold: inv.gold })); }
+// each hero has bags of their own: 'dw-inv-c0' (warrior), 'c1' (mage), 'c2' (hunter); the bags from before heroes
+// were kept apart (the one 'dw-inv-v1') go to the hunter
+let invCls = -1;
+const keyOf = c => 'dw-inv-c' + c;
+export function loadInv(cls) {
+  if (cls === invCls) return;
+  if (invCls >= 0) persistInv();
+  invCls = cls; inv.items = []; inv.equipped = {}; inv.gold = 0;
+  let raw = ls.get(keyOf(cls));
+  if (raw === null && cls === 2) raw = ls.get(KEY);
+  try { const s = JSON.parse(raw); if (s) { inv.items = s.items || []; inv.equipped = s.equipped || {}; inv.gold = s.gold || 0; } } catch (e) { }
+  nextId = 1 + Math.max(0, ...inv.items.map(i => i.id || 0), ...Object.values(inv.equipped).map(i => i.id || 0));
+  inv.onChange && inv.onChange();
+}
+export function persistInv() { if (invCls < 0) return; ls.set(keyOf(invCls), JSON.stringify({ items: inv.items, equipped: inv.equipped, gold: inv.gold })); }
 const changed = () => { persistInv(); inv.onChange && inv.onChange(); };
 
 // a rarity by the weapons' odds, shifted up with level

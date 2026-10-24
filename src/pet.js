@@ -53,6 +53,8 @@ export class Pet {
   recall() { if (this.p) { this.p.pos.copy(this.player.pos); this.p.pos.x += 2; } }
   update(dt, autoAtk) {
     const P = this.p; if (!P) return;
+    // (only the hunter's: while you play another hero it waits out of sight)
+    P.root.visible = this.player.cls === 2; if (!P.root.visible) { P.pos.copy(this.player.pos); return; }
     const hero = this.player.pos, w = this.world, k = KIND[P.type], t = performance.now() / 1000;
     this.wrath = Math.max(0, this.wrath - dt); P.biteCd -= dt;
     // what it's after: your target while you fight it, else whatever's hunting you nearby
