@@ -46,6 +46,12 @@ html.locked #cross{display:block}
 .uframe .bar{height:13px}
 .uframe .bar.xp{height:5px}
 .uframe .bar em{position:absolute;inset:0;display:grid;place-items:center;font:900 10px var(--body);font-style:normal;color:#fff;text-shadow:0 1px 0 #000,0 0 3px #000;letter-spacing:.04em}
+.fcol{display:flex;flex-direction:column;gap:6px}
+.uframe.pet{width:min(170px,32vw);padding:4px 8px 5px;gap:3px}
+.uframe.pet .uname{font-size:11px}
+.uframe.pet .bar{height:9px}
+.uframe.pet .bar em{font-size:8px}
+#pethpfill{background:linear-gradient(90deg,#3aa04a,#7ae06a)}
 #thpfill{background:linear-gradient(90deg,#c82a2a,#ff5a48)}
 #bars{position:absolute;left:calc(12px + env(safe-area-inset-left,0px));top:calc(54px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:6px;width:min(260px,44vw)}
 .bar{position:relative;height:12px;border-radius:999px;background:rgba(0,0,0,.55);box-shadow:inset 0 0 0 2px rgba(255,255,255,.1);overflow:hidden}
@@ -247,7 +253,10 @@ html.touchy .keys{display:none}
     <div id="nums"></div>
     <div id="cross"></div>
     <div id="frames">
+      <div class="fcol">
       <div class="uframe" id="pframe"><div class="uname"><b id="pName">WARRIOR</b><span id="lvT">LV 1</span></div><div class="bar hp"><i id="hpfill"></i><em id="hpT">30/30</em></div><div class="bar xp"><i id="xpfill"></i></div></div>
+      <div class="uframe pet" id="petframe" hidden><div class="uname"><b id="petName">PET</b><span id="petState"></span></div><div class="bar hp"><i id="pethpfill"></i><em id="pethpT">40/40</em></div></div>
+      </div>
       <div class="uframe tgt" id="tframe" hidden><div class="uname"><b id="tName">SLIME</b><span id="tLv">LV 1</span><span id="tAuto" hidden>AUTO</span></div><div class="bar hp"><i id="thpfill"></i><em id="thpT">10/10</em></div></div>
     </div>
     <div id="where" class="chip"><i id="whereDot"></i><span id="whereName">WHISPERWOOD</span></div>

@@ -15,7 +15,7 @@ import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollLoot, bestRarity } from './loot.js';
 import { inv, loadInv, addItem, addGold, equipItem, gearTotals, armorCut, GLYPH_ITEM, SLOT_NAME } from './inventory.js';
-import { statsOf, plainStats, dpsOf, hitOf, RARITIES, setLevelSource } from './weaponkit.js';
+import { randomSpec, statsOf, plainStats, dpsOf, hitOf, RARITIES, setLevelSource } from './weaponkit.js';
 import { Turntable } from './turntable.js';
 import { AURA_VIEW } from './auras.js';
 import { VERSION } from './version.js';
@@ -57,7 +57,7 @@ const player = new Player(world);
 player.onHurt = () => { sfx('hurt'); $('hurt').style.opacity = 1; setTimeout(() => $('hurt').style.opacity = 0, 250); };
 player.setClass(UI.cls);
 // the hunter's KayKit ranger: loaded in the background, swapped in when it's ready
-loadKay().then(() => { if (player.cls === 2 || player.cls === 0) { const f = player.face; player.setClass(2); player.face = f; } }).catch(e => console.warn('the ranger did not load', e));
+loadKay().then(() => { if (player.cls >= 0) { const f = player.face; player.setClass(2); player.face = f; } }).catch(e => console.warn('the ranger did not load', e));
 let start = save && save.seed === seed ? [save.x, save.y, save.z] : world.spawnPoint();
 player.place(...start);
 if (save && save.seed === seed) { player.yaw = save.yaw ?? player.yaw; sky.t = save.t ?? sky.t; }
@@ -315,6 +315,8 @@ function updateHud(dt) {
   $('xpfill').style.width = (stats.xp / xpToNext() * 100) + '%'; $('lvT').textContent = 'LV ' + stats.level; $('pName').textContent = ['WARRIOR', 'MAGE', 'HUNTER'][player.cls];
   if (errT > 0 && (errT -= dt) <= 0) $('err').classList.remove('on');
   // the target's frame: the focused monster's name, level and health, lit AUTO while auto-attacking
+  { const P = pet.p, show = !!P && player.cls === 2; $('petframe').hidden = !show;
+    if (show) { $('petName').textContent = P.name.toUpperCase(); $('petState').textContent = P.down > 0 ? `DOWN ${Math.ceil(P.down)}s` : ''; $('pethpfill').style.width = (P.hp / P.maxHp * 100) + '%'; $('pethpT').textContent = `${Math.ceil(P.hp)}/${P.maxHp}`; } }
   { const m = monsters.focus; $('tframe').hidden = !m; if (m) { $('tName').textContent = m.name; $('tLv').textContent = 'LV ' + m.lvl; $('thpfill').style.width = Math.max(0, m.hp / m.maxHp * 100) + '%'; $('thpT').textContent = `${Math.max(0, Math.ceil(m.hp))}/${m.maxHp}`; $('tAuto').hidden = !input.autoAtk; } }
   $('clockT').textContent = clock();
   // the swing timer shows while it's running or auto-attack is on
@@ -546,7 +548,7 @@ document.getElementById('boot')?.remove();
 
 // a hook for testing
 window.__dw = {
-  world, player, sky, UI, input, view, renderer, scene, camera, THREE, monsters, bolts, hero: stats, abilities, forge, bodies, openLoot, closeLoot, sheet, openSheet, pet,
+  world, player, sky, UI, input, view, renderer, scene, camera, THREE, monsters, bolts, hero: stats, abilities, forge, randomSpec, bodies, openLoot, closeLoot, sheet, openSheet, pet,
   start(cls = 0) { pickHero(cls); },
   teleport(x, z) { player.place(x + 0.5, 90, z + 0.5); placed = false; },
   setQuality(q) { UI.autoQ = false; UI.quality = q; setQuality(q); },

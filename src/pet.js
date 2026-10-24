@@ -36,7 +36,8 @@ export class Pet {
     const root = CUTE[type] ? buildPet(CUTE[type]) : buildMonster(type, 1 + Math.floor(stats.level / 3)); root.scale.multiplyScalar(KIND[type].scale);
     root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
     scene.add(root);
-    this.p = { type, name, root, pos: at.clone(), face: 0, biteCd: 0, seed: Math.random() * 10, moving: false };
+    const maxHp = 40 + stats.level * 12;
+    this.p = { type, name, root, pos: at.clone(), face: 0, biteCd: 0, seed: Math.random() * 10, moving: false, hp: maxHp, maxHp, hurtCd: 1.5, calm: 0, down: 0 };
     this.save();
   }
   dismiss(quiet = false) {
@@ -56,10 +57,13 @@ export class Pet {
     return name;
   }
   // when the hero has fallen and stands up again, the pet comes back to their side
-  recall() { if (this.p) { this.p.pos.copy(this.player.pos); this.p.pos.x += 2; } }
+  recall() { const P = this.p; if (P) { P.pos.copy(this.player.pos); P.pos.x += 2; P.down = 0; P.hp = P.maxHp; } }
   update(dt, autoAtk) {
     const P = this.p; if (!P) return;
     // (only the hunter's: while you play another hero it waits out of sight)
+    P.maxHp = 40 + stats.level * 12; P.hp = Math.min(P.hp, P.maxHp);
+    // (fallen: it lies low a while, then comes back to your side at half its health)
+    if (P.down > 0) { P.down -= dt; P.root.visible = false; if (P.down <= 0) { P.hp = Math.ceil(P.maxHp / 2); P.pos.copy(this.player.pos); P.pos.x += 2; } return; }
     P.root.visible = this.player.cls === 2; if (!P.root.visible) { P.pos.copy(this.player.pos); return; }
     const hero = this.player.pos, w = this.world, k = KIND[P.type], t = performance.now() / 1000;
     this.wrath = Math.max(0, this.wrath - dt); P.biteCd -= dt;
@@ -77,6 +81,10 @@ export class Pet {
     else if (foe) P.face = Math.atan2(dx, dz);
     const g = w.poly ? w.ground(P.pos.x, P.pos.z) : null;
     if (g !== null && g !== undefined) P.pos.y += ((g + (k.fly ? 3.4 + Math.sin(t * 3 + P.seed) * 0.4 : 0)) - P.pos.y) * Math.min(1, dt * 12);
+    // what it's fighting fights back; out of a fight it heals
+    if (foe && !P.moving) { P.calm = 0; P.hurtCd -= dt; if (P.hurtCd <= 0) { P.hurtCd = 1.6 + Math.random() * 0.6; const d = Math.max(1, Math.round((foe.atk || 3) * (0.6 + Math.random() * 0.4))); P.hp -= d; number(P.pos.x, P.pos.y + 2.4, P.pos.z, d);
+      if (P.hp <= 0) { P.hp = 0; P.down = 20; P.root.visible = false; burst(P.pos.x, P.pos.y + 1, P.pos.z, '#c8b8a8', 18, 6, 1.2, false, 0.8); return; } } }
+    else { P.calm += dt; if (P.calm > 4 && P.hp < P.maxHp) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.05 * dt); }
     // the bite: a share of the hero's own blow, twice as hard in a bestial wrath
     if (foe && !P.moving && P.biteCd <= 0) {
       P.biteCd = 1.5; P.lunge = 0.25;

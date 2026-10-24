@@ -50,8 +50,8 @@ export class CharSheet {
     const p = this.player, cls = p.cls, have = equippedSpec(cls), st = have ? statsOf(have) : null;
     $('csName').textContent = HERO_NAME[cls]; $('csLevel').textContent = `LEVEL ${stats.level}`;
     // the hero on the stand, idling, with what's in hand
-    if ((cls === 2 || cls === 0) && kay.ready) {
-      const m = makeKayHero(2.15, cls); if (have) holdForged(m, buildForged(have));
+    if (kay.ready) {
+      const m = makeKayHero(2.15, cls); if (have) holdForged(m, buildForged(have), have);
       let last = performance.now();
       this.heroView.showModel(m, () => { const now = performance.now(); animKay(m, Math.min(0.05, (now - last) / 1000), { speed: 0, cast: -1 }); last = now; }, { spin: 0.35, sway: false, face: 0.4, wobble: 0.5, dist: 1.4 });
     } else {

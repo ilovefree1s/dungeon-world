@@ -13,7 +13,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { makeFlashable } from './dh/models.js';
 
 const V3 = THREE.Vector3;
-const FILES = ['Ranger.glb', 'Knight.glb', 'Rig_Medium_General.glb', 'Rig_Medium_MovementBasic.glb', 'Rig_Medium_MovementAdvanced.glb', 'Rig_Medium_CombatRanged.glb', 'Rig_Medium_CombatMelee.glb', 'bow_withString.glb', 'arrow_bow.glb', 'sword_1handed.glb', 'shield_badge_color.glb'];
+const FILES = ['Ranger.glb', 'Knight.glb', 'Rig_Medium_General.glb', 'Rig_Medium_MovementBasic.glb', 'Rig_Medium_MovementAdvanced.glb', 'Rig_Medium_CombatRanged.glb', 'Rig_Medium_CombatMelee.glb', 'bow_withString.glb', 'arrow_bow.glb', 'sword_1handed.glb', 'shield_badge_color.glb', 'Mage.glb', 'staff.glb'];
 export const SHAPE = { leg: 1.5, thick: 1.19, head: 0.7 };
 async function bytes(name) {
   const packed = window.__KAY && window.__KAY[name];
@@ -27,8 +27,8 @@ export const kay = { ready: false };
 export function loadKay() {
   if (assets) return assets;
   return (assets = (async () => {
-    const [ranger, knight, gen, mov, adv, ranged, melee, bow, arrow, sword, shield] = await Promise.all(FILES.map(f => bytes(f).then(parse)));
-    kay.models = { 2: ranger.scene, 0: knight.scene }; kay.bow = bow.scene; kay.arrow = arrow.scene; kay.sword = sword.scene; kay.shield = shield.scene;
+    const [ranger, knight, gen, mov, adv, ranged, melee, bow, arrow, sword, shield, mage, staff] = await Promise.all(FILES.map(f => bytes(f).then(parse)));
+    kay.models = { 2: ranger.scene, 0: knight.scene, 1: mage.scene }; kay.staff = staff.scene; kay.bow = bow.scene; kay.arrow = arrow.scene; kay.sword = sword.scene; kay.shield = shield.scene;
     kay.clips = [...gen.animations, ...mov.animations, ...adv.animations, ...ranged.animations, ...melee.animations];
     kay.ready = true;
     return kay;
@@ -40,8 +40,10 @@ const CLIPS = {
   0: { idle: 'Idle_A', aim: 'Melee_Blocking', block: 'Melee_Blocking', walk: 'Walking_A', run: 'Running_A', jump: 'Jump_Idle', swim: 'Walking_C', dodge: 'Dodge_Forward',
     s0: 'Melee_1H_Attack_Slice_Diagonal', s1: 'Melee_1H_Attack_Slice_Horizontal', s2: 'Melee_1H_Attack_Chop', s3: 'Melee_1H_Attack_Stab',
     spin: 'Melee_2H_Attack_Spinning', slam: 'Melee_1H_Attack_Jump_Chop', bash: 'Melee_Block_Attack', hit: 'Hit_A', die: 'Death_A' },
+  1: { idle: 'Idle_B', aim: 'Ranged_Magic_Spellcasting', walk: 'Walking_B', run: 'Running_B', jump: 'Jump_Idle', swim: 'Walking_C', dodge: 'Dodge_Forward',
+    shoot: 'Ranged_Magic_Shoot', nova: 'Ranged_Magic_Summon', up: 'Ranged_Magic_Raise', hit: 'Hit_A', die: 'Death_A' },
 };
-const ONCE = ['dodge', 'shoot', 'up', 'hit', 'die', 's0', 's1', 's2', 's3', 'slam', 'bash'];
+const ONCE = ['dodge', 'shoot', 'nova', 'up', 'hit', 'die', 's0', 's1', 's2', 's3', 'slam', 'bash'];
 // a new hero (2 the ranger, 0 the knight), as tall as the hero it replaces
 export function makeKayHero(height, cls = 2) {
   const model = SkeletonUtils.clone(kay.models[cls]), root = new THREE.Group(); root.add(model);
@@ -57,32 +59,38 @@ export function makeKayHero(height, cls = 2) {
   // the ranger: the bow in the left hand, an arrow in the right; the knight: the sword in the right, the shield on the left
   const hold = new THREE.Group(), arrow = kay.arrow.clone(); arrow.visible = false;
   if (cls === 2) { B.slot[0].add(hold); hold.add(kay.bow.clone()); B.slot[1].add(arrow); }
-  else { B.slot[1].add(hold); hold.add(kay.sword.clone()); B.slot[0].add(kay.shield.clone()); }
+  else if (cls === 0) { B.slot[1].add(hold); hold.add(kay.sword.clone()); B.slot[0].add(kay.shield.clone()); }
+  else { B.slot[1].add(hold); hold.add(kay.staff.clone()); }
   makeFlashable(root);
   const mixer = new THREE.AnimationMixer(model), act = {}, CLIP = CLIPS[cls];
   for (const k in CLIP) { const c = kay.clips.find(c => c.name === CLIP[k]); if (c) act[k] = mixer.clipAction(c); }
   for (const k of ONCE) if (act[k]) { act[k].setLoop(THREE.LoopOnce, 1); act[k].clampWhenFinished = true; }
   act.idle.play();
   const rest = []; model.traverse(o => { if (o.isBone) rest.push([o, o.quaternion.clone()]); });
-  Object.assign(root.userData, { kay: true, model, mixer, act, cur: 'idle', base: 'idle', one: null, oneT: 0, B, legLen, baseY: model.position.y, rest, hold, arrow, lastCast: -1, lastSwing: -1, cls, own: () => (cls === 2 ? kay.bow : kay.sword).clone() });
+  Object.assign(root.userData, { kay: true, model, mixer, act, cur: 'idle', base: 'idle', one: null, oneT: 0, B, legLen, baseY: model.position.y, rest, hold, arrow, lastCast: -1, lastSwing: -1, cls, own: () => (cls === 2 ? kay.bow : cls === 0 ? kay.sword : kay.staff).clone() });
   return root;
 }
-// a forged bow in the ranger's hand (null: the pack's own): turned so its long side lies as the pack's bow's does
-export function holdForged(root, w) {
+// a forged weapon in a KayKit hand (null: the pack's own), laid as the pack's own lies: the forge builds every weapon
+// along +y (a blade or head up; a bow's limbs up and down, its belly toward +z); the pack's sword and staff lie along +y
+// too, its bow along z with its belly toward -x. A staff is gripped 40% up, a wand near its end; sized as the pack's own
+export function holdForged(root, w, spec) {
   const u = root.userData, h = u.hold;
   for (const c of [...h.children]) h.remove(c);
   if (!w) { h.add(u.own()); return; }
-  const ref = u.own(), rb = new THREE.Box3().setFromObject(ref).getSize(new V3()), wb = new THREE.Box3().setFromObject(w).getSize(new V3());
-  const axis = s => s.x >= s.y && s.x >= s.z ? new V3(1, 0, 0) : s.y >= s.z ? new V3(0, 1, 0) : new V3(0, 0, 1);
-  const g = new THREE.Group(); g.quaternion.setFromUnitVectors(axis(wb), axis(rb));
-  g.scale.setScalar(Math.max(rb.x, rb.y, rb.z) / Math.max(wb.x, wb.y, wb.z));
+  const len = o => { const s = new THREE.Box3().setFromObject(o).getSize(new V3()); return Math.max(s.x, s.y, s.z); };
+  const type = spec && spec.type, g = new THREE.Group(), refLen = len(u.own());
+  if (type === 'bow' || type === 'crossbow') g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new V3(0, -1, 0), new V3(0, 0, 1), new V3(-1, 0, 0)));
+  const bb = new THREE.Box3().setFromObject(w), hgt = bb.max.y - bb.min.y;
+  if (type === 'staff') w.position.y = -(bb.min.y + 0.4 * hgt);
+  else if (type === 'wand') w.position.y = -(bb.min.y + 0.12 * hgt);
+  g.scale.setScalar(refLen / len(w) * (type === 'wand' ? 0.6 : 1));
   g.add(w); h.add(g);
 }
 // each frame: which motion, crossfaded; one-shots (a shot, a dodge) over it; then the proportions
 export function animKay(root, dt, s) {
   const u = root.userData, A = u.act;
   // a new shot starts a loosing of the string (straight up for the rain)
-  if (s.cast >= 0 && (u.lastCast < 0 || s.cast < u.lastCast)) playOnce(u, s.castKind === 'rain' ? 'up' : 'shoot', 0.55);
+  if (s.cast >= 0 && (u.lastCast < 0 || s.cast < u.lastCast)) { const k = s.castKind; if (u.cls === 1) playOnce(u, k === 'nova' ? 'nova' : k === 'meteor' ? 'up' : 'shoot', k === 'bolt' ? 0.5 : 0.7); else playOnce(u, k === 'rain' ? 'up' : 'shoot', 0.55); }
   u.lastCast = s.cast;
   if (s.roll > 0 && u.one !== 'dodge') playOnce(u, 'dodge', 0.42);
   // the knight: a swing of the sword (four cuts in turn), the whirlwind spinning, the slam leaping down on them

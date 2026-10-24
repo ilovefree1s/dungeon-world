@@ -44,7 +44,7 @@ export class Player {
     this.cls = cls;
     let m;
     // (the hunter is KayKit's ranger once its models are in; until then, and for the others, Dungeon Heart's heroes)
-    if ((cls === 2 || cls === 0) && kay.ready) m = makeKayHero(heroHeight(), cls);
+    if (kay.ready) m = makeKayHero(heroHeight(), cls);
     else { m = buildHero(cls); equipHeroWeapon(m, cls, 1, 0); m.scale.multiplyScalar(HERO_SCALE / 2.15); }
     m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
     // (the shine from the environment map dims at night; remember each material's own)
@@ -64,7 +64,7 @@ export class Player {
     const spec = this.forgedSpecs ? this.forgedSpecs[this.cls] : null;
     this.forged = spec ? statsOf(spec) : null;
     const u = this.model && this.model.userData, hold = u && [u.sword, u.staff, u.bow][this.cls];
-    if (u && u.kay) { holdForged(this.model, spec ? buildForged(spec) : null); return; }
+    if (u && u.kay) { holdForged(this.model, spec ? buildForged(spec) : null, spec); return; }
     if (!hold) return;
     if (!spec) { equipHeroWeapon(this.model, this.cls, 1, 0); return; }
     for (const c of [...hold.children]) hold.remove(c);
