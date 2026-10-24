@@ -5,7 +5,7 @@
 // ============================================================================
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { LOOKS, SKINS, HAIRS, MAINS, ACCENTS, buildHunterLook } from './hunters.js';
+import { LOOKS, SKINS, HAIRS, MAINS, ACCENTS, buildHunterLook, tickHunter, poseHunter, setInk, INK } from './hunters.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('stage');
@@ -26,13 +26,13 @@ dais.position.y = -0.09; dais.receiveShadow = true; scene.add(dais);
 const rimStone = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.06, 8, 64), new THREE.MeshStandardMaterial({ color: '#6a6458', roughness: 0.8 }));
 rimStone.rotation.x = Math.PI / 2; rimStone.position.y = 0.0; scene.add(rimStone);
 
-const state = { look: 'ranger', pal: {}, anim: 'idle', spin: true, yaw: 0.5 };
+const state = { look: 'ranger', pal: {}, anim: 'walk', spin: true, yaw: 0.5, ink: true, close: false };
 try { const s = JSON.parse(localStorage.getItem('dw-hunter-builder')); if (s && LOOKS.some(l => l.id === s.look)) Object.assign(state, { look: s.look, pal: s.pal || {} }); } catch (e) { }
 const save = () => { try { localStorage.setItem('dw-hunter-builder', JSON.stringify({ look: state.look, pal: state.pal })); } catch (e) { } };
 let hero = null;
 function rebuild() {
   if (hero) { scene.remove(hero); hero.traverse(o => o.geometry && o.geometry.dispose()); }
-  hero = buildHunterLook(state.look, state.pal);
+  hero = buildHunterLook(state.look, state.pal); setInk(hero, state.ink);
   scene.add(hero);
   renderUI(); save();
 }
@@ -48,6 +48,7 @@ function renderUI() {
   };
   row('swSkin', SKINS, P.skin, true); row('swHair', HAIRS, P.hair, true); row('swMain', MAINS, P.main, false); row('swAccent', ACCENTS, P.accent, false);
   for (const b of document.querySelectorAll('.anim')) b.setAttribute('aria-pressed', b.dataset.a === state.anim);
+  $('ink').setAttribute('aria-pressed', state.ink); $('close').setAttribute('aria-pressed', state.close);
   $('code').textContent = `${L.name} · skin ${P.skin + 1} · hair ${P.hair + 1} · main ${P.main} · accent ${P.accent}`;
 }
 $('looks').innerHTML = LOOKS.map((l, i) => `<button class="look" data-id="${l.id}"><span class="n">${i + 1}</span><span class="t">${l.name}</span></button>`).join('');
@@ -55,6 +56,8 @@ $('looks').addEventListener('click', e => { const b = e.target.closest('.look');
 const bindRow = (id, k, isIndex) => $(id).addEventListener('click', e => { const b = e.target.closest('.sw'); if (!b) return; state.pal[k] = isIndex ? +b.dataset.v : b.dataset.v; rebuild(); });
 bindRow('swSkin', 'skin', true); bindRow('swHair', 'hair', true); bindRow('swMain', 'main', false); bindRow('swAccent', 'accent', false);
 $('anims').addEventListener('click', e => { const b = e.target.closest('.anim'); if (!b) return; state.anim = b.dataset.a; animT = 0; renderUI(); });
+$('ink').addEventListener('click', () => { state.ink = !state.ink; setInk(hero, state.ink); renderUI(); });
+$('close').addEventListener('click', () => { state.close = !state.close; resize(); renderUI(); });
 $('reset').addEventListener('click', () => { state.pal = {}; rebuild(); });
 $('shuffle').addEventListener('click', () => {
   const r = a => Math.floor(Math.random() * a.length);
@@ -76,28 +79,15 @@ canvas.addEventListener('pointerup', () => { drag = null; });
 canvas.addEventListener('dblclick', () => { state.spin = true; });
 
 // ---------------------------------------------------------------- motion
-// (the game's own hero motion for the bow, so a look moves here as it will there)
-let animT = 0;
-function animate(u, t, dt) {
-  const walking = state.anim === 'walk', shooting = state.anim === 'shoot';
-  const walk = t * 9, move = walking ? 1 : 0, w = Math.sin(walk) * move;
-  u.legs[0].rotation.x = w * 0.7; u.legs[1].rotation.x = -w * 0.7;
-  u.body.position.y = Math.abs(Math.cos(walk)) * 0.06 * move + Math.sin(t * 2) * 0.012;
-  if (u.cape) u.cape.rotation.x = 0.1 + move * 0.22 + Math.sin(t * 5 + walk) * 0.04;
-  u.head.rotation.y = Math.sin(t * 0.7) * 0.08;
-  u.arms[0].rotation.set(-w * 0.5 - 0.2, 0, 0.06);
-  u.arms[1].rotation.set(w * 0.5 - 0.3, 0, -0.06); u.arms[1].position.z = 0;
-  const pos = u.string.geometry.attributes.position;
-  if (shooting) {
-    animT = (animT + dt / 1.4) % 1;
-    const k = animT;
-    u.arms[0].rotation.set(-1.55, 0.25, 0);
-    u.arms[1].rotation.set(-1.45, -0.2, 0);
-    const pull = k < 0.6 ? k / 0.6 : Math.max(0, 1 - (k - 0.6) / 0.15);
-    u.arms[1].position.z = -pull * 0.25;
-    pos.setZ(1, u.stringZ - pull * 0.35);
-  } else pos.setZ(1, u.stringZ);
-  pos.needsUpdate = true;
+let animT = 0, lastYaw = state.yaw, spd = 0;
+function animate(t, dt) {
+  const want = { idle: 0, walk: 1, run: 2, shoot: 0 }[state.anim];
+  spd += (want - spd) * Math.min(1, dt * 4);
+  let draw = -1;
+  if (state.anim === 'shoot') { animT = (animT + dt / 1.5) % 1; draw = animT; }
+  const turn = dt > 0 ? (state.yaw - lastYaw) / dt : 0; lastYaw = state.yaw;
+  poseHunter(hero, t, { speed: spd, draw });
+  tickHunter(hero, dt, { speed: spd, turn, t, draw });
 }
 
 function resize() {
@@ -105,8 +95,8 @@ function resize() {
   renderer.setSize(r.width, r.height, false);
   camera.aspect = r.width / r.height;
   // (frame the whole hero, a little more room on a tall phone screen)
-  const d = camera.aspect < 0.8 ? 9.2 : 7.4;
-  camera.position.set(0, 1.55, d); camera.lookAt(0, 1.15, 0); camera.updateProjectionMatrix();
+  const d = state.close ? (camera.aspect < 0.8 ? 3.4 : 2.6) : camera.aspect < 0.8 ? 9.2 : 7.4, ly = state.close ? 1.95 : 1.15;
+  camera.position.set(0, ly + (state.close ? 0.05 : 0.4), d); camera.lookAt(0, ly, 0); camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(canvas);
 let last = performance.now();
@@ -115,7 +105,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   const t = now / 1000;
   if (state.spin && !reduce) state.yaw += dt * 0.45;
-  if (hero) { hero.rotation.y = state.yaw; animate(hero.userData, t, dt); }
+  if (hero) { hero.rotation.y = state.yaw; animate(t, dt); }
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
