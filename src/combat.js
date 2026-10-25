@@ -6,7 +6,7 @@
 // ============================================================================
 import { THREE, scene, camera, TEX, V3 } from './engine.js';
 import { buildMonster } from './dh/models.js';
-import { kay, makeKaySkeleton } from './kayhero.js';
+import { kay, makeKaySkeleton, makeGoblin } from './kayhero.js';
 import * as D from './dh/data.js';
 import { burst, ring, number } from './fx.js';
 import { sfx } from './audio.js';
@@ -48,15 +48,17 @@ export const KIND = {
   [D.M_WISP]: { spd: 8, r: 1.2, h: 2.4, fly: 1, see: 36, atk: 'shot', shot: { color: '#b0f0ff', spd: 46, range: 26, cd: 2.6 } },
   [D.M_HELLCRAB]: { spd: 6.8, r: 2, h: 2.2, fly: 0, see: 28, atk: 'charge' },
   [D.M_VBAT]: { spd: 13, r: 1.4, h: 1.8, fly: 1, see: 40, atk: 'swoop', hover: 7 },
+  [D.M_GOBLIN]: { spd: 9.5, r: 1.1, h: 3.2, fly: 0, see: 34, atk: 'melee' },
+  [D.M_GOBARCHER]: { spd: 9, r: 1.1, h: 3.2, fly: 0, see: 40, atk: 'shot', shot: { color: '#d8c890', spd: 52, range: 26, cd: 2.2 } },
 };
 const HERO_MID = 2.6;      // the hero's middle above its feet
 const REGEN_AFTER = 6, REGEN_EVERY = 1.2;   // seconds unhurt before healing starts; seconds per point
 // who lives where: forest, snow, desert, swamp, lava, crystal
 const BY_BIOME = [
-  [D.M_SLIME, D.M_SLIME, D.M_BAT, D.M_SPIDER],
-  [D.M_SKEL, D.M_SKEL, D.M_BAT, D.M_GHOST],
+  [D.M_SLIME, D.M_SLIME, D.M_BAT, D.M_SPIDER, D.M_GOBLIN, D.M_GOBLIN, D.M_GOBARCHER],
+  [D.M_SKEL, D.M_SKEL, D.M_BAT, D.M_GHOST, D.M_GOBLIN, D.M_GOBARCHER],
   [D.M_HELLCRAB, D.M_HELLCRAB, D.M_SKEL, D.M_VBAT],
-  [D.M_GHOST, D.M_SLIME, D.M_SPIDER, D.M_VBAT],
+  [D.M_GHOST, D.M_SLIME, D.M_SPIDER, D.M_VBAT, D.M_GOBLIN, D.M_GOBLIN],
   [D.M_IMP, D.M_IMP, D.M_FIRESPRITE, D.M_HELLCRAB],
   [D.M_WISP, D.M_WISP, D.M_GHOST, D.M_SPIDER],
 ];
@@ -95,8 +97,9 @@ export class Monsters {
   }
   spawn(type, x, y, z) {
     // (the skeletons are KayKit's, once its models are in)
-    const kk = type === D.M_SKEL && kay.ready;
-    const root = kk ? makeKaySkeleton(KIND[type].h * 0.95) : buildMonster(type, 1 + Math.floor(stats.level / 3));
+    if ((type === D.M_GOBLIN || type === D.M_GOBARCHER) && !kay.ready) type = D.M_SKEL;   // (goblins once their models are in)
+    const kk = (type === D.M_SKEL || type === D.M_GOBLIN || type === D.M_GOBARCHER) && kay.ready;
+    const root = !kk ? buildMonster(type, 1 + Math.floor(stats.level / 3)) : type === D.M_SKEL ? makeKaySkeleton(KIND[type].h * 0.95) : makeGoblin(type, KIND[type].h);
     if (!kk) root.scale.multiplyScalar(1.24);
     root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
     scene.add(root);

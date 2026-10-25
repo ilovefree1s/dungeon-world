@@ -17,16 +17,17 @@ export const TILE_WALK = [0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0];
 export const DIR_DOWN = 0, DIR_UP = 1, DIR_RIGHT = 2, DIR_LEFT = 3;
 
 // monsters
+export const M_GOBLIN = 18, M_GOBARCHER = 19;
 export const M_NONE = 0, M_SLIME = 1, M_BAT = 2, M_SKEL = 3, M_SPIDER = 4, M_GHOST = 5, M_WIZARD = 6, M_IMP = 7,
   M_GOLEM = 8, M_ARCHER = 9, M_FIRESPRITE = 10, M_VBAT = 11, M_WISP = 12, M_HELLCRAB = 13, M_SLIMEKING = 14,
   M_DEMON = 15, M_WRAITH = 16, M_INFERNO = 17, NMON = 17;
 export const MON_NAME = ['', 'SLIME', 'BAT', 'SKELETON', 'SPIDER', 'GHOST', 'WIZARD', 'IMP', 'GOLEM', 'ARCHER',
-  'FIRE SPRITE', 'VAMPIRE BAT', 'WISP', 'HELL CRAB', 'SLIME KING', 'DEMON', 'WRAITH', 'INFERNO'];
-export const MON_BASE_HP = [0, 4, 3, 8, 5, 6, 6, 5, 30, 7, 4, 5, 8, 40, 45, 25, 12, 14];
-export const MON_BASE_ATK = [0, 2, 3, 4, 4, 5, 5, 4, 10, 5, 6, 7, 7, 9, 9, 13, 10, 11];
-export const MON_BASE_XP = [0, 2, 3, 5, 4, 5, 6, 6, 10, 8, 7, 9, 9, 11, 12, 13, 13, 14];
+  'FIRE SPRITE', 'VAMPIRE BAT', 'WISP', 'HELL CRAB', 'SLIME KING', 'DEMON', 'WRAITH', 'INFERNO', 'GOBLIN', 'GOBLIN ARCHER'];
+export const MON_BASE_HP = [0, 4, 3, 8, 5, 6, 6, 5, 30, 7, 4, 5, 8, 40, 45, 25, 12, 14, 6, 5];
+export const MON_BASE_ATK = [0, 2, 3, 4, 4, 5, 5, 4, 10, 5, 6, 7, 7, 9, 9, 13, 10, 11, 4, 4];
+export const MON_BASE_XP = [0, 2, 3, 5, 4, 5, 6, 6, 10, 8, 7, 9, 9, 11, 12, 13, 13, 14, 5, 5];
 // the depth each monster first appears at
-export const MON_UNLOCK = [0, 1, 2, 3, 5, 8, 12, 16, 20, 26, 34, 40, 46, 52, 58, 66, 74, 84];
+export const MON_UNLOCK = [0, 1, 2, 3, 5, 8, 12, 16, 20, 26, 34, 40, 46, 52, 58, 66, 74, 84, 1, 1];
 // how far a type's body reaches past its 16x16 box: each side / above (for the sword and shots)
 export const MON_HIT_W = [0, 3, 6, 1, 6, 5, 4, 2, 4, 1, 0, 6, 5, 6, 6, 6, 4, 3];
 export const MON_HIT_H = [0, 4, 1, 12, 4, 14, 15, 7, 13, 12, 9, 2, 16, 3, 9, 13, 15, 16];

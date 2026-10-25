@@ -9,6 +9,7 @@ import { THREE, scene, V3 } from './engine.js';
 import { buildPet, PET_NAMES } from './dh/pets.js';
 import { stats, heroBuff, KIND as MKIND } from './combat.js';
 import { buildMonster } from './dh/models.js';
+import { kay, makeGoblin } from './kayhero.js';
 import { burst, ring, number } from './fx.js';
 import { sfx } from './audio.js';
 import * as D from './dh/data.js';
@@ -33,7 +34,7 @@ export class Pet {
   save() { ls.set(KEY, JSON.stringify(this.p ? { type: this.p.type, name: this.p.name } : null)); }
   make(type, name, at) {
     this.dismiss(true);
-    const root = CUTE[type] ? buildPet(CUTE[type]) : buildMonster(type, 1 + Math.floor(stats.level / 3)); root.scale.multiplyScalar(KIND[type].scale);
+    const gob = type === D.M_GOBLIN || type === D.M_GOBARCHER, root = CUTE[type] ? buildPet(CUTE[type]) : gob && kay.ready ? makeGoblin(type, 3.2) : buildMonster(gob ? D.M_SKEL : type, 1 + Math.floor(stats.level / 3)); root.scale.multiplyScalar(KIND[type].scale);
     root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
     scene.add(root);
     const maxHp = 40 + stats.level * 12;

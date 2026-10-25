@@ -13,7 +13,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { makeFlashable } from './dh/models.js';
 
 const V3 = THREE.Vector3;
-const FILES = ['Ranger.glb', 'Knight.glb', 'Rig_Medium_General.glb', 'Rig_Medium_MovementBasic.glb', 'Rig_Medium_MovementAdvanced.glb', 'Rig_Medium_CombatRanged.glb', 'Rig_Medium_CombatMelee.glb', 'bow_withString.glb', 'arrow_bow.glb', 'sword_1handed.glb', 'shield_badge_color.glb', 'Mage.glb', 'staff.glb', 'Rig_Medium_Special.glb', 'Skeleton_Minion.glb', 'Skeleton_Warrior.glb', 'Skeleton_Rogue.glb', 'Skeleton_Mage.glb', 'Skeleton_Blade.glb', 'Skeleton_Axe.glb', 'Skeleton_Staff.glb', 'Skeleton_Shield_Small_A.glb', 'Skeleton_Crossbow.glb'];
+const FILES = ['Ranger.glb', 'Knight.glb', 'Rig_Medium_General.glb', 'Rig_Medium_MovementBasic.glb', 'Rig_Medium_MovementAdvanced.glb', 'Rig_Medium_CombatRanged.glb', 'Rig_Medium_CombatMelee.glb', 'bow_withString.glb', 'arrow_bow.glb', 'sword_1handed.glb', 'shield_badge_color.glb', 'Mage.glb', 'staff.glb', 'Rig_Medium_Special.glb', 'Skeleton_Minion.glb', 'Skeleton_Warrior.glb', 'Skeleton_Rogue.glb', 'Skeleton_Mage.glb', 'Skeleton_Blade.glb', 'Skeleton_Axe.glb', 'Skeleton_Staff.glb', 'Skeleton_Shield_Small_A.glb', 'Skeleton_Crossbow.glb', 'Basic_Goblin.glb', 'Goblin_Warrior.glb', 'Goblin_Archer.glb', 'Goblin_Rusty_Shiv.glb', 'Goblin_Notched_Shortsword.glb', 'Goblin_Recurve_Shortbow.glb'];
 export const SHAPE = { leg: 1.5, thick: 1.19, head: 0.7 };
 async function bytes(name) {
   const packed = window.__KAY && window.__KAY[name];
@@ -27,10 +27,11 @@ export const kay = { ready: false };
 export function loadKay() {
   if (assets) return assets;
   return (assets = (async () => {
-    const [ranger, knight, gen, mov, adv, ranged, melee, bow, arrow, sword, shield, mage, staff, special, skMin, skWar, skRog, skMag, skBlade, skAxe, skStaff, skShield, skXbow] = await Promise.all(FILES.map(f => bytes(f).then(parse)));
+    const [ranger, knight, gen, mov, adv, ranged, melee, bow, arrow, sword, shield, mage, staff, special, skMin, skWar, skRog, skMag, skBlade, skAxe, skStaff, skShield, skXbow, gBasic, gWar, gArch, gShiv, gSword, gBow] = await Promise.all(FILES.map(f => bytes(f).then(parse)));
     kay.models = { 2: ranger.scene, 0: knight.scene, 1: mage.scene }; kay.staff = staff.scene; kay.bow = bow.scene; kay.arrow = arrow.scene; kay.sword = sword.scene; kay.shield = shield.scene;
     kay.clips = [...gen.animations, ...mov.animations, ...adv.animations, ...ranged.animations, ...melee.animations, ...special.animations];
     kay.skel = { minion: skMin.scene, warrior: skWar.scene, rogue: skRog.scene, mage: skMag.scene };
+    kay.gob = { basic: gBasic.scene, warrior: gWar.scene, archer: gArch.scene, shiv: gShiv.scene, sword: gSword.scene, bow: gBow.scene };
     kay.skelGear = { blade: skBlade.scene, axe: skAxe.scene, staff: skStaff.scene, shield: skShield.scene, xbow: skXbow.scene };
     kay.ready = true;
     return kay;
@@ -176,5 +177,76 @@ export function makeKaySkeleton(height) {
   // fallen: it falls apart and lies there (the bodies keep ticking it)
   u.die = () => { u.one = null; u.cur = null; const a = act.die; if (a) { a.timeScale = 1; a.reset().play(); u.cur = 'die'; } };
   u.tickDead = dt => u.mixer.update(dt);
+  return root;
+}
+
+// ---------------------------------------------------------------- the goblins (a free goblin pack: rigged, not animated)
+// so they're moved here, in code: each limb pointed where a walk, a run, a chop or a bow-draw puts it (in the goblin's
+// own frame: +z ahead, +y up, its left at +x), from the shoulders and hips down
+const GOB_KINDS = { 18: [['basic', 'shiv'], ['warrior', 'sword']], 19: [['archer', 'bow']] };
+const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _a = new V3(), _b = new V3(), _c = new V3();
+function point(bone, child, dir, modelQ) {
+  bone.updateMatrixWorld(true);
+  const p = bone.getWorldPosition(_a), cdir = child.getWorldPosition(_b).sub(p).normalize();
+  const want = _c.copy(dir).normalize().applyQuaternion(modelQ);
+  _q.setFromUnitVectors(cdir, want);
+  const wq = bone.getWorldQuaternion(_q2).premultiply(_q);
+  bone.quaternion.copy(bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(wq));
+  bone.updateMatrixWorld(true);
+}
+export function makeGoblin(type, height) {
+  const opts = GOB_KINDS[type], [kind, gear] = opts[Math.floor(Math.random() * opts.length)];
+  const model = SkeletonUtils.clone(kay.gob[kind]), root = new THREE.Group(); root.add(model);
+  model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3(); model.traverse(o => { if (o.isSkinnedMesh) { o.computeBoundingBox(); box.union(o.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
+  const sc = height / (box.max.y - box.min.y); model.scale.setScalar(sc); const baseY = -box.min.y * sc; model.position.y = baseY;
+  const bone = n => model.getObjectByName(n) || model.getObjectByName(n.replace(/\./g, ''));
+  const B = { ua: [bone('upper_arm.L'), bone('upper_arm.R')], fa: [bone('forearm.L'), bone('forearm.R')], hd: [bone('hand.L'), bone('hand.R')],
+    th: [bone('thigh.L'), bone('thigh.R')], sh: [bone('shin.L'), bone('shin.R')], ft: [bone('foot.L'), bone('foot.R')], spine: bone('spine.001') || bone('spine'), chest: bone('spine.003') };
+  const w = kay.gob[gear].clone(); (gear === 'bow' ? B.hd[0] : B.hd[1]).add(w); w.userData.gear = gear;
+  makeFlashable(root);
+  const rest = []; model.traverse(o => { if (o.isBone) rest.push([o, o.quaternion.clone()]); });
+  const u = root.userData;
+  Object.assign(u, { gob: true, model, B, rest, phase: Math.random() * 6, lastT: -1, atkT: -1, wasAtk: false, hurtT: 0, archer: gear === 'bow', w });
+  const mq = new THREE.Quaternion(), V = (x, y, z) => new V3(x, y, z);
+  u.anim = (t, s) => {
+    const dt = u.lastT < 0 ? 0 : Math.min(0.1, t - u.lastT); u.lastT = t;
+    for (const [b, q] of u.rest) b.quaternion.copy(q);
+    const spd = s.moving ? (s.chase ? 1.6 : 1) : 0;
+    u.phase += dt * (s.moving ? (s.chase ? 13 : 8) : 0);
+    if (s.attack && !u.wasAtk) u.atkT = 0; u.wasAtk = !!s.attack;
+    if (u.atkT >= 0) { u.atkT += dt / (u.archer ? 0.6 : 0.42); if (u.atkT >= 1) u.atkT = -1; }
+    if (s.hurt) u.hurtT = 0.25; u.hurtT = Math.max(0, u.hurtT - dt);
+    const ph = u.phase, sw = Math.sin(ph) * Math.min(1, spd) * (s.chase ? 0.75 : 0.5);
+    // the body: a bob as it steps, a hunch when it runs, a flinch back when struck, a lean into a swing
+    model.position.y = baseY + Math.abs(Math.cos(ph)) * 0.05 * sc * Math.min(1, spd);
+    model.rotation.x = (s.chase && s.moving ? 0.18 : 0) - u.hurtT * 1.2 + (u.atkT >= 0 && !u.archer ? Math.sin(u.atkT * Math.PI) * 0.25 : 0);
+    model.updateMatrixWorld(true); model.getWorldQuaternion(mq);
+    // legs: each thigh swings, the knee bends as the leg comes through
+    for (let i = 0; i < 2; i++) {
+      const a = i ? -sw : sw, knee = Math.max(0, Math.sin(ph + (i ? Math.PI : 0) - 0.9)) * 0.9 * Math.min(1, spd) + 0.1;
+      point(B.th[i], B.sh[i], V(0, -Math.cos(a), Math.sin(a)), mq);
+      point(B.sh[i], B.ft[i], V(0, -Math.cos(a - knee), Math.sin(a - knee)), mq);
+    }
+    // arms: down at the sides, swinging against the legs; the weapon hand a little forward
+    const side = [1, -1];
+    for (let i = 0; i < 2; i++) {
+      const a = i ? sw : -sw;
+      point(B.ua[i], B.fa[i], V(0.32 * side[i], -Math.cos(a) * 0.95, Math.sin(a) + 0.05), mq);
+      point(B.fa[i], B.hd[i], V(0.12 * side[i], -0.75, 0.55 + Math.sin(a) * 0.4), mq);
+    }
+    // a strike: the weapon arm (right) up and back, then down and through; an archer: bow arm out, string hand to the chin
+    const k = u.atkT, wind = s.wind;
+    if (u.archer && (k >= 0 || wind)) {
+      const pull = k < 0 ? 0.6 : k < 0.7 ? k / 0.7 : 1 - (k - 0.7) / 0.3;
+      point(B.ua[0], B.fa[0], V(0.15, 0.08, 1), mq); point(B.fa[0], B.hd[0], V(0.05, 0.08, 1), mq);
+      point(B.ua[1], B.fa[1], V(-0.55, 0.1, 0.6 - pull * 0.4), mq); point(B.fa[1], B.hd[1], V(0.8, 0.15, 0.35 - pull * 0.3), mq);
+    } else if (!u.archer && (k >= 0 || wind)) {
+      const up = k < 0 ? 1 : k < 0.35 ? 1 : Math.max(0, 1 - (k - 0.35) / 0.25);
+      const ua = V(-0.25, 0.95 * up - 0.4 * (1 - up), 0.15 * up + 0.95 * (1 - up)), fa = V(-0.1, 0.6 * up - 0.7 * (1 - up), -0.6 * up + 0.7 * (1 - up));
+      point(B.ua[1], B.fa[1], ua, mq); point(B.fa[1], B.hd[1], fa, mq);
+    }
+  };
   return root;
 }
