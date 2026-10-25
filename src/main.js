@@ -11,7 +11,7 @@ import { startAudio, sfx, setSfx, setMusic, audioState } from './audio.js';
 import { BIOME_NAME, BIOME_SUB, CH } from './gen.js';
 import { Monsters, Bolts, stats, xpToNext, pickMonster } from './combat.js';
 import { loadKay } from './kayhero.js';
-import { Abilities, KITS } from './abilities.js';
+import { Abilities, KITS, meleeReach } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollLoot, bestRarity } from './loot.js';
 import { classArmor, inv, loadInv, addItem, addGold, equipItem, gearTotals, armorCut, GLYPH_ITEM, SLOT_NAME } from './inventory.js';
@@ -252,7 +252,7 @@ function heroCombat(dt, inp, frozen) {
     // class turns to face it as the swing timer comes up and strikes (the swing and the shot aim at the target)
     if (inp.autoAtk && !inp.atkHeld) {
       const m = monsters.focus, p = player.pos, d = Math.hypot(m.pos.x - p.x, m.pos.z - p.z);
-      const reach = player.cls === 0 ? (player.forged ? player.forged.reach : 4.6) + m.k.r + 1 : 42;
+      const reach = player.cls === 0 ? meleeReach(player) + m.k.r : 42;
       if (d > reach) { inp.atk = false; if (abilities.atkCd <= 0) sayError('OUT OF RANGE'); }
       else player.aimFace = Math.atan2(m.pos.x - p.x, m.pos.z - p.z);
     }

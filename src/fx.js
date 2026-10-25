@@ -26,6 +26,16 @@ export function ring(x, y, z, color, r0 = 0.5, r1 = 6, life = 0.5) {
   m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); scene.add(m);
   rings.push({ m, r0, r1, life, t: 0 });
 }
+// a sweep of the blade: a flat crescent on the ground around (x, z), facing dir (dx, dz), as wide as the swing reaches
+// and as far round as it cuts (arc, radians; a whole turn for the whirlwind, which spins as it fades)
+const slashes = [];
+export function slash(x, y, z, dx, dz, radius, arc, color = '#ffe0a0', life = 0.32, spin = 0) {
+  const c = Math.atan2(-dz, dx), mk = (r0, r1, op) => {
+    const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 48, 1, c - arc / 2, arc), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); scene.add(m); return m; };
+  const body = mk(radius * 0.25, radius, 0.32), edge = mk(radius * 0.93, radius * 1.02, 0.9);
+  slashes.push({ ms: [body, edge], ops: [0.32, 0.9], t: 0, life, spin, cx: x, cz: z });
+}
 // floating numbers over the world (Dungeon Heart's .num)
 const nums = [];
 let numBox = null;
@@ -50,6 +60,12 @@ export function stepFx(dt) {
     const r = rings[i]; r.t += dt; const k = r.t / r.life;
     if (k >= 1) { scene.remove(r.m); r.m.geometry.dispose(); r.m.material.dispose(); rings.splice(i, 1); continue; }
     const s = r.r0 + (r.r1 - r.r0) * (1 - (1 - k) * (1 - k)); r.m.scale.set(s, s, s); r.m.material.opacity = 0.9 * (1 - k);
+  }
+  for (let i = slashes.length - 1; i >= 0; i--) {
+    const S = slashes[i]; S.t += dt; const k = S.t / S.life;
+    if (k >= 1) { for (const m of S.ms) { scene.remove(m); m.geometry.dispose(); m.material.dispose(); } slashes.splice(i, 1); continue; }
+    const g = 0.75 + 0.25 * (1 - (1 - Math.min(1, k * 2.5)) ** 2);
+    S.ms.forEach((m, j) => { m.scale.set(g, g, 1); m.material.opacity = S.ops[j] * (1 - k * k); if (S.spin) m.rotation.z += S.spin * dt; });
   }
   for (let i = nums.length - 1; i >= 0; i--) {
     const n = nums[i]; n.t += dt;

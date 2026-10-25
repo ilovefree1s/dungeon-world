@@ -61,11 +61,12 @@ with sync_playwright() as pw:
     # a slime in front, auto-attack it
     page.evaluate("""() => { const p = __dw.player, M = __dw.monsters; M.list.slice().forEach(m => M.remove(m));
       const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); const d = __dw.player.cls === 0 ? 4 : 14; const m = M.spawn(1, p.pos.x + fx * d, p.pos.y, p.pos.z + fz * d); m.frz = 999; M.focus = m; __dw.input.autoAtk = true; }""")
+    page.evaluate('__dw.player.camDist = 22; __dw.player.pitch = 0.9')
     for i in range(3):
         if CLS == 0 and i == 1: page.evaluate('__dw.input.abEdge[1] = true')
         for _ in range(6):
             frames(1)
-            if page.evaluate('__dw.player.model.userData.oneT') < 0.35 and page.evaluate('__dw.player.model.userData.one'): break
+            if page.evaluate('__dw.player.model.userData.oneT') < 0.3 and page.evaluate('__dw.player.model.userData.one'): break
         page.screenshot(path=SP + f'g{2+i}.png'); print('  ', page.evaluate('[__dw.player.model.userData.cur, __dw.player.model.userData.one]'))
     print('anim now', page.evaluate('__dw.player.model.userData.cur'), page.evaluate('__dw.player.model.userData.one'))
     page.evaluate('__dw.input.autoAtk = false')

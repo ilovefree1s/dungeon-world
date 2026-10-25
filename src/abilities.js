@@ -8,7 +8,7 @@ import { THREE, scene, camera, TEX, V3 } from './engine.js';
 import { heroDamage, heroBuff, aimPoint, stats } from './combat.js';
 import { TAMEABLE } from './pet.js';
 import { PLAIN_TIME } from './weaponkit.js';
-import { burst, ring } from './fx.js';
+import { burst, ring, slash } from './fx.js';
 import { sfx } from './audio.js';
 
 const BOLT = '#9ad8ff', FIRE = '#ff8a2a', FROST = '#9fe6ff', ARROW = '#e8d8b0';
@@ -59,6 +59,9 @@ const buff = (p, k, t, v = {}) => { p.buffs[k] = { t, ...v }; };
 // damage over time on a monster: total over seconds, a tick a second
 const dot = (m, total, secs, color) => { (m.dots ||= []).push({ t: secs, every: 1, acc: 0, dmg: Math.max(1, Math.round(total / secs)) }); burst(m.pos.x, m.pos.y + m.k.h * 0.6, m.pos.z, color, 8, 4, 1, true, 0.5); };
 const fireAt = (ctx, m, color, opts) => { const p = ctx.player, from = p.pos.clone(); from.y += 3.6; const to = new V3(m.pos.x, m.pos.y + m.k.h * 0.5, m.pos.z), d = to.sub(from).normalize(); faceTo(p, d); ctx.bolts.fire(from.clone().addScaledVector(d, 1.8), d, color, opts); return d; };
+// how far the warrior's swing reaches (a forged weapon's own reach, or the plain sword's), and the whirlwind
+export const meleeReach = p => (p.forged ? p.forged.reach : 4.6) * 1.5;
+const WHIRL_R = 9;
 // ---------------------------------------------------------------- the kits
 export const KITS = [
   // ---- warrior
@@ -68,7 +71,9 @@ export const KITS = [
       sfx('swing');
       // (a weapon from the forge sets the swing's damage, speed and reach)
       const heroic = p.buffs.heroic ? 2.4 : 1; if (heroic > 1) { delete p.buffs.heroic; burst(p.pos.x + dir.x * 2, p.pos.y + 2.5, p.pos.z + dir.z * 2, '#ffb040', 14, 8, 1.4, true, 0.5); }
-      ctx.later(0.2, () => { const n = hitAll(ctx, around(ctx.monsters, p.pos.x + dir.x * 1.5, p.pos.y + 2, p.pos.z + dir.z * 1.5, f ? f.reach : 4.6, dir, 0.3), 1.5 * heroic * (f ? f.dmg : 1), p.pos); if (n) sfx(heroic > 1 ? 'crit' : 'hit'); });
+      // (the cut sweeps a wide arc in front, as far as meleeReach, and the ground shows it)
+      ctx.later(0.2, () => { const R = meleeReach(p); slash(p.pos.x, p.pos.y + 0.35, p.pos.z, dir.x, dir.z, R, 2.5, heroic > 1 ? '#ffb040' : '#ffe8b0');
+        const n = hitAll(ctx, around(ctx.monsters, p.pos.x, p.pos.y + 2, p.pos.z, R, dir, 0.25), 1.5 * heroic * (f ? f.dmg : 1), p.pos); if (n) sfx(heroic > 1 ? 'crit' : 'hit'); });
     } },
     abilities: [
       { name: 'CHARGE', glyph: '➤', cd: 5, use(ctx) {
@@ -80,9 +85,9 @@ export const KITS = [
       { name: 'WHIRL', glyph: '✺', cd: 7, use(ctx) {
           const p = ctx.player; p.swingT = 0; p.whirl = true; p.swingLen = 0.7;
           sfx('swing');
-          ctx.later(0.2, () => { if (hitAll(ctx, around(ctx.monsters, p.pos.x, p.pos.y + 2, p.pos.z, 5.5), 1.4, p.pos)) sfx('hit'); });
-          ctx.later(0.5, () => { if (hitAll(ctx, around(ctx.monsters, p.pos.x, p.pos.y + 2, p.pos.z, 5.5), 1.4, p.pos)) sfx('hit'); });
-          ring(p.pos.x, p.pos.y + 0.3, p.pos.z, '#ffd8a0', 1, 6, 0.5);
+          // (two turns of the blade, each cutting everything within WHIRL_R, a spinning disc on the ground showing how far)
+          for (const at of [0.2, 0.5]) ctx.later(at, () => { slash(p.pos.x, p.pos.y + 0.35, p.pos.z, 1, 0, WHIRL_R, Math.PI * 2, '#ffd8a0', 0.4, 9); ring(p.pos.x, p.pos.y + 0.3, p.pos.z, '#ffd8a0', WHIRL_R * 0.6, WHIRL_R, 0.35);
+            if (hitAll(ctx, around(ctx.monsters, p.pos.x, p.pos.y + 2, p.pos.z, WHIRL_R), 1.4, p.pos)) sfx('hit'); });
         } },
       { name: 'SLAM', glyph: '⯆', cd: 10, use(ctx) {
           const p = ctx.player;
