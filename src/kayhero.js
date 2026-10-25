@@ -13,7 +13,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { makeFlashable } from './dh/models.js';
 
 const V3 = THREE.Vector3;
-const FILES = ['Ranger.glb', 'Knight.glb', 'Rig_Medium_General.glb', 'Rig_Medium_MovementBasic.glb', 'Rig_Medium_MovementAdvanced.glb', 'Rig_Medium_CombatRanged.glb', 'Rig_Medium_CombatMelee.glb', 'bow_withString.glb', 'arrow_bow.glb', 'sword_1handed.glb', 'shield_badge_color.glb', 'Mage.glb', 'staff.glb'];
+const FILES = ['Ranger.glb', 'Knight.glb', 'Rig_Medium_General.glb', 'Rig_Medium_MovementBasic.glb', 'Rig_Medium_MovementAdvanced.glb', 'Rig_Medium_CombatRanged.glb', 'Rig_Medium_CombatMelee.glb', 'bow_withString.glb', 'arrow_bow.glb', 'sword_1handed.glb', 'shield_badge_color.glb', 'Mage.glb', 'staff.glb', 'Rig_Medium_Special.glb', 'Skeleton_Minion.glb', 'Skeleton_Warrior.glb', 'Skeleton_Rogue.glb', 'Skeleton_Mage.glb', 'Skeleton_Blade.glb', 'Skeleton_Axe.glb', 'Skeleton_Staff.glb', 'Skeleton_Shield_Small_A.glb', 'Skeleton_Crossbow.glb'];
 export const SHAPE = { leg: 1.5, thick: 1.19, head: 0.7 };
 async function bytes(name) {
   const packed = window.__KAY && window.__KAY[name];
@@ -27,9 +27,11 @@ export const kay = { ready: false };
 export function loadKay() {
   if (assets) return assets;
   return (assets = (async () => {
-    const [ranger, knight, gen, mov, adv, ranged, melee, bow, arrow, sword, shield, mage, staff] = await Promise.all(FILES.map(f => bytes(f).then(parse)));
+    const [ranger, knight, gen, mov, adv, ranged, melee, bow, arrow, sword, shield, mage, staff, special, skMin, skWar, skRog, skMag, skBlade, skAxe, skStaff, skShield, skXbow] = await Promise.all(FILES.map(f => bytes(f).then(parse)));
     kay.models = { 2: ranger.scene, 0: knight.scene, 1: mage.scene }; kay.staff = staff.scene; kay.bow = bow.scene; kay.arrow = arrow.scene; kay.sword = sword.scene; kay.shield = shield.scene;
-    kay.clips = [...gen.animations, ...mov.animations, ...adv.animations, ...ranged.animations, ...melee.animations];
+    kay.clips = [...gen.animations, ...mov.animations, ...adv.animations, ...ranged.animations, ...melee.animations, ...special.animations];
+    kay.skel = { minion: skMin.scene, warrior: skWar.scene, rogue: skRog.scene, mage: skMag.scene };
+    kay.skelGear = { blade: skBlade.scene, axe: skAxe.scene, staff: skStaff.scene, shield: skShield.scene, xbow: skXbow.scene };
     kay.ready = true;
     return kay;
   })());
@@ -132,4 +134,47 @@ function playOnce(u, name, secs) {
   const a = u.act[name]; if (!a) return;
   a.timeScale = a.getClip().duration / secs;
   to(u, name, 0.06); u.one = name; u.oneT = secs;
+}
+
+// ---------------------------------------------------------------- the skeletons (KayKit Skeletons, CC0)
+// four kinds, each with its own gear; they rise out of the ground when they appear, shamble about, run at you, chop,
+// flinch when struck and fall apart when they die. anim(t, s) is the monsters' own way of being moved
+const SKEL_KINDS = [['minion', ['blade', null]], ['warrior', ['axe', 'shield']], ['rogue', ['blade', 'xbow']], ['mage', ['staff', null]]];
+const SKEL_CLIP = { idle: 'Skeletons_Idle', walk: 'Skeletons_Walking', run: 'Running_A', attack: 'Melee_1H_Attack_Chop', attack2: 'Melee_1H_Attack_Slice_Diagonal',
+  wind: 'Melee_Block', hit: 'Hit_A', die: 'Skeletons_Death', rise: 'Skeletons_Awaken_Floor', taunt: 'Skeletons_Taunt' };
+export function makeKaySkeleton(height) {
+  const [kind, [rh, lh]] = SKEL_KINDS[Math.floor(Math.random() * SKEL_KINDS.length)];
+  const model = SkeletonUtils.clone(kay.skel[kind]), root = new THREE.Group(); root.add(model);
+  model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3(); model.traverse(o => { if (o.isSkinnedMesh) { o.computeBoundingBox(); box.union(o.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
+  const sc = height / (box.max.y - box.min.y); model.scale.setScalar(sc); model.position.y = -box.min.y * sc;
+  const bone = n => model.getObjectByName(n) || model.getObjectByName(n.replace(/\./g, ''));
+  const sr = bone('handslot.r'), sl = bone('handslot.l');
+  if (rh && sr) sr.add(kay.skelGear[rh].clone());
+  if (lh && sl) sl.add(kay.skelGear[lh].clone());
+  makeFlashable(root);
+  const mixer = new THREE.AnimationMixer(model), act = {};
+  for (const k in SKEL_CLIP) { const c = kay.clips.find(c => c.name === SKEL_CLIP[k]); if (c) act[k] = mixer.clipAction(c); }
+  for (const k of ['attack', 'attack2', 'hit', 'die', 'rise', 'taunt']) if (act[k]) { act[k].setLoop(THREE.LoopOnce, 1); act[k].clampWhenFinished = true; }
+  const u = root.userData;
+  Object.assign(u, { kay: true, mixer, act, cur: null, one: null, oneT: 0, lastT: -1, wasAtk: false, swing: 0 });
+  const go = (name, fade = 0.2) => { const a = act[name]; if (!a || u.cur === name) return; a.reset().play(); if (u.cur && act[u.cur]) a.crossFadeFrom(act[u.cur], fade, false); u.cur = name; };
+  const once = (name, secs) => { const a = act[name]; if (!a) return; a.timeScale = a.getClip().duration / secs; u.cur = null; go(name, 0.08); u.one = name; u.oneT = secs; };
+  // (rising from the ground as it appears)
+  once('rise', 1.4);
+  u.anim = (t, s) => {
+    const dt = u.lastT < 0 ? 0 : Math.min(0.1, t - u.lastT); u.lastT = t;
+    if (s.attack && !u.wasAtk) once((u.swing++ & 1) ? 'attack2' : 'attack', 0.45);
+    u.wasAtk = !!s.attack;
+    if (s.hurt && !u.one) once('hit', 0.35);
+    if (u.one) { u.oneT -= dt; if (u.oneT <= 0) u.one = null; }
+    if (!u.one) go(s.wind ? 'wind' : s.moving ? (s.chase ? 'run' : 'walk') : 'idle');
+    if (act.run) act.run.timeScale = 0.9;
+    u.mixer.update(dt);
+  };
+  // fallen: it falls apart and lies there (the bodies keep ticking it)
+  u.die = () => { u.one = null; u.cur = null; const a = act.die; if (a) { a.timeScale = 1; a.reset().play(); u.cur = 'die'; } };
+  u.tickDead = dt => u.mixer.update(dt);
+  return root;
 }

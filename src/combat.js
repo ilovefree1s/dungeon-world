@@ -6,6 +6,7 @@
 // ============================================================================
 import { THREE, scene, camera, TEX, V3 } from './engine.js';
 import { buildMonster } from './dh/models.js';
+import { kay, makeKaySkeleton } from './kayhero.js';
 import * as D from './dh/data.js';
 import { burst, ring, number } from './fx.js';
 import { sfx } from './audio.js';
@@ -93,8 +94,10 @@ export class Monsters {
     this.calm = 0; this.regenAcc = 0; // seconds since the hero was last hurt; healing in progress
   }
   spawn(type, x, y, z) {
-    const root = buildMonster(type, 1 + Math.floor(stats.level / 3));
-    root.scale.multiplyScalar(1.24);
+    // (the skeletons are KayKit's, once its models are in)
+    const kk = type === D.M_SKEL && kay.ready;
+    const root = kk ? makeKaySkeleton(KIND[type].h * 0.95) : buildMonster(type, 1 + Math.floor(stats.level / 3));
+    if (!kk) root.scale.multiplyScalar(1.24);
     root.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
     scene.add(root);
     const k = KIND[type];
@@ -405,7 +408,7 @@ export class Monsters {
       m.root.position.copy(m.pos);
       if (m.lunge > 0) { const a = Math.sin(m.lunge / 0.3 * Math.PI); m.root.position.x += Math.sin(m.face) * a * 1.2; m.root.position.z += Math.cos(m.face) * a * 1.2; }
       m.root.rotation.y = m.face;
-      if (!frozen) m.root.userData.anim(t, { moving: m.moving, seed: m.seed, timer: Math.floor(this.timer + m.seed * 20), attack: m.lunge > 0 });
+      if (!frozen) m.root.userData.anim(t, { moving: m.moving, seed: m.seed, timer: Math.floor(this.timer + m.seed * 20), attack: m.lunge > 0, chase: m.state === 'chase', wind: m.wind > 0, hurt: m.flash > 0.1 });
       // hit: a white flash; winding up: an orange glow; frozen: an icy tint
       if (m.flash > 0) m.flash -= dt;
       const tint = m.flash > 0 ? 'hit' : m.wind > 0 ? 'wind' : frozen ? 'frz' : '';

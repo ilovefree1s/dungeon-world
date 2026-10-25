@@ -51,8 +51,9 @@ export class Bodies {
   fall(m, loot) {
     const root = m.root;
     root.userData.flash && root.userData.flash(0);
-    root.rotation.z = (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2;
-    root.position.copy(m.pos); root.position.y += m.k.r * 0.6;
+    // (a KayKit skeleton falls apart where it stands; the others tip over)
+    if (root.userData.die) { root.userData.die(); root.position.copy(m.pos); }
+    else { root.rotation.z = (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2; root.position.copy(m.pos); root.position.y += m.k.r * 0.6; }
     // (a flyer that dies in the air drops: the body falls to the ground and lies there)
     const w = this.player.world, g = w && w.poly ? w.ground(m.pos.x, m.pos.z) : null;
     const b = { root, pos: m.pos.clone(), t: 0, loot, mark: null, h: m.k.h, r: m.k.r, vy: 0, floor: g !== null && g !== undefined ? g : m.pos.y };
@@ -73,9 +74,10 @@ export class Bodies {
     let best = null, bd = LOOK;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const b = this.list[i]; b.t += dt;
+      if (b.root.userData.tickDead) b.root.userData.tickDead(dt);
       if (b.pos.y > b.floor + 0.01) {
         b.vy -= 40 * dt; b.pos.y = Math.max(b.floor, b.pos.y + b.vy * dt);
-        b.root.position.y = b.pos.y + b.r * 0.6;
+        b.root.position.y = b.pos.y + (b.root.userData.die ? 0 : b.r * 0.6);
         if (b.pos.y <= b.floor) { b.vy = 0; burst(b.pos.x, b.pos.y + 0.3, b.pos.z, '#c8b090', 8, 5, 1.2, false, 0.5); }
       }
       if (b.t > BODY_LIFE || b.pos.distanceTo(p) > 220) { if (b.t > BODY_LIFE - 1.2 && b.root.userData.fade) b.root.userData.fade(Math.max(0, BODY_LIFE - b.t) / 1.2); if (b.t > BODY_LIFE) this.remove(b); continue; }
