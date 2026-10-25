@@ -13,7 +13,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { makeFlashable } from './dh/models.js';
 
 const V3 = THREE.Vector3;
-const FILES = ['Ranger.glb', 'Knight.glb', 'Rig_Medium_General.glb', 'Rig_Medium_MovementBasic.glb', 'Rig_Medium_MovementAdvanced.glb', 'Rig_Medium_CombatRanged.glb', 'Rig_Medium_CombatMelee.glb', 'bow_withString.glb', 'arrow_bow.glb', 'sword_1handed.glb', 'shield_badge_color.glb', 'Mage.glb', 'staff.glb', 'Rig_Medium_Special.glb', 'Skeleton_Minion.glb', 'Skeleton_Warrior.glb', 'Skeleton_Rogue.glb', 'Skeleton_Mage.glb', 'Skeleton_Blade.glb', 'Skeleton_Axe.glb', 'Skeleton_Staff.glb', 'Skeleton_Shield_Small_A.glb', 'Skeleton_Crossbow.glb', 'Basic_Goblin.glb', 'Goblin_Warrior.glb', 'Goblin_Archer.glb', 'Goblin_Rusty_Shiv.glb', 'Goblin_Notched_Shortsword.glb', 'Goblin_Recurve_Shortbow.glb'];
+const FILES = ['Ranger.glb', 'Knight.glb', 'Rig_Medium_General.glb', 'Rig_Medium_MovementBasic.glb', 'Rig_Medium_MovementAdvanced.glb', 'Rig_Medium_CombatRanged.glb', 'Rig_Medium_CombatMelee.glb', 'bow_withString.glb', 'arrow_bow.glb', 'sword_1handed.glb', 'shield_badge_color.glb', 'Mage.glb', 'staff.glb', 'Rig_Medium_Special.glb', 'Skeleton_Minion.glb', 'Skeleton_Warrior.glb', 'Skeleton_Rogue.glb', 'Skeleton_Mage.glb', 'Skeleton_Blade.glb', 'Skeleton_Axe.glb', 'Skeleton_Staff.glb', 'Skeleton_Shield_Small_A.glb', 'Skeleton_Crossbow.glb', 'Basic_Goblin.glb', 'Goblin_Warrior.glb', 'Goblin_Archer.glb', 'Goblin_Rusty_Shiv.glb', 'Goblin_Notched_Shortsword.glb', 'Goblin_Recurve_Shortbow.glb', 'Bandit_Thug.glb', 'Bandit_Scavenger.glb', 'Bandit_Poacher.glb', 'Bandit_Spiked_Club.glb', 'Bandit_Broken_Bottle.glb', 'Bandit_Crossbow.glb'];
 export const SHAPE = { leg: 1.5, thick: 1.19, head: 0.7 };
 async function bytes(name) {
   const packed = window.__KAY && window.__KAY[name];
@@ -27,11 +27,12 @@ export const kay = { ready: false };
 export function loadKay() {
   if (assets) return assets;
   return (assets = (async () => {
-    const [ranger, knight, gen, mov, adv, ranged, melee, bow, arrow, sword, shield, mage, staff, special, skMin, skWar, skRog, skMag, skBlade, skAxe, skStaff, skShield, skXbow, gBasic, gWar, gArch, gShiv, gSword, gBow] = await Promise.all(FILES.map(f => bytes(f).then(parse)));
+    const [ranger, knight, gen, mov, adv, ranged, melee, bow, arrow, sword, shield, mage, staff, special, skMin, skWar, skRog, skMag, skBlade, skAxe, skStaff, skShield, skXbow, gBasic, gWar, gArch, gShiv, gSword, gBow, bThug, bScav, bPoach, bClub, bBottle, bXbow] = await Promise.all(FILES.map(f => bytes(f).then(parse)));
     kay.models = { 2: ranger.scene, 0: knight.scene, 1: mage.scene }; kay.staff = staff.scene; kay.bow = bow.scene; kay.arrow = arrow.scene; kay.sword = sword.scene; kay.shield = shield.scene;
     kay.clips = [...gen.animations, ...mov.animations, ...adv.animations, ...ranged.animations, ...melee.animations, ...special.animations];
     kay.skel = { minion: skMin.scene, warrior: skWar.scene, rogue: skRog.scene, mage: skMag.scene };
-    kay.gob = { basic: gBasic.scene, warrior: gWar.scene, archer: gArch.scene, shiv: gShiv.scene, sword: gSword.scene, bow: gBow.scene };
+    kay.gob = { basic: gBasic.scene, warrior: gWar.scene, archer: gArch.scene, shiv: gShiv.scene, sword: gSword.scene, bow: gBow.scene,
+      thug: bThug.scene, scavenger: bScav.scene, poacher: bPoach.scene, club: bClub.scene, bottle: bBottle.scene, xbow: bXbow.scene };
     kay.skelGear = { blade: skBlade.scene, axe: skAxe.scene, staff: skStaff.scene, shield: skShield.scene, xbow: skXbow.scene };
     kay.ready = true;
     return kay;
@@ -183,9 +184,16 @@ export function makeKaySkeleton(height) {
 // ---------------------------------------------------------------- the goblins (a free goblin pack: rigged, not animated)
 // so they're moved here, in code: each limb pointed where a walk, a run, a chop or a bow-draw puts it (in the goblin's
 // own frame: +z ahead, +y up, its left at +x), from the shoulders and hips down
-const GOB_KINDS = { 18: [['basic', 'shiv'], ['warrior', 'sword']], 19: [['archer', 'bow']] };
+// (and the bandits, from the same maker, on the same skeleton: a thug with a spiked club, a scavenger with a broken bottle,
+// a poacher with a crossbow)
+const GOB_KINDS = { 18: [['basic', 'shiv'], ['warrior', 'sword']], 19: [['archer', 'bow']], 20: [['thug', 'club'], ['scavenger', 'bottle']], 21: [['poacher', 'xbow']] };
+export const IS_GOB = t => t >= 18 && t <= 21;
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _a = new V3(), _b = new V3(), _c = new V3();
 function point(bone, child, dir, modelQ) {
+  if (bone.userData.copies) for (const [b, c] of bone.userData.copies) point1(b, c, dir, modelQ);
+  point1(bone, child, dir, modelQ);
+}
+function point1(bone, child, dir, modelQ) {
   bone.updateMatrixWorld(true);
   const p = bone.getWorldPosition(_a), cdir = child.getWorldPosition(_b).sub(p).normalize();
   const want = _c.copy(dir).normalize().applyQuaternion(modelQ);
@@ -205,10 +213,26 @@ export function makeGoblin(type, height) {
   const B = { ua: [bone('upper_arm.L'), bone('upper_arm.R')], fa: [bone('forearm.L'), bone('forearm.R')], hd: [bone('hand.L'), bone('hand.R')],
     th: [bone('thigh.L'), bone('thigh.R')], sh: [bone('shin.L'), bone('shin.R')], ft: [bone('foot.L'), bone('foot.R')], spine: bone('spine.001') || bone('spine'), chest: bone('spine.003') };
   const w = kay.gob[gear].clone(); (gear === 'bow' ? B.hd[0] : B.hd[1]).add(w); w.userData.gear = gear;
+  const xbow = gear === 'xbow';
   makeFlashable(root);
+  // (each limb's next bone is its own child, not a same-named bone of another copy)
+  // (a converted model may slip a helper node between a bone and the next: look two deep)
+  const kid = (b, n) => { if (!b) return null; const m = n.replace(/\./g, ''); for (const c of b.children) { if (c.name === n || c.name === m) return c; for (const g of c.children) if (g.name === n || g.name === m) return g; } return null; };
+  for (let i = 0; i < 2; i++) { const L = i ? 'R' : 'L';
+    B.fa[i] = kid(B.ua[i], 'forearm.' + L) || B.fa[i]; B.hd[i] = kid(B.fa[i], 'hand.' + L) || B.hd[i];
+    B.sh[i] = kid(B.th[i], 'shin.' + L) || B.sh[i]; B.ft[i] = kid(B.sh[i], 'foot.' + L) || B.ft[i]; }
+  (gear === 'bow' ? B.hd[0] : B.hd[1]).add(w);
   const rest = []; model.traverse(o => { if (o.isBone) rest.push([o, o.quaternion.clone()]); });
+  // (some of these models carry a copy of the skeleton per piece: every copy of a limb is pointed the same way)
+  const named = {}; for (const [b] of rest) (named[b.name] ||= []).push(b);
+  for (const [pa, ch] of [['ua', 'fa'], ['fa', 'hd'], ['th', 'sh'], ['sh', 'ft']]) for (let i = 0; i < 2; i++) {
+    const p0 = B[pa][i], c0 = B[ch][i]; if (!p0 || !c0) continue;
+    p0.userData.copies = named[p0.name].filter(b => b !== p0).map(b => [b, kid(b, c0.name)]).filter(([, c]) => c);
+  }
+  const firstOf = {}, dups = [];
+  for (const [b, q] of rest) { if (firstOf[b.name]) dups.push([b, firstOf[b.name][0], q, firstOf[b.name][1].clone().invert()]); else firstOf[b.name] = [b, q]; }
   const u = root.userData;
-  Object.assign(u, { gob: true, model, B, rest, phase: Math.random() * 6, lastT: -1, atkT: -1, wasAtk: false, hurtT: 0, archer: gear === 'bow', w });
+  Object.assign(u, { gob: true, model, B, rest, phase: Math.random() * 6, lastT: -1, atkT: -1, wasAtk: false, hurtT: 0, archer: gear === 'bow' || xbow, xbow, w });
   const mq = new THREE.Quaternion(), V = (x, y, z) => new V3(x, y, z);
   u.anim = (t, s) => {
     const dt = u.lastT < 0 ? 0 : Math.min(0.1, t - u.lastT); u.lastT = t;
@@ -238,7 +262,11 @@ export function makeGoblin(type, height) {
     }
     // a strike: the weapon arm (right) up and back, then down and through; an archer: bow arm out, string hand to the chin
     const k = u.atkT, wind = s.wind;
-    if (u.archer && (k >= 0 || wind)) {
+    if (u.xbow && (k >= 0 || wind)) {
+      // (the crossbow raised to the shoulder in both hands)
+      point(B.ua[1], B.fa[1], V(-0.2, 0.0, 1), mq); point(B.fa[1], B.hd[1], V(0.25, 0.05, 1), mq);
+      point(B.ua[0], B.fa[0], V(0.15, -0.1, 1), mq); point(B.fa[0], B.hd[0], V(-0.45, 0.0, 0.8), mq);
+    } else if (u.archer && (k >= 0 || wind)) {
       const pull = k < 0 ? 0.6 : k < 0.7 ? k / 0.7 : 1 - (k - 0.7) / 0.3;
       point(B.ua[0], B.fa[0], V(0.15, 0.08, 1), mq); point(B.fa[0], B.hd[0], V(0.05, 0.08, 1), mq);
       point(B.ua[1], B.fa[1], V(-0.55, 0.1, 0.6 - pull * 0.4), mq); point(B.fa[1], B.hd[1], V(0.8, 0.15, 0.35 - pull * 0.3), mq);

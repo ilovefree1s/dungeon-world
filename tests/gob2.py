@@ -56,8 +56,11 @@ with sync_playwright() as pw:
     def frames(n): page.evaluate('window.__f0 = __fc'); page.wait_for_function(f'__fc - __f0 >= {n}')
     page.evaluate("""() => { const p = __dw.player, M = __dw.monsters; M.list.slice().forEach(m => M.remove(m)); p.camDist = 9;
       const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
-      [[18, -3, 'wander'], [18, 0, 'chase'], [19, 3, 'chase']].forEach(([t, o, st]) => { const m = M.spawn(t, p.pos.x + fx * 7 + rx * o, p.pos.y, p.pos.z + fz * 7 + rz * o); m.state = st; });
+      [[20, -3, 'wander'], [20, 0, 'chase'], [21, 3, 'chase']].forEach(([t, o, st]) => { const m = M.spawn(t, p.pos.x + fx * 7 + rx * o, p.pos.y, p.pos.z + fz * 7 + rz * o); m.state = st; });
       p.model.visible = false; window.__keep = setInterval(() => { M.list.forEach((m, i) => { m.pos.x = p.pos.x + fx * 7 + rx * (i * 3 - 3); m.pos.z = p.pos.z + fz * 7 + rz * (i * 3 - 3); m.face = p.yaw + 0.6; m.moving = i < 2; }); }, 5); }""")
+    print(page.evaluate('''() => { const m = __dw.monsters.list.find(m => m.type === 20); if (!m) return 'none'; const u = m.root.userData, out = [];
+      m.root.traverse(o => { if (o.isSkinnedMesh) out.push([o.name, o.skeleton.bones.length, o.skeleton.bones.includes(u.B.ua[0]), o.skeleton.bones.includes(u.B.ua[1]), o.skeleton.bones.filter(b => b.name === 'upper_armL').length, (u.B.ua[0].userData.copies || []).length, o.skeleton.bones.some(b => (u.B.ua[0].userData.copies||[]).some(c => c[0] === b))]); });
+      const body = []; m.root.traverse(o => { if (o.isSkinnedMesh && o.name === 'Body') body.push(o.skeleton.bones.map(b => b.name + (b.parent ? '<' + b.parent.name : '')).join(',')); }); return body.join(' | ') + ' ### ' + JSON.stringify(out) + ' ' + u.B.ua[0].name + ' ' + u.B.fa[0].name + ' ' + (u.B.fa[0].parent === u.B.ua[0]); }'''))
     from PIL import Image
     ims = []
     for i in range(6):
@@ -67,7 +70,7 @@ with sync_playwright() as pw:
         print(i, page.evaluate('''() => { const m = __dw.monsters.list[1], u = m.root.userData, T = __dw.THREE; const a = u.B.ua[1].getWorldPosition(new T.Vector3()), h = u.B.hd[1].getWorldPosition(new T.Vector3()); return [m.wind, m.lunge, u.atkT, h.sub(a).toArray().map(v => +v.toFixed(2))]; }''')); page.screenshot(path=SP + 'k0.png'); ims.append(Image.open(SP + 'k0.png').crop((326, 150, 826, 560)))
     o = Image.new('RGB', (3000, 410))
     for i, im in enumerate(ims): o.paste(im, (500 * i, 0))
-    o.save(SP + 'gob2.png')
+    o.save(SP + 'ban.png')
     check(not errors, f'no errors {errors}')
     b.close()
 print('all good' if not fails else f'FAILED {fails}')

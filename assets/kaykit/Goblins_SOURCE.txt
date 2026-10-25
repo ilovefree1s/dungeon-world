@@ -1,2 +1,4 @@
 The goblins (Basic_Goblin, Goblin_Warrior, Goblin_Archer and the Goblin_ weapons) come from a free "GoblinPack_Free" download
 the owner of this game found; the pack had no license file in it. Check the source page before sharing the game.
+The bandits (Bandit_Thug, Bandit_Scavenger, Bandit_Poacher and the Bandit_ weapons) come from a free "Bandits_Free" pack, converted from FBX;
+the pack had no license file in it. Check the source page before sharing the game.
