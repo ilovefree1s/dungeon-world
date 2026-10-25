@@ -14,7 +14,7 @@ import { kay, makeKayHero, animKay, holdForged } from './kayhero.js';
 import { Turntable } from './turntable.js';
 import { stats, xpToNext } from './combat.js';
 import { sfx } from './audio.js';
-import { inv, equipItem, unequipSlot, dropItem, usePotion, gearTotals, armorCut, GLYPH_ITEM, SLOT_NAME, BAG_SIZE } from './inventory.js';
+import { classArmor, inv, equipItem, unequipSlot, dropItem, usePotion, gearTotals, armorCut, GLYPH_ITEM, SLOT_NAME, BAG_SIZE } from './inventory.js';
 import { RARITIES } from './weaponkit.js';
 
 const $ = id => document.getElementById(id);
@@ -80,7 +80,7 @@ export class CharSheet {
     $('csStats').innerHTML = [
       ['HEALTH', `${stats.hp} / ${stats.maxHp}`], ['EXPERIENCE', `${stats.xp} / ${xpToNext()}`], ['KILLS', stats.kills],
       ['DPS', dpsOf(w, cls, stats.level)], ['HIT', `${Math.round(hitOf(w, cls, stats.level))} (x${w.dmg})`], [cls === 0 ? 'SWING' : 'SHOT', `every ${w.time.toFixed(2)}s`],
-      ['ARMOR', `${gearTotals().armor} (−${Math.round(armorCut(gearTotals().armor, stats.level) * 100)}%)`], ['STAMINA', gearTotals().stam], ['GOLD', inv.gold], ['AURA', w.aura && w.aura !== 'none' ? w.aura.toUpperCase() : '—'],
+      ['ARMOR', (a => `${a} (−${Math.round(armorCut(a, stats.level) * 100)}%)`)(gearTotals().armor + classArmor(cls, stats.level))], ['STAMINA', gearTotals().stam], ['GOLD', inv.gold], ['AURA', w.aura && w.aura !== 'none' ? w.aura.toUpperCase() : '—'],
     ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
   }
   // ---------------------------------------------------------------- the bags

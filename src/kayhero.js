@@ -176,7 +176,7 @@ export function makeKaySkeleton(height) {
     u.mixer.update(dt);
   };
   // fallen: it falls apart and lies there (the bodies keep ticking it)
-  u.die = () => { u.one = null; u.cur = null; const a = act.die; if (a) { a.timeScale = 1; a.reset().play(); u.cur = 'die'; } };
+  u.die = () => { u.one = null; u.cur = 'die'; u.anim = () => { }; mixer.stopAllAction(); const a = act.die; if (a) { a.timeScale = 1; a.reset().play(); } };
   u.tickDead = dt => u.mixer.update(dt);
   return root;
 }
@@ -203,7 +203,7 @@ function point1(bone, child, dir, modelQ) {
   bone.updateMatrixWorld(true);
 }
 export function makeGoblin(type, height) {
-  const opts = GOB_KINDS[type], [kind, gear] = opts[Math.floor(Math.random() * opts.length)];
+  const opts = GOB_KINDS[type], [kind, gear] = opts[window.__dwGobPick ?? Math.floor(Math.random() * opts.length)];
   const model = SkeletonUtils.clone(kay.gob[kind]), root = new THREE.Group(); root.add(model);
   model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
   model.updateMatrixWorld(true);
@@ -222,6 +222,10 @@ export function makeGoblin(type, height) {
     B.fa[i] = kid(B.ua[i], 'forearm.' + L) || B.fa[i]; B.hd[i] = kid(B.fa[i], 'hand.' + L) || B.hd[i];
     B.sh[i] = kid(B.th[i], 'shin.' + L) || B.sh[i]; B.ft[i] = kid(B.sh[i], 'foot.' + L) || B.ft[i]; }
   (gear === 'bow' ? B.hd[0] : B.hd[1]).add(w);
+  // (and a converted model can nest its copies of a bone one inside another, upper_armL_1 > _2 > _3 > upper_armL, each
+  // mesh bound to its own: the outermost is the one to turn, so every copy inside it turns too)
+  const base = n => n.replace(/_\d+$/, ''), top = b => { if (!b) return b; while (b.parent && b.parent.isBone !== undefined && base(b.parent.name) === base(b.name)) b = b.parent; return b; };
+  for (const k of ['ua', 'fa', 'hd', 'th', 'sh', 'ft']) B[k] = B[k].map(top);
   const rest = []; model.traverse(o => { if (o.isBone) rest.push([o, o.quaternion.clone()]); });
   // (some of these models carry a copy of the skeleton per piece: every copy of a limb is pointed the same way)
   const named = {}; for (const [b] of rest) (named[b.name] ||= []).push(b);

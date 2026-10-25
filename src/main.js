@@ -14,7 +14,7 @@ import { loadKay } from './kayhero.js';
 import { Abilities, KITS } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollLoot, bestRarity } from './loot.js';
-import { inv, loadInv, addItem, addGold, equipItem, gearTotals, armorCut, GLYPH_ITEM, SLOT_NAME } from './inventory.js';
+import { classArmor, inv, loadInv, addItem, addGold, equipItem, gearTotals, armorCut, GLYPH_ITEM, SLOT_NAME } from './inventory.js';
 import { randomSpec, statsOf, plainStats, dpsOf, hitOf, RARITIES, setLevelSource } from './weaponkit.js';
 import { Turntable } from './turntable.js';
 import { AURA_VIEW } from './auras.js';
@@ -106,7 +106,9 @@ const CURSOR = { idle: svgCursor(swordSvg('#dfe6ee', '#ffffff', null), 1, 1, 'de
 // a weapon with no item level of its own (a forged one) is at your level; worn armor turns blows aside and its
 // stamina adds health (two a point)
 setLevelSource(() => stats.level);
-monsters.hooks.armor = () => armorCut(gearTotals().armor, stats.level);
+// (each hero's own armor, before any worn: the warrior's plate turns aside about 45% of a blow, the hunter's leather
+// about 20%, the mage's robes nothing)
+monsters.hooks.armor = () => armorCut(gearTotals().armor + classArmor(player.cls, stats.level), stats.level);
 // a shield block takes most of a blow; an ice barrier soaks blows until it's spent
 monsters.hooks.absorb = dmg => { const B = player.buffs || {}; if (B.block) dmg = Math.round(dmg * 0.3); if (B.absorb) { const t = Math.min(B.absorb.left, dmg); B.absorb.left -= t; dmg -= t; } return dmg; };
 let gearHp = 0;

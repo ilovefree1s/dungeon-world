@@ -50,7 +50,8 @@ export class Bodies {
   // a monster fell: its model stays, tipped over on the ground
   fall(m, loot) {
     const root = m.root;
-    root.userData.flash && root.userData.flash(0);
+    // (its hit flash put out for good: nothing that still holds it can light the body up again)
+    if (root.userData.flash) { root.userData.flash(0); root.userData.flash = () => { }; }
     // (a KayKit skeleton falls apart where it stands; the others tip over)
     if (root.userData.die) { root.userData.die(); root.position.copy(m.pos); }
     else { root.rotation.z = (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2; root.position.copy(m.pos); root.position.y += m.k.r * 0.6; }

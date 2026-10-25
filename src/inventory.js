@@ -80,4 +80,6 @@ export function usePotion(id) { const it = inv.items.find(x => x.id === id); if 
 // what the worn gear adds up to
 export function gearTotals() { let armor = 0, stam = 0; for (const s of GEAR_SLOTS) { const it = inv.equipped[s]; if (it) { armor += it.armor; stam += it.stam; } } return { armor, stam }; }
 // the share of a blow the armor turns aside, against an attacker of a level
+// each hero's own armor before any worn: the warrior's plate, the hunter's leather, the mage's robes (none)
+export const classArmor = (cls, level) => [24 + level * 11, 0, 8 + level * 3][cls] || 0;
 export const armorCut = (armor, level) => armor / (armor + 30 + level * 12);
