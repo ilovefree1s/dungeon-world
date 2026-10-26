@@ -57,7 +57,7 @@ export class Bodies {
     else { root.rotation.z = (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2; root.position.copy(m.pos); root.position.y += m.k.r * 0.6; }
     // (a flyer that dies in the air drops: the body falls to the ground and lies there)
     const w = this.player.world, g = w && w.poly ? w.ground(m.pos.x, m.pos.z) : null;
-    const b = { root, pos: m.pos.clone(), t: 0, loot, mark: null, h: m.k.h, r: m.k.r, vy: 0, floor: g !== null && g !== undefined ? g : m.pos.y };
+    const b = { name: m.name || 'CHEST', root, pos: m.pos.clone(), t: 0, loot, mark: null, h: m.k.h, r: m.k.r, vy: 0, floor: g !== null && g !== undefined ? g : m.pos.y };
     if (loot) { const rr = bestRarity(loot); b.mark = new THREE.Sprite(markMat.clone()); b.mark.material.color.set(rr.color); b.mark.scale.setScalar(2.6 + RARITIES.indexOf(rr) * 0.5); b.mark.position.set(b.pos.x, b.pos.y + 3.5, b.pos.z); scene.add(b.mark); b.color = rr.color; }
     this.list.push(b);
     return true;

@@ -77,14 +77,23 @@ html.locked #cross{display:block}
 #compass span.n{color:#ff8a6a}
 #compass span.tw{color:var(--gold);font-size:13px}
 #compass::after{content:"";position:absolute;left:50%;top:3px;bottom:3px;width:2px;margin-left:-1px;background:rgba(255,255,255,.5);border-radius:2px}
-/* the loot window's list: one row per thing the fallen carried */
-#lootList{display:flex;flex-direction:column;gap:6px;margin-top:10px}
-#lootList button{display:flex;align-items:center;gap:10px;width:100%;border:0;border-radius:10px;padding:7px 10px;background:rgba(0,0,0,.4);box-shadow:inset 0 0 0 1px var(--line);cursor:pointer;text-align:left}
-#lootList button.on{box-shadow:inset 0 0 0 2px #fff}
-#lootList .g{font-size:22px;width:28px;text-align:center}
-#lootList .n{font-family:var(--display);font-size:13px;letter-spacing:.04em;flex:1}
-#lootList .s{font-size:10px;font-weight:900;letter-spacing:.08em;color:var(--dim)}
-#lootIcon{font-size:64px;text-align:center;line-height:1.2;padding:10px 0;border-radius:16px;background:radial-gradient(ellipse at 50% 40%,rgba(255,220,170,.14),rgba(0,0,0,.35))}
+/* the loot frame: small, by the body, squares you hover and click */
+#lootBox{position:fixed;z-index:30;width:236px;padding:8px 10px 10px;border-radius:12px;background:rgba(18,14,11,.94);box-shadow:inset 0 0 0 1px var(--line),0 10px 30px rgba(0,0,0,.5);pointer-events:auto}
+#lootBox .lbHead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+#lootBox .lbHead b{flex:1;font:400 14px var(--display);letter-spacing:.05em;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lootLeave{width:24px;height:24px;border:0;border-radius:7px;background:rgba(255,255,255,.08);color:var(--dim);font:900 16px var(--body);cursor:pointer;line-height:1}
+#lootList{display:grid;grid-template-columns:repeat(4,48px);gap:7px}
+#lootList button{position:relative;width:48px;height:48px;border:0;border-radius:9px;background:radial-gradient(circle at 50% 35%,rgba(255,255,255,.1),rgba(0,0,0,.5));box-shadow:inset 0 0 0 2px var(--rc,#888);cursor:pointer;font-size:24px;line-height:48px;text-align:center;padding:0}
+#lootList button:hover{box-shadow:inset 0 0 0 2px #fff,0 0 12px var(--rc,#888);transform:translateY(-1px)}
+#lootList button i{position:absolute;right:3px;bottom:1px;font:900 10px var(--body);font-style:normal;color:#fff;text-shadow:0 1px 0 #000,0 0 3px #000;line-height:1.2}
+#lootList button.up::after{content:"▲";position:absolute;left:3px;top:1px;font-size:10px;line-height:1;color:#5ce65c;text-shadow:0 1px 0 #000}
+#lootAll{margin-top:9px;width:100%;border:0;border-radius:8px;padding:6px;background:rgba(255,255,255,.08);color:var(--gold);font:900 11px var(--body);letter-spacing:.14em;cursor:pointer}
+#lootAll:hover,#lootLeave:hover{background:rgba(255,255,255,.16)}
+#lootTip{position:fixed;z-index:31;width:240px;padding:9px 11px 10px;border-radius:10px;background:rgba(10,8,7,.96);box-shadow:inset 0 0 0 1px var(--rc,var(--line)),0 10px 30px rgba(0,0,0,.6);pointer-events:none;font:700 12px/1.45 var(--body);color:var(--text)}
+#lootTip .tn{font:400 15px var(--display);letter-spacing:.04em;margin-bottom:2px}
+#lootTip .tr{font-size:10px;font-weight:900;letter-spacing:.16em;margin-bottom:6px}
+#lootTip .tl{color:var(--dim);font-size:11px;margin-bottom:4px}
+#lootTip .th{margin-top:7px;font-size:10px;font-weight:900;letter-spacing:.1em;color:var(--dim)}
 #err{position:absolute;left:0;right:0;top:calc(96px + env(safe-area-inset-top,0px));text-align:center;font-family:var(--display);font-size:17px;letter-spacing:.04em;color:#ff4a3c;text-shadow:0 2px 0 #000;opacity:0;transition:opacity .3s;pointer-events:none}
 #err.on{opacity:1}
 #banner{position:absolute;left:0;right:0;top:24%;text-align:center;pointer-events:none;opacity:0;transform:scale(.88);transition:opacity .4s,transform .4s;padding:0 16px}
@@ -338,22 +347,13 @@ html.touchy .keys{display:none}
       </div>
     </div>
   </div>
-  <div id="loot" class="scrim" hidden>
-    <div class="panel" style="width:min(420px,94vw)">
-      <h2 id="lootT">IT DROPPED</h2>
-      <canvas id="lootGl" style="width:100%;height:220px;display:block;border-radius:16px;background:radial-gradient(ellipse at 50% 40%,rgba(255,220,170,.14),rgba(0,0,0,.35));box-shadow:inset 0 0 0 1px var(--line);margin-bottom:10px"></canvas>
-      <p class="small" id="lootRarity" style="letter-spacing:.2em;margin:0 0 2px"></p>
-      <p class="logo" id="lootName" style="font-size:clamp(22px,5vw,34px);margin:0 0 6px"></p>
-      <p class="small" id="lootLine"></p>
-      <div id="lootIcon" hidden></div>
-      <div id="lootStats" style="margin-top:10px;font-size:12px;font-weight:800;color:var(--dim);line-height:1.6"></div>
-      <div id="lootList"></div>
-      <button class="big" id="lootWield">TAKE &amp; WIELD</button>
-      <button class="big" id="lootTake" style="background:rgba(255,255,255,.1);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)">TAKE (INTO THE FORGE)</button>
-      <button class="big" id="lootAll" style="background:rgba(255,255,255,.1);color:var(--gold);box-shadow:inset 0 0 0 1px var(--line)">TAKE ALL</button>
-      <button class="big" id="lootLeave" style="background:rgba(255,255,255,.06);color:var(--dim);box-shadow:inset 0 0 0 1px var(--line);margin-top:8px">LEAVE IT</button>
-    </div>
+  <!-- the loot window, the MMO way: a small frame by the body, a square for each thing it carried; hover one to see it, click to take it -->
+  <div id="lootBox" hidden>
+    <div class="lbHead"><b id="lootT">SLIME</b><button type="button" id="lootLeave" aria-label="Close">×</button></div>
+    <div id="lootList"></div>
+    <button type="button" id="lootAll">TAKE ALL</button>
   </div>
+  <div id="lootTip" hidden></div>
   <div id="char" class="scrim" hidden>
     <div class="panel wow">
       <div class="wtabs"><button type="button" id="tabChar" class="on">CHARACTER <em>C</em></button><button type="button" id="tabBags">BAGS <em>B</em></button><button type="button" id="csClose" class="x" aria-label="Close">×</button></div>

@@ -131,9 +131,8 @@ monsters.hooks.fallen = m => { camps.fell(m); return bodies.fall(m, rollLoot(m, 
 const camps = new Camps(world, monsters, player, bodies, m => rollLoot(m, player.cls));
 camps.onCleared = (c, name) => { banner(name + ' CLEARED', 'they left a chest by the fire'); sfx('legend'); };
 let lootBody = null;
-const lootView = new Turntable($('lootGl'));
-// the loot window: everything the fallen carried in a list; the one picked shows on top (a weapon turning on its
-// stand, the rest as their icons) with its numbers against what you have, and what you can do with it
+// the loot window, the MMO way: a small frame by the body with a square for each thing it carried. hover a square
+// to see what it is (against what you have), click to take it, shift-click to take and wear or wield it
 function lootEntries(b) {
   const L = b.loot, out = [];
   if (L.weapon) out.push({ kind: 'weapon', it: L.weapon });
@@ -141,56 +140,63 @@ function lootEntries(b) {
   if (L.gold) out.push({ kind: 'gold', it: { name: `${L.gold} GOLD`, rarity: 'common' } });
   return out;
 }
-let lootPick = 0;
+const WEAPON_GLYPH = ['⚔', '🪄', '🏹'];
+const glyphOf = e => e.kind === 'weapon' ? WEAPON_GLYPH[bodies.describe(e.it).cls] : e.kind === 'gold' ? '🪙' : GLYPH_ITEM[e.kind === 'armor' ? e.it.slot : 'potion'];
+const rarityOfIt = it => RARITIES.find(r => r.id === it.rarity) || RARITIES[0];
+// is it better than what's worn (for the little green arrow)
+function isUpgrade(e) {
+  if (e.kind === 'armor') { const cur = inv.equipped[e.it.slot]; return !cur || e.it.armor + e.it.stam * 2 > cur.armor + cur.stam * 2; }
+  if (e.kind === 'weapon') { const d = bodies.describe(e.it); if (d.cls !== player.cls) return false; const have = equippedSpec(d.cls), cur = have ? statsOf(have) : plainStats(d.cls); return dpsOf(d.stats, d.cls, stats.level) > dpsOf(cur, d.cls, stats.level); }
+  return false;
+}
+function tipFor(e) {
+  const it = e.it, rr = rarityOfIt(it);
+  const row = (label, a, bb, post = '', lessIsBetter = false) => { const dlt = +(a - bb).toFixed(2), good = lessIsBetter ? -dlt : dlt; const col = good > 0 ? '#5ce65c' : good < 0 ? '#ff6a55' : 'var(--dim)'; return `<div>${label} <b>${a}${post}</b> <span style="color:${col}">${good > 0 ? '▲' : good < 0 ? '▼' : '='} ${dlt > 0 ? '+' : ''}${dlt || ''}</span></div>`; };
+  let h = `<div class="tn" style="color:${rr.color}">${it.name}</div>`;
+  if (e.kind === 'gold') return h + '<div class="tl">Coin of the realm</div><div class="th">CLICK TO TAKE</div>';
+  h += `<div class="tr" style="color:${rr.color}">${rr.name} · ITEM LEVEL ${it.ilvl || stats.level}</div>`;
+  if (e.kind === 'weapon') {
+    const d = bodies.describe(it), have = equippedSpec(d.cls), cur = have ? statsOf(have) : plainStats(d.cls);
+    h += `<div class="tl">${d.line}</div>` + row('DPS', dpsOf(d.stats, d.cls, stats.level), dpsOf(cur, d.cls, stats.level)) + row('HIT', Math.round(hitOf(d.stats, d.cls, stats.level)), Math.round(hitOf(cur, d.cls, stats.level))) + row(d.cls === 0 ? 'SWING' : 'SHOT', d.stats.time, cur.time, 's', true);
+    if (d.stats.aura && d.stats.aura !== 'none') h += `<div style="color:#b48cff">${d.stats.aura.toUpperCase()} AURA</div>`;
+    h += `<div class="th">${d.cls !== player.cls ? 'FOR THE ' + ['WARRIOR', 'MAGE', 'HUNTER'][d.cls] + ' · ' : ''}CLICK TO TAKE · SHIFT-CLICK TO WIELD</div>`;
+  } else if (e.kind === 'armor') {
+    const cur = inv.equipped[it.slot] || { armor: 0, stam: 0 };
+    h += `<div class="tl">${SLOT_NAME[it.slot]} ARMOR</div>` + row('ARMOR', it.armor, cur.armor) + row('STAMINA', it.stam, cur.stam) + `<div class="th">CLICK TO TAKE · SHIFT-CLICK TO EQUIP</div>`;
+  } else if (e.kind === 'potion') h += `<div class="tl">Heals ${Math.round(it.heal * 100)}% of your health</div><div class="th">CLICK TO TAKE</div>`;
+  return h;
+}
+function placeBox(x, y) {
+  const box = $('lootBox'), w = 236, h = box.offsetHeight || 140;
+  box.style.left = Math.max(8, Math.min(innerWidth - w - 8, x + 24)) + 'px';
+  box.style.top = Math.max(60, Math.min(innerHeight - h - 90, y - 30)) + 'px';
+}
 function openLoot(b) {
-  lootBody = b; lootPick = 0;
-  unlockMouse(); UI.state = 'loot'; $('loot').hidden = false;
+  lootBody = b;
+  if (!input.cursorMode) unlockMouse();
+  $('lootBox').hidden = false;
   const best = bestRarity(b.loot);
   sfx(best.id === 'legendary' ? 'legend' : best.id === 'common' ? 'pickup' : 'rare');
   showLoot();
+  // (by the cursor when there is one, else left of the middle of the screen)
+  if (input.cursor && input.cursor.in) placeBox(input.cursor.x, input.cursor.y); else placeBox(innerWidth * 0.18, innerHeight * 0.32);
 }
 function showLoot() {
   const b = lootBody; if (!b) return;
   const E = lootEntries(b);
   if (!E.length) { closeLoot(); return; }
-  lootPick = Math.min(lootPick, E.length - 1);
-  const e = E[lootPick], it = e.it, rr = RARITIES.find(r => r.id === it.rarity) || RARITIES[0];
   const best = bestRarity(b.loot);
-  $('lootT').textContent = best.id === 'common' ? 'IT DROPPED' : `A ${best.name} DROP`;
-  $('loot').querySelector('.panel').style.boxShadow = `inset 0 0 0 2px ${best.color}, 0 24px 60px rgba(0,0,0,.55), 0 0 40px ${best.color}44`;
-  $('lootRarity').textContent = e.kind === 'gold' ? 'COIN' : `${rr.name} · ITEM LEVEL ${it.ilvl || stats.level}`; $('lootRarity').style.color = rr.color;
-  $('lootName').textContent = it.name; $('lootName').style.color = rr.color; $('lootName').style.textShadow = `0 5px 0 rgba(0,0,0,.55), 0 0 24px ${rr.color}66`;
-  const row = (label, a, bb, pre = 'x', post = '', lessIsBetter = false) => { const dlt = +(a - bb).toFixed(2), good = lessIsBetter ? -dlt : dlt; const col = good > 0 ? '#5ce65c' : good < 0 ? '#ff6a55' : 'var(--dim)'; const arrow = good > 0 ? '▲' : good < 0 ? '▼' : '='; return `<div><span style="display:inline-block;width:72px;text-align:left">${label}</span> ${pre}${a}${post} <b style="color:${col}">${arrow} ${dlt > 0 ? '+' : ''}${dlt || ''}</b> <span style="color:var(--dim);font-weight:700">(now ${pre}${bb}${post})</span></div>`; };
-  $('lootGl').hidden = e.kind !== 'weapon'; $('lootIcon').hidden = e.kind === 'weapon';
-  $('lootWield').hidden = !(e.kind === 'weapon' || e.kind === 'armor');
-  if (e.kind === 'weapon') {
-    const d = bodies.describe(it); lootView.show(it);
-    $('lootLine').textContent = d.line;
-    const have = equippedSpec(d.cls), cur = have ? statsOf(have) : plainStats(d.cls);
-    $('lootStats').innerHTML = row('DPS', dpsOf(d.stats, d.cls, stats.level), dpsOf(cur, d.cls, stats.level), '') + row('HIT', Math.round(hitOf(d.stats, d.cls, stats.level)), Math.round(hitOf(cur, d.cls, stats.level)), '') + row(d.stats.cls === 0 ? 'SWING' : 'SHOT', d.stats.time, cur.time, '', 's', true)
-      + `<div class="small" style="margin-top:6px">${have ? 'AGAINST ' + (have.name || 'YOUR FORGED WEAPON') : 'AGAINST THE PLAIN ONE'}</div>`;
-    $('lootWield').textContent = d.cls === player.cls ? 'TAKE & WIELD' : `TAKE & WIELD (AS THE ${['WARRIOR', 'MAGE', 'HUNTER'][d.cls]})`;
-    $('lootTake').textContent = 'TAKE (INTO THE BAGS)';
-  } else {
-    lootView.stop();
-    $('lootIcon').textContent = e.kind === 'gold' ? '🪙' : GLYPH_ITEM[e.kind === 'armor' ? it.slot : 'potion'];
-    if (e.kind === 'armor') {
-      const cur = inv.equipped[it.slot] || { armor: 0, stam: 0 };
-      $('lootLine').textContent = `${SLOT_NAME[it.slot]} ARMOR`;
-      $('lootStats').innerHTML = row('ARMOR', it.armor, cur.armor, '') + row('STAMINA', it.stam, cur.stam, '') + `<div class="small" style="margin-top:6px">${inv.equipped[it.slot] ? 'AGAINST ' + inv.equipped[it.slot].name : 'NOTHING WORN THERE'}</div>`;
-      $('lootWield').textContent = 'TAKE & EQUIP'; $('lootTake').textContent = 'TAKE (INTO THE BAGS)';
-    } else if (e.kind === 'potion') { $('lootLine').textContent = `HEALS ${Math.round(it.heal * 100)}% OF YOUR HEALTH`; $('lootStats').innerHTML = ''; $('lootTake').textContent = 'TAKE'; }
-    else { $('lootLine').textContent = 'COIN OF THE REALM'; $('lootStats').innerHTML = ''; $('lootTake').textContent = 'TAKE'; }
-  }
-  // the list
+  $('lootT').textContent = b.name || 'LOOT';
+  $('lootBox').style.boxShadow = `inset 0 0 0 1px ${best.id === 'common' ? 'var(--line)' : best.color}, 0 10px 30px rgba(0,0,0,.5)`;
   $('lootList').innerHTML = '';
-  $('lootList').hidden = E.length < 2;
-  E.forEach((x, i) => {
-    const r2 = RARITIES.find(r => r.id === x.it.rarity) || RARITIES[0], el = document.createElement('button'); el.type = 'button';
-    const g = x.kind === 'weapon' ? '⚔' : x.kind === 'gold' ? '🪙' : GLYPH_ITEM[x.kind === 'armor' ? x.it.slot : 'potion'];
-    el.innerHTML = `<span class="g">${g}</span><span class="n" style="color:${r2.color}">${x.it.name}</span><span class="s">${x.kind === 'gold' ? '' : 'LV ' + (x.it.ilvl || '')}</span>`;
-    if (i === lootPick) el.classList.add('on');
-    el.addEventListener('click', () => { lootPick = i; sfx('pickup'); showLoot(); });
+  E.forEach(e => {
+    const el = document.createElement('button'); el.type = 'button';
+    el.style.setProperty('--rc', rarityOfIt(e.it).color);
+    el.innerHTML = glyphOf(e) + (e.kind === 'gold' ? `<i>${b.loot.gold}</i>` : e.it.count > 1 ? `<i>${e.it.count}</i>` : '');
+    if (isUpgrade(e)) el.classList.add('up');
+    el.addEventListener('mouseenter', () => { const t = $('lootTip'); t.innerHTML = tipFor(e); t.style.setProperty('--rc', rarityOfIt(e.it).color); t.hidden = false; const r = el.getBoundingClientRect(); t.style.left = Math.min(innerWidth - 250, r.right + 10) + 'px'; t.style.top = Math.max(8, Math.min(innerHeight - t.offsetHeight - 8, r.top - 6)) + 'px'; });
+    el.addEventListener('mouseleave', () => { $('lootTip').hidden = true; });
+    el.addEventListener('click', ev => { if (!lootBody) return; const use = ev.shiftKey && (e.kind === 'weapon' || e.kind === 'armor'); if (takeOne(e, use)) { bodies.took(lootBody); sfx(use ? 'rare' : 'pickup'); $('lootTip').hidden = true; showLoot(); } });
     $('lootList').appendChild(el);
   });
   $('lootAll').hidden = E.length < 2;
@@ -210,13 +216,13 @@ sheet.onClose = () => { if (UI.state === 'char') UI.state = 'play'; };
 sheet.onForge = () => { sheet.close(); forgeFrom = 'play'; UI.state = 'forge'; openForge(); };
 $('charBtn').addEventListener('click', () => openSheet('char'));
 $('bagsBtn').addEventListener('click', () => openSheet('bags'));
-function closeLoot() { UI.state = 'play'; $('loot').hidden = true; lootBody = null; lootView.stop(); }
-$('lootWield').addEventListener('click', () => { if (!lootBody) return; const e = lootEntries(lootBody)[lootPick]; if (e && takeOne(e, true)) { bodies.took(lootBody); sfx('rare'); showLoot(); } });
-$('lootTake').addEventListener('click', () => { if (!lootBody) return; const e = lootEntries(lootBody)[lootPick]; if (e && takeOne(e, false)) { bodies.took(lootBody); sfx('pickup'); showLoot(); } });
+function closeLoot() { $('lootBox').hidden = true; $('lootTip').hidden = true; lootBody = null; }
 $('lootAll').addEventListener('click', () => { if (!lootBody) return; for (const e of lootEntries(lootBody)) if (!takeOne(e, false)) break; bodies.took(lootBody); sfx('pickup'); showLoot(); });
 $('lootLeave').addEventListener('click', () => { sfx('nope'); closeLoot(); });
 function heroCombat(dt, inp, frozen) {
   ctx.frozen = frozen;
+  // (walk away from the body and its loot window closes)
+  if (lootBody && (lootBody.pos.distanceTo(player.pos) > 20 || !bodies.list.includes(lootBody))) closeLoot();
   // a body in your sights: a click or F looks at what it dropped instead of swinging
   bodies.update(dt, monsters.list.some(m => m.state === 'chase' && m.pos.distanceTo(player.pos) < 16));
   $('lootHint').hidden = !bodies.target || input.cursorMode;
@@ -426,7 +432,8 @@ function menuStep() {
       else if (k === 'right' || k === 'down') focusHero(focusI + 1);
       else if (k === 'ok') pickHero(focusI);
     } else if (UI.state === 'play') {
-      if (k === 'pause') openMenu();
+      if (k === 'pause' && lootBody) closeLoot();
+      else if (k === 'pause') openMenu();
       else if (k === 'char') openSheet('char');
       else if (k === 'bags') openSheet('bags');
     } else if (UI.state === 'char') {
