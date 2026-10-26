@@ -260,7 +260,7 @@ export class Monsters {
       const alive = stats.hp > 0;
       if (m.state === 'wander') {
         if (alive && d < k.see) { m.state = 'chase'; }
-        else if (m.t <= 0) { m.t = 2 + Math.random() * 3; const a = Math.random() * 6.28, r = Math.random() * 16; m.goal = new V3(m.home.x + Math.cos(a) * r, 0, m.home.z + Math.sin(a) * r); m.rest = Math.random() < 0.4; }
+        else if (m.t <= 0) { m.t = 2 + Math.random() * 3; const a = Math.random() * 6.28, r = Math.random() * (m.roam ?? 16); m.goal = new V3(m.home.x + Math.cos(a) * r, 0, m.home.z + Math.sin(a) * r); m.rest = Math.random() < 0.4; }
       } else if (m.state === 'chase') {
         if (!alive || d > k.see * 2.2 || m.pos.distanceTo(m.home) > 120) { m.state = 'wander'; m.t = 0; m.home.copy(m.pos); m.wind = 0; m.act = null; }
         m.goal = hero; m.rest = false;

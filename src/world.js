@@ -156,8 +156,9 @@ export class World {
     }
     if (d.poly) {
       // the trees and rocks, and the trunks to walk around; the grass comes when the hero is near
-      const f = buildFlora(d.trees, MAT.flora, MAT.glow);
-      for (const m of f.meshes) g.add(m);
+      c.trees0 = d.trees;
+      const f = buildFlora(this.cleared(d.trees, d.cx * CH, d.cz * CH), MAT.flora, MAT.glow);
+      for (const m of f.meshes) { m.userData.flora = true; g.add(m); }
       c.trunks = f.trunks; c.grassSpots = d.grass.length ? d.grass : null; c.grass = null;
     }
     g.updateMatrixWorld(true);
@@ -166,6 +167,29 @@ export class World {
     c.group = g;
     this.stats.built++;
     this.stats.meshMs = performance.now() - t;
+  }
+  // clearings (a camp's ground): no trees or rocks inside them, in chunks built now or later
+  cleared(list, ox, oz) {
+    if (!this.clearings || !this.clearings.length) return list;
+    const out = [];
+    for (let i = 0; i < list.length; i += 6) {
+      const x = list[i + 1] + ox, z = list[i + 3] + oz;
+      if (this.clearings.some(c => (x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r)) continue;
+      for (let j = 0; j < 6; j++) out.push(list[i + j]);
+    }
+    return out;
+  }
+  clearAround(x, z, r) {
+    (this.clearings ||= []).push({ x, z, r });
+    for (const c of this.chunks.values()) {
+      if (!c.group || !c.trees0) continue;
+      const ox = c.cx * CH, oz = c.cz * CH;
+      if (x + r < ox || x - r > ox + CH || z + r < oz || z - r > oz + CH) continue;
+      for (const m of [...c.group.children]) if (m.userData.flora) { c.group.remove(m); m.dispose && m.dispose(); }
+      const f = buildFlora(this.cleared(c.trees0, ox, oz), MAT.flora, MAT.glow);
+      for (const m of f.meshes) { m.userData.flora = true; c.group.add(m); }
+      c.trunks = f.trunks; c.group.updateMatrixWorld(true);
+    }
   }
   unload(k, c) {
     if (c.group) {

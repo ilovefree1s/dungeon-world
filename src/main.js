@@ -11,6 +11,7 @@ import { startAudio, sfx, setSfx, setMusic, audioState } from './audio.js';
 import { BIOME_NAME, BIOME_SUB, CH } from './gen.js';
 import { Monsters, Bolts, stats, xpToNext, pickMonster } from './combat.js';
 import { loadKay } from './kayhero.js';
+import { Camps } from './camps.js';
 import { Abilities, KITS, meleeReach } from './abilities.js';
 import { forge, openForge, closeForge, equippedSpec, takeLoot } from './forge.js';
 import { Bodies, rollLoot, bestRarity } from './loot.js';
@@ -125,7 +126,10 @@ inv.onGear = () => applyGearHp();
 swapHero(player.cls);
 // the fallen: bodies stay a while, some with a weapon on them
 const bodies = new Bodies(player);
-monsters.hooks.fallen = m => bodies.fall(m, rollLoot(m, player.cls));
+monsters.hooks.fallen = m => { camps.fell(m); return bodies.fall(m, rollLoot(m, player.cls)); };
+// goblin and bandit camps about the world
+const camps = new Camps(world, monsters, player, bodies, m => rollLoot(m, player.cls));
+camps.onCleared = (c, name) => { banner(name + ' CLEARED', 'they left a chest by the fire'); sfx('legend'); };
 let lootBody = null;
 const lootView = new Turntable($('lootGl'));
 // the loot window: everything the fallen carried in a list; the one picked shows on top (a weapon turning on its
@@ -505,7 +509,7 @@ function frame(now) {
   fwd.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   world.update(p.x, p.z, fwd.x, fwd.z);
   AURA_VIEW.h = renderer.domElement.height;   // (the auras' particles size themselves to the render)
-  if (UI.state === 'play') { monsters.update(dt); bolts.update(dt); pet.update(dt, input.autoAtk); }
+  if (UI.state === 'play') { monsters.update(dt); bolts.update(dt); pet.update(dt, input.autoAtk); camps.update(dt); }
   stepFx(dt);
   // the grass: the wind, and who walks through it
   grassUniforms.uTime.value = performance.now() / 1000;
@@ -550,7 +554,7 @@ document.getElementById('boot')?.remove();
 
 // a hook for testing
 window.__dw = {
-  world, player, sky, UI, input, view, renderer, scene, camera, THREE, monsters, bolts, hero: stats, abilities, forge, randomSpec, bodies, openLoot, closeLoot, sheet, openSheet, pet,
+  world, player, sky, UI, input, view, renderer, scene, camera, THREE, monsters, bolts, hero: stats, abilities, forge, randomSpec, camps, bodies, openLoot, closeLoot, sheet, openSheet, pet,
   start(cls = 0) { pickHero(cls); },
   teleport(x, z) { player.place(x + 0.5, 90, z + 0.5); placed = false; },
   setQuality(q) { UI.autoQ = false; UI.quality = q; setQuality(q); },
