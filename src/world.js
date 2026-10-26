@@ -168,6 +168,9 @@ export class World {
     this.stats.built++;
     this.stats.meshMs = performance.now() - t;
   }
+  // something built that blocks the way: a post of radius r at (x, z) (a wall is a row of them)
+  addCollider(x, z, r) { this.colliders ||= new Map(); const k = key(Math.floor(x / CH), Math.floor(z / CH)); if (!this.colliders.has(k)) this.colliders.set(k, []); this.colliders.get(k).push(x, z, r); }
+  removeColliders(test) { if (!this.colliders) return; for (const [k, C] of this.colliders) { const keep = []; for (let i = 0; i < C.length; i += 3) if (!test(C[i], C[i + 1])) keep.push(C[i], C[i + 1], C[i + 2]); this.colliders.set(k, keep); } }
   // clearings (a camp's ground): no trees or rocks inside them, in chunks built now or later
   cleared(list, ox, oz) {
     if (!this.clearings || !this.clearings.length) return list;
@@ -217,6 +220,8 @@ export class World {
     const out = [];
     const cx = Math.floor(x / CH), cz = Math.floor(z / CH);
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const c = this.chunks.get(key(cx + dx, cz + dz)); if (c && c.trunks) out.push([c.trunks, (cx + dx) * CH, (cz + dz) * CH]); }
+    // (and anything built in the world that blocks the way: castle walls, towers)
+    if (this.colliders) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const C = this.colliders.get(key(cx + dx, cz + dz)); if (C) out.push([C, 0, 0]); }
     return out;
   }
   // pushed out of any trunk: returns [x, z] moved clear

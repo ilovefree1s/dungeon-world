@@ -13,23 +13,23 @@ import * as D from './dh/data.js';
 
 const CELL = 300, BUILD_R = 230, DROP_R = 420, FILL_R = 150, REFILL = 300;
 // (a camp's people, by kind: mostly fighters, one or two who shoot)
-const KINDS = {
+export const KINDS = {
   goblin: { melee: D.M_GOBLIN, ranged: D.M_GOBARCHER, tent: ['#6a5a3a', '#4a5a2a', '#7a4a2a'], flag: '#5a8a2a', name: 'GOBLIN CAMP' },
   bandit: { melee: D.M_BANDIT, ranged: D.M_POACHER, tent: ['#8a2a2a', '#a8946a', '#5a4a3a'], flag: '#b8322a', name: 'BANDIT CAMP' },
 };
 // which kind lives in each land (0 woods, 1 mountains, 2 sands, 3 bog, 4 cinder, 5 prism)
 const BY_BIOME = [['goblin', 'bandit'], ['goblin'], ['bandit'], ['goblin'], ['bandit'], ['bandit']];
 
-const hash = (a, b, s) => { let h = (a * 374761393 + b * 668265263 + s * 2246822519) >>> 0; h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0; return () => ((h = (Math.imul(h ^ (h >>> 15), 2246822519) + 0x6D2B79F5) >>> 0) / 4294967296); };
+export const hash = (a, b, s) => { let h = (a * 374761393 + b * 668265263 + s * 2246822519) >>> 0; h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0; return () => ((h = (Math.imul(h ^ (h >>> 15), 2246822519) + 0x6D2B79F5) >>> 0) / 4294967296); };
 const M = {};
-const mat = (c, o = {}) => M[c + JSON.stringify(o)] || (M[c + JSON.stringify(o)] = new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, flatShading: true, ...o }));
-const mesh = (g, m) => { const o = new THREE.Mesh(g, m); o.castShadow = true; o.receiveShadow = true; return o; };
+export const mat = (c, o = {}) => M[c + JSON.stringify(o)] || (M[c + JSON.stringify(o)] = new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, flatShading: true, ...o }));
+export const mesh = (g, m) => { const o = new THREE.Mesh(g, m); o.castShadow = true; o.receiveShadow = true; return o; };
 
 // two lights shared by the nearest camps' fires (a fixed number, so nothing has to recompile when camps come and go)
 const LIGHTS = [0, 1].map(() => { const l = new THREE.PointLight('#ff9a40', 0, 46, 1.6); scene.add(l); return l; });
 
 // ---------------------------------------------------------------- the props
-function campfire() {
+export function campfire() {
   const g = new THREE.Group();
   for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2, s = mesh(new THREE.DodecahedronGeometry(0.42 + (i % 3) * 0.06, 0), mat('#7a7670')); s.position.set(Math.cos(a) * 1.5, 0.25, Math.sin(a) * 1.5); s.rotation.set(i, i * 2, 0); g.add(s); }
   for (let i = 0; i < 4; i++) { const l = mesh(new THREE.CylinderGeometry(0.16, 0.2, 2.4, 6), mat('#5a3a1e')); l.rotation.set(Math.PI / 2 - 0.5, i * Math.PI / 4, 0, 'YXZ'); l.position.y = 0.55; g.add(l); }
@@ -43,7 +43,7 @@ function campfire() {
   g.userData.flames = flames;
   return g;
 }
-function tent(colors, r) {
+export function tent(colors, r) {
   const g = new THREE.Group(), c = colors[Math.floor(r() * colors.length)], w = 3.6 + r() * 1.2, L = 4.4 + r() * 1.4, h = 3 + r() * 0.6;
   // an A-frame: a triangular prism of cloth, a dark doorway, two poles, ropes pegged out
   const geo = new THREE.CylinderGeometry(w * 0.58, w * 0.58, L, 3, 1, true); geo.rotateZ(Math.PI / 2); geo.rotateX(Math.PI / 6);
@@ -53,10 +53,10 @@ function tent(colors, r) {
   const patch = mesh(new THREE.PlaneGeometry(0.9, 0.7), mat('#3a3020', { side: THREE.DoubleSide })); patch.position.set(0.4, h * 0.55, w * 0.27); patch.rotation.x = -0.55; g.add(patch);
   return g;
 }
-const crate = () => { const g = new THREE.Group(), b = mesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), mat('#8a6a3a')); b.position.y = 0.6; g.add(b); for (const y of [0.15, 1.05]) { const s = mesh(new THREE.BoxGeometry(1.46, 0.14, 1.46), mat('#5a4020')); s.position.y = y; g.add(s); } return g; };
-const barrel = () => { const g = new THREE.Group(), b = mesh(new THREE.CylinderGeometry(0.62, 0.62, 1.5, 10), mat('#7a5230')); b.position.y = 0.75; g.add(b); for (const y of [0.25, 1.25]) { const h = mesh(new THREE.TorusGeometry(0.64, 0.05, 4, 12), mat('#3a3a3a', { metalness: 0.6 })); h.rotation.x = Math.PI / 2; h.position.y = y; g.add(h); } return g; };
+export const crate = () => { const g = new THREE.Group(), b = mesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), mat('#8a6a3a')); b.position.y = 0.6; g.add(b); for (const y of [0.15, 1.05]) { const s = mesh(new THREE.BoxGeometry(1.46, 0.14, 1.46), mat('#5a4020')); s.position.y = y; g.add(s); } return g; };
+export const barrel = () => { const g = new THREE.Group(), b = mesh(new THREE.CylinderGeometry(0.62, 0.62, 1.5, 10), mat('#7a5230')); b.position.y = 0.75; g.add(b); for (const y of [0.25, 1.25]) { const h = mesh(new THREE.TorusGeometry(0.64, 0.05, 4, 12), mat('#3a3a3a', { metalness: 0.6 })); h.rotation.x = Math.PI / 2; h.position.y = y; g.add(h); } return g; };
 const logSeat = () => { const l = mesh(new THREE.CylinderGeometry(0.45, 0.5, 3, 7), mat('#6a4424')); l.rotation.z = Math.PI / 2; l.position.y = 0.45; const g = new THREE.Group(); g.add(l); return g; };
-function banner(color) {
+export function banner(color) {
   const g = new THREE.Group(), p = mesh(new THREE.CylinderGeometry(0.1, 0.12, 6, 6), mat('#4a3420')); p.position.y = 3; g.add(p);
   const f = mesh(new THREE.PlaneGeometry(1.8, 1.3, 4, 1), mat(color, { side: THREE.DoubleSide })); f.position.set(0.95, 5.1, 0); g.add(f); g.userData.flag = f;
   const skull = mesh(new THREE.SphereGeometry(0.28, 6, 5), mat('#e8e0cc')); skull.position.y = 6.1; g.add(skull);
@@ -64,7 +64,7 @@ function banner(color) {
 }
 const bedroll = c => { const b = mesh(new THREE.CapsuleGeometry(0.4, 1.6, 3, 8), mat(c)); b.rotation.z = Math.PI / 2; b.scale.y = 0.45; b.position.y = 0.18; const g = new THREE.Group(); g.add(b); return g; };
 // a chest left by the fire of a cleared camp
-function chest() {
+export function chest() {
   const g = new THREE.Group(), b = mesh(new THREE.BoxGeometry(1.6, 0.9, 1.1), mat('#7a4a22')); b.position.y = 0.45; g.add(b);
   const lid = mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.6, 8, 1, false, 0, Math.PI), mat('#8a5a2a')); lid.rotation.z = Math.PI / 2; lid.position.y = 0.9; g.add(lid);
   for (const x of [-0.6, 0.6]) { const s = mesh(new THREE.BoxGeometry(0.14, 1.5, 1.16), mat('#c8963c', { metalness: 0.7, roughness: 0.4 })); s.position.set(x, 0.75, 0); g.add(s); }
@@ -101,7 +101,7 @@ export class Camps {
         const x = tries ? c.x + (rr() - 0.5) * CELL * 0.6 : c.x, z = tries ? c.z + (rr() - 0.5) * CELL * 0.6 : c.z;
         let lo = 1e9, hi = -1e9, bad = false;
         for (let i = 0; i < 13 && !bad; i++) { const a = i / 12 * 6.28, d = i ? 16 : 0, g = w.ground(x + Math.cos(a) * d, z + Math.sin(a) * d); if (g === null || g === undefined || w.seaAt(x + Math.cos(a) * d, z + Math.sin(a) * d)) bad = true; else { lo = Math.min(lo, g); hi = Math.max(hi, g); } }
-        if (!bad && hi - lo < 3) { c.x = x; c.z = z; ok = true; }
+        if (!bad && hi - lo < 3 && !(w.gen.castleNear && w.gen.castleNear(x, z, 40))) { c.x = x; c.z = z; ok = true; }
       }
       if (!ok) { c.none = true; return false; }
     }

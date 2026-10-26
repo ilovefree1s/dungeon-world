@@ -124,35 +124,35 @@ export function createGen(seed = 1, flat = false) {
     switch (b) {
       case FOREST: {
         // rolling meadows, a few bluffs
-        let h = 31 + 7 * fbm(nA, x / 150, z / 150, 3) + 1.6 * fbm(nB, x / 40, z / 40, 2);
+        let h = 31 + 4 * fbm(nA, x / 150, z / 150, 3) + 1.0 * fbm(nB, x / 40, z / 40, 2);
         const c = nC(x / 170, z / 170);
-        if (c > 0.3) h += 8 * clamp01((c - 0.3) * 3);
+        if (c > 0.3) h += 4.5 * clamp01((c - 0.3) * 3);
         if (c > 0.42) h = h + (terrace(h, 4) - h) * clamp01((c - 0.42) * 5);
         const lake = nD(x / 140, z / 140); if (lake < -0.45) h -= 14 * clamp01((-0.45 - lake) * 4);
         return h;
       }
       case SNOW: {
         const r = 1 - Math.abs(fbm(nA, x / 190, z / 190, 3)); // ridges
-        let h = 33 + 34 * r * r * r + 4 * fbm(nB, x / 26, z / 26, 2);
+        let h = 33 + 18 * r * r * r + 2.5 * fbm(nB, x / 26, z / 26, 2);
         const c = nC(x / 90, z / 90); if (c > 0.3) h = h + (terrace(h, 5) - h) * clamp01((c - 0.3) * 4);
         const lake = nD(x / 120, z / 120); if (lake < -0.5) h -= 16 * clamp01((-0.5 - lake) * 4);
         return h;
       }
       case DESERT: {
         let h = 28 + 3.2 * Math.abs(nB(x / 38, z / 60)) + 1.5 * nA(x / 90, z / 90);
-        const m = nC(x / 120 + 100, z / 120); if (m > 0.28) h += 14 * clamp01((m - 0.28) * 7); // mesas
+        const m = nC(x / 120 + 100, z / 120); if (m > 0.28) h += 9 * clamp01((m - 0.28) * 7); // mesas
         const o = nD(x / 110, z / 110); if (o < -0.55) h -= 10 * clamp01((-0.55 - o) * 5); // an oasis
         return h;
       }
       case SWAMP: return 23.4 + 2.4 * fbm(nA, x / 34, z / 34, 2) + 1.1 * nB(x / 9, z / 9) + 3 * clamp01(nC(x / 80, z / 80));
       case LAVA: {
-        let h = 28 + 11 * Math.abs(fbm(nA, x / 70, z / 70, 3)) + 1.6 * nB(x / 6, z / 6);
+        let h = 28 + 6 * Math.abs(fbm(nA, x / 70, z / 70, 3)) + 1.0 * nB(x / 6, z / 6);
         const p = nD(x / 60, z / 60); if (p > 0.3) h -= 12 * clamp01((p - 0.3) * 4); // lava pools
-        const s = nC(x / 40, z / 40); if (s > 0.5) h += 10 * clamp01((s - 0.5) * 5); // spikes of rock
+        const s = nC(x / 40, z / 40); if (s > 0.5) h += 5 * clamp01((s - 0.5) * 5); // spikes of rock
         return h;
       }
       case CRYSTAL: {
-        let h = terrace(32 + 18 * fbm(nA, x / 100, z / 100, 3), 4) + 0.6 * nB(x / 12, z / 12);
+        let h = terrace(32 + 9 * fbm(nA, x / 100, z / 100, 3), 4) + 0.6 * nB(x / 12, z / 12);
         const l = nD(x / 120, z / 120); if (l < -0.5) h -= 13 * clamp01((-0.5 - l) * 4);
         return h;
       }
@@ -163,15 +163,44 @@ export function createGen(seed = 1, flat = false) {
   const out = { h: 0, biome: 0, pick: 0, water: 0 };
   // one column: its height (the top solid block's y), the biome, the biome its surface shows
   // (dithered between neighbors at a border), the liquid over it
-  function column(x, z) {
-    if (flat) { out.h = 60; out.hf = 60; out.biome = 0; out.pick = 0; return out; } // (a flat meadow, for tests)
-    const best = weights(x, z);
+  // the land's height before anything is built on it
+  function rawHeight(x, z) {
+    weights(x, z);
     let h = 0, base = 0;
     for (let b = 0; b < 6; b++) if (wts[b] > 0.002) { h += wts[b] * heightOf(b, x, z); base += wts[b] * FLAT_BASE[b]; }
     // plains: broad regions where the land settles to its biome's level, with the gentlest of rolls;
     // the hills and cliffs are what stands between them
-    const plain = clamp01((nW(x / 420 + 7.3, z / 420 + 3.1) + 0.25) * 2.0);
+    const plain = clamp01((nW(x / 420 + 7.3, z / 420 + 3.1) + 0.55) * 2.0);
     if (plain > 0) h += (base + 1.2 * fbm(nB, x / 80, z / 80, 2) - h) * plain;
+    return h;
+  }
+  // ---- castles and forts: about one in two of the 560 x 560 cells of the world has one, on dry land; the ground
+  // under it is leveled to the height at its middle (the same for the worker that builds the land and the page
+  // that builds the castle), and no tree grows on it
+  const CASTLE_CELL = 560, CASTLE_FLAT = 50, CASTLE_EDGE = 78, castles = new Map();
+  function castleIn(i, j) {
+    const k = i + ',' + j;
+    if (castles.has(k)) return castles.get(k);
+    let c = null;
+    if (!flat && !(i === 0 && j === 0) && hash3(i, j, seed, 71) < 0.55) {
+      const x = (i + 0.5) * CASTLE_CELL + (hash3(i, j, seed, 72) - 0.5) * CASTLE_CELL * 0.45, z = (j + 0.5) * CASTLE_CELL + (hash3(i, j, seed, 73) - 0.5) * CASTLE_CELL * 0.45;
+      const h0 = rawHeight(x, z), b = weights(x, z);
+      if (h0 * 2 > SEA + 5) c = { x, z, h0, hf: h0 * 2, biome: b, r: hash3(i, j, seed, 74), k };
+    }
+    castles.set(k, c);
+    return c;
+  }
+  function castleNear(x, z, pad = 0) {
+    const i0 = Math.floor(x / CASTLE_CELL), j0 = Math.floor(z / CASTLE_CELL);
+    for (let j = j0 - 1; j <= j0 + 1; j++) for (let i = i0 - 1; i <= i0 + 1; i++) { const c = castleIn(i, j); if (c && Math.hypot(x - c.x, z - c.z) < CASTLE_EDGE + pad) return c; }
+    return null;
+  }
+  function column(x, z) {
+    if (flat) { out.h = 60; out.hf = 60; out.biome = 0; out.pick = 0; return out; } // (a flat meadow, for tests)
+    const cs = castleNear(x, z);
+    let h = rawHeight(x, z);
+    const best = weights(x, z);
+    if (cs) { const d = Math.hypot(x - cs.x, z - cs.z), t = clamp01((CASTLE_EDGE - d) / (CASTLE_EDGE - CASTLE_FLAT)); h += (cs.h0 - h) * t * t * (3 - 2 * t); }
     out.hf = Math.max(6, Math.min(WH - 20, h * 2)); // (the land's true height, for the low-poly skin)
     h = Math.max(6, Math.min(WH - 20, Math.floor(h * 2)));
     let pick = best;
@@ -431,7 +460,7 @@ export function createGen(seed = 1, flat = false) {
       const lx = tx - ox, lz = tz - oz;
       if (lx < 0 || lz < 0 || lx >= GW || lz >= GW) continue;
       const gi = lz * GW + lx, h = colH[gi], b = colP[gi];
-      if (h <= SEA || flat) continue;
+      if (h <= SEA || flat || castleNear(tx, tz, -14)) continue;
       const [p, kinds] = TREES[b];
       const r0 = hash3(i, j, seed, 43);
       // (fewer trees in the meadows: a slow noise thins the woods)
@@ -514,7 +543,7 @@ const TREE_ID = { oak: 0, birch: 1, pine: 2, cactus: 3, willow: 4, char: 5, spir
       const tx = i * C5 + Math.floor(hash3(i, j, seed, 41) * C5), tz = j * C5 + Math.floor(hash3(i, j, seed, 42) * C5);
       if (tx < ox || tz < oz || tx >= ox + CH || tz >= oz + CH) continue;
       const c = column(tx, tz), h = c.hf + 1, b = c.pick;
-      if (h <= SEA + 1.5) continue;
+      if (h <= SEA + 1.5 || castleNear(tx, tz, -14)) continue;
       const [p, kinds] = POLY_TREES[b];
       const r0 = hash3(i, j, seed, 43);
       const dens = b === FOREST ? p * clamp01(0.45 + nC(tx / 70 + 9, tz / 70) * 1.3) : p;
@@ -545,5 +574,5 @@ const TREE_ID = { oak: 0, birch: 1, pine: 2, cactus: 3, willow: 4, char: 5, spir
     }
     return { cx, cz, poly: true, hf: hfs.slice(), top: top + 2, solid: take(B.solid), glow: take(B.glow), water: take(B.water), trees: Float32Array.from(trees), grass: Float32Array.from(grass) };
   }
-  return { column, chunk, polyChunk, weights: (x, z) => { const b = weights(x, z); return { best: b, w: Array.from(wts) }; }, site: (i, j) => [siteX(i, j), siteZ(i, j)], biomeOfCell };
+  return { column, chunk, polyChunk, castleNear, castleIn, CASTLE_CELL, weights: (x, z) => { const b = weights(x, z); return { best: b, w: Array.from(wts) }; }, site: (i, j) => [siteX(i, j), siteZ(i, j)], biomeOfCell };
 }
