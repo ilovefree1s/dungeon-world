@@ -329,7 +329,7 @@ const ABIL_DESC = {
   BLINK: 'Teleport a short way forward.', NOVA: 'A burst of frost that damages and freezes enemies around you.', METEOR: 'Call down a meteor that crashes into the ground ahead.',
   FIREBALL: 'A heavy ball of fire at your target.', MISSILES: 'Five arcane missiles in quick succession.', 'ICE LANCE': 'A fast shard of ice; deals much more to frozen enemies.',
   CHAIN: 'Lightning that leaps from enemy to enemy.', POLYMORPH: 'Turn your target into a harmless sheep for 8 seconds.', BARRIER: 'A shield that absorbs damage equal to 35% of your health.',
-  ROLL: 'Roll quickly out of harm’s way.', MULTI: 'Loose a fan of arrows at the enemies in front of you.', RAIN: 'A rain of arrows over an area.',
+  ROLL: 'Roll quickly out of harm’s way.', MULTI: 'Three arrows at once: one each at up to three enemies in range, or all three into a lone target.', RAIN: 'A rain of arrows over an area.',
   AIMED: 'A slow, carefully aimed shot that hits very hard.', STING: 'A poisoned arrow that deals damage over 8 seconds.', CONCUSS: 'An arrow that dazes the target and slows it for 6 seconds.',
   'RAPID FIRE': 'Shoot 60% faster for 10 seconds.', TAME: 'Tame a beast to fight at your side as your pet.', WRATH: 'Your pet hits much harder for 10 seconds.',
 };

@@ -174,12 +174,24 @@ export const KITS = [
           sfx('roll');
         } },
       { name: 'MULTI', glyph: '⋔', cd: 6, use(ctx) {
-          const p = ctx.player, from = p.pos.clone(); from.y += 3.6;
-          const dir = ctx.aim(from); faceTo(p, dir); p.castT = 0; p.castKind = 'multi';
-          from.addScaledVector(dir, 1.8);
-          for (let i = -2; i <= 2; i++) {
+          const p = ctx.player, f = p.forged, R = 50;
+          // up to three targets: yours first, then the nearest others in (or near) range; fewer than three and
+          // the spare arrows go to them in turn (one target takes all three), loosed a beat apart
+          const first = target(ctx, R), picks = first ? [first] : [];
+          ctx.monsters.list.filter(m => m !== first && m.hp > 0 && m.pos.distanceTo(p.pos) < R + m.k.r)
+            .sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos)).slice(0, 3 - picks.length).forEach(m => picks.push(m));
+          p.castT = 0; p.castKind = 'multi';
+          if (picks.length) {
+            for (let i = 0; i < 3; i++) { const m = picks[i % picks.length];
+              ctx.later(i * 0.07, () => { if (ctx.monsters.list.includes(m)) { fireAt(ctx, m, ARROW, { speed: 110, arrow: true, mult: 0.8 * (f ? f.dmg : 1) }); sfx('shoot'); } }); }
+            return;
+          }
+          // (nothing near: a fan of three where you look)
+          const from = p.pos.clone(); from.y += 3.6;
+          const dir = ctx.aim(from); faceTo(p, dir); from.addScaledVector(dir, 1.8);
+          for (let i = -1; i <= 1; i++) {
             const a = i * 0.16, d = new V3(dir.x * Math.cos(a) - dir.z * Math.sin(a), dir.y, dir.x * Math.sin(a) + dir.z * Math.cos(a)).normalize();
-            ctx.bolts.fire(from.clone(), d, ARROW, { speed: 96, arrow: true, mult: 0.8 });
+            ctx.bolts.fire(from.clone(), d, ARROW, { speed: 96, arrow: true, mult: 0.8 * (f ? f.dmg : 1) });
           }
           sfx('shoot');
         } },
