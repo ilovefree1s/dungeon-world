@@ -238,6 +238,6 @@ export class Abilities {
   // for the HUD: each slot's name, key and how much of its cooldown is left (0..1)
   // the swing timer: how far the basic attack's time between swings has run (0 ready .. 1 just swung), and the time itself
   swing() { const kit = this.kit(), p = this.ctx.player, t = kit.attack.cdOf ? kit.attack.cdOf(p) : kit.attack.cd; return { left: Math.max(0, this.atkCd / t), time: t }; }
-  slots() { const kit = this.kit(); return kit.abilities.map((a, i) => ({ name: a.name, glyph: a.glyph, left: Math.max(0, this.cd[i] / a.cd) })); }
+  slots() { const kit = this.kit(); return kit.abilities.map((a, i) => ({ name: a.name, glyph: a.glyph, cd: a.cd, left: Math.max(0, this.cd[i] / a.cd) })); }
   reset() { this.cd.fill(0); this.atkCd = 0; this.timers.length = 0; }
 }

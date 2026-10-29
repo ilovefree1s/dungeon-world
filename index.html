@@ -90,6 +90,9 @@ html.locked #cross{display:block}
 #lootAll{margin-top:9px;width:100%;border:0;border-radius:8px;padding:6px;background:rgba(255,255,255,.08);color:var(--gold);font:900 11px var(--body);letter-spacing:.14em;cursor:pointer}
 #lootAll:hover,#lootLeave:hover{background:rgba(255,255,255,.16)}
 #lootTip{position:fixed;z-index:31;width:240px;padding:9px 11px 10px;border-radius:10px;background:rgba(10,8,7,.96);box-shadow:inset 0 0 0 1px var(--rc,var(--line)),0 10px 30px rgba(0,0,0,.6);pointer-events:none;font:700 12px/1.45 var(--body);color:var(--text)}
+#abTip{position:fixed;z-index:31;width:230px;padding:9px 11px 10px;border-radius:10px;background:rgba(10,8,7,.96);box-shadow:inset 0 0 0 1px var(--line),0 10px 30px rgba(0,0,0,.6);pointer-events:none;font:700 12px/1.45 var(--body);color:var(--text)}
+#abTip .tn{font:400 15px var(--display);letter-spacing:.04em;margin-bottom:2px}
+#abTip .tr{font-size:10px;font-weight:900;letter-spacing:.12em;margin-bottom:6px}
 #lootTip .tn{font:400 15px var(--display);letter-spacing:.04em;margin-bottom:2px}
 #lootTip .tr{font-size:10px;font-weight:900;letter-spacing:.16em;margin-bottom:6px}
 #lootTip .tl{color:var(--dim);font-size:11px;margin-bottom:4px}
@@ -287,7 +290,7 @@ html.touchy .keys{display:none}
     <div id="banner"><h1 id="bannerT"></h1><p id="bannerS"></p></div>
     <div id="swing"><i></i><b></b></div>
     <div id="abil"><div class="slot"><b class="g"></b><span class="n"></span><em class="k">1</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">2</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">3</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">4</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">5</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">6</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">7</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">8</em><i class="cd"></i></div><div class="slot"><b class="g"></b><span class="n"></span><em class="k">9</em><i class="cd"></i></div></div>
-    <div id="lootHint" class="chip" style="position:absolute;left:50%;bottom:calc(109px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(90,60,10,.8);color:var(--gold)" hidden>IT DROPPED SOMETHING · CLICK OR F TO LOOK</div>
+    <div id="lootHint" class="chip" style="pointer-events:auto;cursor:pointer;position:absolute;left:50%;bottom:calc(109px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(90,60,10,.8);color:var(--gold)" hidden>IT DROPPED SOMETHING · CLICK OR F TO LOOK</div>
     <div id="hint"><span class="t">Swipe the screen to look around</span><span class="k kc">Drag to look around (right-drag turns you, both buttons walk) · WASD to move · Space to jump · left click targets a monster or loots a fallen one · right click attacks (on a monster: auto-attack) · Tab targets the nearest enemy (again: the next in range) · 1 to 9 for your skills · Esc for the menu</span><span class="k kl">Click the world to look around · WASD to move · Space to jump · left click attacks · 1, 2, 3 (or right click, Q, E) for your abilities · Esc for the menu</span></div>
     <div id="dbg" hidden></div>
   </div>
@@ -361,6 +364,7 @@ html.touchy .keys{display:none}
     <button type="button" id="lootAll">TAKE ALL</button>
   </div>
   <div id="lootTip" hidden></div>
+  <div id="abTip" hidden></div>
   <div id="char" class="scrim" hidden>
     <div class="panel wow">
       <div class="wtabs"><button type="button" id="tabChar" class="on">CHARACTER <em>C</em></button><button type="button" id="tabBags">BAGS <em>B</em></button><button type="button" id="csClose" class="x" aria-label="Close">×</button></div>

@@ -201,7 +201,10 @@ function showLoot() {
     if (isUpgrade(e)) el.classList.add('up');
     el.addEventListener('mouseenter', () => { const t = $('lootTip'); t.innerHTML = tipFor(e); t.style.setProperty('--rc', rarityOfIt(e.it).color); t.hidden = false; const r = el.getBoundingClientRect(); t.style.left = Math.min(innerWidth - 250, r.right + 10) + 'px'; t.style.top = Math.max(8, Math.min(innerHeight - t.offsetHeight - 8, r.top - 6)) + 'px'; });
     el.addEventListener('mouseleave', () => { $('lootTip').hidden = true; });
-    el.addEventListener('click', ev => { if (!lootBody) return; const use = ev.shiftKey && (e.kind === 'weapon' || e.kind === 'armor'); if (takeOne(e, use)) { bodies.took(lootBody); sfx(use ? 'rare' : 'pickup'); $('lootTip').hidden = true; showLoot(); } });
+    el.addEventListener('pointerdown', ev => { el._touch = ev.pointerType !== 'mouse'; });
+    el.addEventListener('click', ev => { if (!lootBody) return;
+      // (on a touch screen the first tap shows what it is, the second takes it)
+      if (el._touch && !el._armed) { for (const o of $('lootList').children) o._armed = false; el._armed = true; el.dispatchEvent(new Event('mouseenter')); $('lootTip').innerHTML += '<div class="th" style="color:var(--gold)">TAP AGAIN TO TAKE</div>'; return; } const use = ev.shiftKey && (e.kind === 'weapon' || e.kind === 'armor'); if (takeOne(e, use)) { bodies.took(lootBody); sfx(use ? 'rare' : 'pickup'); $('lootTip').hidden = true; showLoot(); } });
     $('lootList').appendChild(el);
   });
   $('lootAll').hidden = E.length < 2;
@@ -230,7 +233,10 @@ function heroCombat(dt, inp, frozen) {
   if (lootBody && (lootBody.pos.distanceTo(player.pos) > 20 || !bodies.list.includes(lootBody))) closeLoot();
   // a body in your sights: a click or F looks at what it dropped instead of swinging
   bodies.update(dt, monsters.list.some(m => m.state === 'chase' && m.pos.distanceTo(player.pos) < 16));
-  $('lootHint').hidden = !bodies.target || input.cursorMode;
+  const nearB = lootBody ? null : bodies.nearest();
+  $('lootHint').hidden = !nearB;
+  if (nearB) { const t = IS_TOUCH ? 'IT DROPPED SOMETHING · TAP HERE TO LOOT' : 'IT DROPPED SOMETHING · CLICK IT OR PRESS F'; if ($('lootHint').textContent !== t) $('lootHint').textContent = t; }
+  if (inp.useEdge && !lootBody && nearB) { inp.useEdge = false; openLoot(nearB); return; }
   // TAB: the nearest enemy; pressed again, the next one in range not yet picked, round and round
   if (inp.tabEdge) { inp.tabEdge = false; tabTarget(); }
   if (!input.cursorMode && bodies.target && (inp.atkEdge || inp.useEdge)) { inp.atkEdge = false; inp.useEdge = false; openLoot(bodies.target); return; }
@@ -271,8 +277,6 @@ function heroCombat(dt, inp, frozen) {
       if (d > reach) { inp.atk = false; if (abilities.atkCd <= 0) sayError('OUT OF RANGE'); }
       else player.aimFace = Math.atan2(m.pos.x - p.x, m.pos.z - p.z);
     }
-    // F looks at the loot you're near, as before
-    if (bodies.target && inp.useEdge) { inp.useEdge = false; openLoot(bodies.target); return; }
   }
   inp.useEdge = false;
   abilities.update(dt, inp);
@@ -317,6 +321,36 @@ let biomeNow = -1, biomeSeen = -1, biomeT = 0, bannerT = 0;
 function banner(t, s) { $('bannerT').textContent = t; $('bannerS').textContent = s; $('banner').classList.add('on'); bannerT = 3.2; }
 const compass = $('compass');
 const abSlots = [...document.querySelectorAll('#abil .slot')];
+// what each skill does, for the tooltip over its button
+const ABIL_DESC = {
+  CHARGE: 'Dash forward, striking every enemy in your path.', WHIRL: 'Spin with your weapon, hitting every enemy around you.', SLAM: 'Leap and slam the ground, damaging and knocking back enemies nearby.',
+  HEROIC: 'Your next swing (within 8 seconds) hits for 2.4 times the damage.', REND: 'A wounding strike that makes your target bleed for 6 seconds.', THROW: 'Hurl an axe at a distant target.',
+  BLOCK: 'Raise your shield: take far less damage for 5 seconds.', SHOUT: 'A battle cry: deal 25% more damage for 12 seconds.', '2ND WIND': 'Recover 5% of your health every second for 8 seconds.',
+  BLINK: 'Teleport a short way forward.', NOVA: 'A burst of frost that damages and freezes enemies around you.', METEOR: 'Call down a meteor that crashes into the ground ahead.',
+  FIREBALL: 'A heavy ball of fire at your target.', MISSILES: 'Five arcane missiles in quick succession.', 'ICE LANCE': 'A fast shard of ice; deals much more to frozen enemies.',
+  CHAIN: 'Lightning that leaps from enemy to enemy.', POLYMORPH: 'Turn your target into a harmless sheep for 8 seconds.', BARRIER: 'A shield that absorbs damage equal to 35% of your health.',
+  ROLL: 'Roll quickly out of harm’s way.', MULTI: 'Loose a fan of arrows at the enemies in front of you.', RAIN: 'A rain of arrows over an area.',
+  AIMED: 'A slow, carefully aimed shot that hits very hard.', STING: 'A poisoned arrow that deals damage over 8 seconds.', CONCUSS: 'An arrow that dazes the target and slows it for 6 seconds.',
+  'RAPID FIRE': 'Shoot 60% faster for 10 seconds.', TAME: 'Tame a beast to fight at your side as your pet.', WRATH: 'Your pet hits much harder for 10 seconds.',
+};
+abSlots.forEach((el, i) => {
+  const show = () => {
+    const sl = abilities.slots()[i]; if (!sl) return;
+    const t = $('abTip');
+    t.innerHTML = `<div class="tn" style="color:var(--gold)">${sl.name}</div><div class="tr" style="color:var(--dim)">KEY ${i + 1} · COOLDOWN ${sl.cd}s${sl.left > 0 ? ' · READY IN ' + Math.ceil(sl.left * sl.cd) + 's' : ''}</div><div>${ABIL_DESC[sl.name] || ''}</div>`;
+    t.hidden = false;
+    const r = el.getBoundingClientRect(), w = t.offsetWidth, h = t.offsetHeight;
+    t.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+    t.style.top = Math.max(8, r.top - h - 10) + 'px';
+  };
+  el.addEventListener('mouseenter', e => { if (!IS_TOUCH) show(); });
+  el.addEventListener('mouseleave', () => { $('abTip').hidden = true; });
+  // (touch: hold a skill for half a second to read it)
+  let hold = 0;
+  el.addEventListener('touchstart', () => { clearTimeout(hold); hold = setTimeout(show, 500); }, { passive: true });
+  for (const ev of ['touchend', 'touchcancel']) el.addEventListener(ev, () => { clearTimeout(hold); setTimeout(() => { $('abTip').hidden = true; }, 1200); }, { passive: true });
+});
+$('lootHint').addEventListener('click', () => { const b = bodies.nearest(); if (b && UI.state === 'play') openLoot(b); });
 const marks = [['N', 0], ['E', 90], ['S', 180], ['W', 270], ['·', 45], ['·', 135], ['·', 225], ['·', 315]];
 compass.innerHTML = marks.map(([t]) => `<span class="${t === 'N' ? 'n' : ''}">${t}</span>`).join('') + '<span class="tw" title="the Tower">◆</span>';
 const cspans = [...compass.children];

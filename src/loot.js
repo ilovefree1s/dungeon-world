@@ -96,12 +96,19 @@ export class Bodies {
     const f = (h / 2) / Math.tan(camera.fov * Math.PI / 360), p = this.player.pos;
     let best = null, bd = 1e9;
     for (const b of this.list) {
-      if (!hasLoot(b) || b.pos.distanceTo(p) > REACH + 4) continue;
-      tmp.set(b.pos.x, b.pos.y + 1.2, b.pos.z); const dist = tmp.distanceTo(camera.position);
+      if (!hasLoot(b) || b.pos.distanceTo(p) > REACH + 8) continue;
+      // (aimed at the body where it lies, with a generous ring round it)
+      tmp.set(b.pos.x, b.pos.y + 0.6, b.pos.z); const dist = tmp.distanceTo(camera.position);
       tmp.project(camera); if (tmp.z > 1) continue;
-      const sx = (tmp.x + 1) / 2 * w, sy = (1 - tmp.y) / 2 * h, r = Math.max(16, 2.2 * f / dist);
+      const sx = (tmp.x + 1) / 2 * w, sy = (1 - tmp.y) / 2 * h, r = Math.max(34, 3.2 * f / dist);
       if (Math.hypot(sx - x, sy - y) < r && dist < bd) { bd = dist; best = b; }
     }
+    return best;
+  }
+  // the nearest body with loot within reach, wherever you look (F, the touch loot button)
+  nearest(range = REACH + 4) {
+    const p = this.player.pos; let best = null, bd = range;
+    for (const b of this.list) { if (!hasLoot(b)) continue; const d = b.pos.distanceTo(p); if (d < bd) { bd = d; best = b; } }
     return best;
   }
   // what the loot panel shows for a drop
